@@ -26,3 +26,25 @@ def tag_session(session):                                    # session = its bun
         return "failed"                                      # tried but never connected -> failed
 
     return "no_attempt"                                      # never even tried -> no_attempt
+
+
+def failure_reason(session, tag):                            # WHY did a failed session fail? Checked top to bottom, first match wins
+    if tag != "failed":                                      # only failed sessions get a reason
+        return None                                          # connected / no_attempt -> no reason
+
+    phase = last_failure_phase(session)                      # did the app log a connection error, and when?
+    if phase == "pre-connect":                               # an error before connecting started
+        return "setup_error"                                 # -> the session could not even be set up
+    if phase == "connecting":                                # an error while connecting
+        return "error_while_connecting"                      # -> it broke during connecting
+    if phase is not None:                                    # an error with some other phase (none today, but just in case)
+        return "error_other"                                 # -> an error, phase not one we know
+
+    if video_failed(session):                                # no error logged, but the video connection went to "failed"
+        return "video_connection_failed"                     # -> the video link itself broke
+
+    names = session["event_names"]                           # its event names
+    if "host_connected" not in names or "client_connected" not in names:   # the game machine or the player never joined
+        return "someone_never_joined"                        # -> nobody to connect to
+
+    return "no_video"                                        # both joined, no error, but video never started

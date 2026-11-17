@@ -96,16 +96,18 @@ def tag_new_sessions(conn, run_id, limit=None):              # 4. tag batches un
         if not sessions:                                     # nothing left to tag?
             return total                                     # then this round is done; hand back the count
 
-        session_tags = {}                                    # empty box for this batch's results: {session_id: tag}
+        results = {}                                         # empty box for this batch: {session_id: {"tag": ..., "reason": ...}}
 
         for session_id, session in sessions.items():         # go through the sessions one by one
-            session_tags[session_id] = tags.tag_session(session)   # work out its tag and write it next to its ID
+            tag = tags.tag_session(session)                  # connected / failed / no_attempt
+            reason = tags.failure_reason(session, tag)       # why it failed (None if it didn't fail)
+            results[session_id] = {"tag": tag, "reason": reason}   # write both next to its ID
 
-        store.save_tags(conn, session_tags, run_id)          # save the whole batch in one call, marked with this run's ID
+        store.save_tags(conn, results, run_id)               # save the whole batch in one call, marked with this run's ID
         conn.commit()                                        # make it permanent (safe even if the program crashes after this)
 
-        total += len(session_tags)                           # add this batch's size to the round's total
-        print(f"Saved {len(session_tags)} tags (total {total})")   # e.g. "Saved 200 tags (total 400)"
+        total += len(results)                                # add this batch's size to the round's total
+        print(f"Saved {len(results)} tags (total {total})")  # e.g. "Saved 200 tags (total 400)"
 
 
 def show_command(args):                                      # 5. answer a question, e.g. "show status"

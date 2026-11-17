@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS session_tags (                                    -- one row per tagged session (the results + the pipeline's memory)
     session_id UUID PRIMARY KEY,                                             -- which session; primary key = one row per session
     tag STRING NOT NULL CHECK (tag IN ('connected', 'failed', 'no_attempt')), -- the result; only these 3 words allowed
+    reason STRING NULL CHECK (reason IN ('setup_error', 'error_while_connecting', 'error_other',
+                                         'video_connection_failed', 'someone_never_joined', 'no_video')),   -- why it failed (empty if it didn't)
     run_id UUID NULL                                                         -- which run tagged it (links to pipeline_runs)
 );
 
