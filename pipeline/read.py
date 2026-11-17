@@ -2,20 +2,23 @@
 
 EVENTS_SQL = """
 WITH batch AS (                                              -- first, make a small list called "batch"
-    SELECT DISTINCT e.session_id                             -- of session IDs, each one only once
+    SELECT e.session_id,                                     -- of session IDs...
+           min(e.recorded_at) AS ended_at                    -- ...each with the moment it first ended
     FROM session_telemetry_events e                          -- from the events table, nicknamed e
     WHERE e.event_type = 'session_ended'                     -- only sessions that have ended (their result is final)
       AND NOT EXISTS (                                       -- and skip any session that...
           SELECT 1 FROM session_tags t WHERE t.session_id = e.session_id   -- ...already has a row in session_tags
       )
+    GROUP BY e.session_id                                    -- one row per session (a session can end twice; min takes the first)
     ORDER BY e.session_id                                    -- in a fixed order, so it is predictable
     LIMIT %(limit)s                                          -- only the first N (Python fills in the batch size)
 )
-SELECT session_id,                                           -- for each session in the batch...
-       array_agg(coalesce(payload->>'event', event_type::STRING) ORDER BY recorded_at) AS event_names   -- ...all its event names in one list, in time order
-FROM session_telemetry_events                                -- from the events table
-WHERE session_id IN (SELECT session_id FROM batch)           -- only the sessions chosen above
-GROUP BY session_id                                          -- one row per session
+SELECT e.session_id,                                         -- for each session in the batch...
+       array_agg(coalesce(e.payload->>'event', e.event_type::STRING) ORDER BY e.recorded_at) AS event_names   -- ...all its event names in one list, in time order
+FROM session_telemetry_events e                              -- from the events table
+JOIN batch b ON b.session_id = e.session_id                  -- only the sessions chosen above (and bring along their ended_at)
+WHERE e.recorded_at <= b.ended_at                            -- only events up to the moment it ended (later ones are app retries)
+GROUP BY e.session_id                                        -- one row per session
 """
 
 
