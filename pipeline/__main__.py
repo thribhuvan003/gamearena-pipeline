@@ -12,7 +12,7 @@ from pipeline import store                                   # saves the tags
 from pipeline import tags                                    # decides each session's tag
 
 
-def tag_new_sessions(conn, limit=None):                      # ONE ROUND: tag batches until nothing is left (or the limit is reached)
+def tag_new_sessions(conn, run_id, limit=None):              # ONE ROUND: tag batches until nothing is left (or the limit is reached)
     total = 0                                                # how many sessions this round tagged so far
 
     while True:                                              # repeat until there is nothing left (the returns below)
@@ -34,7 +34,7 @@ def tag_new_sessions(conn, limit=None):                      # ONE ROUND: tag ba
         for session_id, event_names in sessions.items():           # go through the sessions one by one
             session_tags[session_id] = tags.tag_session(event_names)   # work out its tag and write it next to its ID
 
-        store.save_tags(conn, session_tags)                  # save the whole batch in one call
+        store.save_tags(conn, session_tags, run_id)          # save the whole batch in one call, marked with this run's ID
 
         conn.commit()                                        # make it permanent (safe even if the program crashes after this)
 
@@ -60,7 +60,11 @@ def main():                                                  # where the program
         while True:                                          # keep running round after round
             try:                                             # watch for database problems in this round
                 with db.connect() as conn:                   # open the connection; it closes itself after
-                    total = tag_new_sessions(conn, args.limit)   # do one round (stops early if --limit was given)
+                    run_id = store.start_run(conn)           # job diary: write "running", get this run's ID
+                    conn.commit()                            # save that row now, so it's visible while the run works
+                    total = tag_new_sessions(conn, run_id, args.limit)   # do one round (stops early if --limit was given)
+                    store.finish_run(conn, run_id, "ok", total)          # job diary: write "ok" and how many were tagged
+                    conn.commit()                            # save that
 
                 print(f"Done. {total} sessions tagged this round")   # e.g. "Done. 6501 sessions tagged this round"
 
