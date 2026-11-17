@@ -91,15 +91,15 @@ def tag_new_sessions(conn, run_id, limit=None):              # 4. tag batches un
                 return total                                 # then stop this round
             batch_size = min(batch_size, remaining)          # never take more than what's left (e.g. 20, not 200)
 
-        sessions = read.read_sessions(conn, batch_size)      # next untagged ended sessions: {session_id: [event_names]}
+        sessions = read.read_sessions(conn, batch_size)      # next untagged ended sessions: {session_id: bundle of facts}
 
         if not sessions:                                     # nothing left to tag?
             return total                                     # then this round is done; hand back the count
 
         session_tags = {}                                    # empty box for this batch's results: {session_id: tag}
 
-        for session_id, event_names in sessions.items():     # go through the sessions one by one
-            session_tags[session_id] = tags.tag_session(event_names)   # work out its tag and write it next to its ID
+        for session_id, session in sessions.items():         # go through the sessions one by one
+            session_tags[session_id] = tags.tag_session(session)   # work out its tag and write it next to its ID
 
         store.save_tags(conn, session_tags, run_id)          # save the whole batch in one call, marked with this run's ID
         conn.commit()                                        # make it permanent (safe even if the program crashes after this)
