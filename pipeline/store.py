@@ -1,8 +1,8 @@
 # store.py: saves the tags. One database call per batch, however many sessions it has.
 
 SAVE_SQL = """
-UPSERT INTO session_tags (session_id, tag, tagged_at)        -- insert each row, or replace it if that session is already there
-SELECT session_id, tag, now()                                -- the session, its tag, and the time right now
+UPSERT INTO session_tags (session_id, tag)                   -- insert each row, or replace it if that session is already there
+SELECT session_id, tag                                       -- the session and its tag
 FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[]) AS t(session_id, tag)   -- turn the 2 lists into rows: (id1, tag1), (id2, tag2)...
 """
 
