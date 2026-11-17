@@ -21,8 +21,8 @@ def tag_new_sessions(conn):
 
         session_tags = {}
 
-        for session_id, events in sessions.items():
-            session_tags[session_id] = tags.tag_session(events)
+        for session_id, steps in sessions.items():
+            session_tags[session_id] = tags.tag_session(steps)
 
         store.save_tags(conn, session_tags)
 

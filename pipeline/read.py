@@ -9,11 +9,11 @@ WITH batch AS (
     ORDER BY e.session_id
     LIMIT %(limit)s
 )
-SELECT session_id, recorded_at, event_type,
-       payload->>'event' AS step
+SELECT session_id,
+       array_agg(payload->>'event') AS steps
 FROM session_telemetry_events
 WHERE session_id IN (SELECT session_id FROM batch)
-ORDER BY session_id, recorded_at
+GROUP BY session_id
 """
 
 
@@ -23,21 +23,7 @@ def read_sessions(conn, limit):
         raise ValueError("Batch size must be positive")
 
     with conn.cursor() as cursor:
-        parameters = {"limit": limit}
-
-        cursor.execute(EVENTS_SQL, parameters)
-
+        cursor.execute(EVENTS_SQL, {"limit": limit})
         rows = cursor.fetchall()
 
-    sessions = {}
-
-    for session_id, recorded_at, event_type, step in rows:
-
-        if session_id not in sessions:
-            sessions[session_id] = []
-
-        event = (recorded_at, event_type, step)
-
-        sessions[session_id].append(event)
-
-    return sessions
+    return dict(rows)

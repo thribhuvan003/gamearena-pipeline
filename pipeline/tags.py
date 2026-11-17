@@ -1,6 +1,4 @@
-def tag_session(events):
-    steps = [step for recorded_at, event_type, step in events]
-
+def tag_session(steps):
     if "pipeline.connect.success" in steps:
         return "connected"
 
