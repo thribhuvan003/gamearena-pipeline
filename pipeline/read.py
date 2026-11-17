@@ -12,7 +12,7 @@ WITH batch AS (                                              -- first, make a sm
     LIMIT %(limit)s                                          -- only the first N (Python fills in the batch size)
 )
 SELECT session_id,                                           -- for each session in the batch...
-       array_agg(payload->>'event' ORDER BY recorded_at) AS steps   -- ...all its step names in one list, in time order
+       array_agg(coalesce(payload->>'event', event_type::STRING) ORDER BY recorded_at) AS event_names   -- ...all its event names in one list, in time order
 FROM session_telemetry_events                                -- from the events table
 WHERE session_id IN (SELECT session_id FROM batch)           -- only the sessions chosen above
 GROUP BY session_id                                          -- one row per session
@@ -26,6 +26,6 @@ def read_sessions(conn, limit):                              # conn = open datab
 
     with conn.cursor() as cursor:                            # a cursor sends one question and holds the answer; closes itself after
         cursor.execute(EVENTS_SQL, {"limit": limit})         # send the SQL above, filling the blank with the batch size
-        rows = cursor.fetchall()                             # all answer rows: [(session_id, [steps]), ...]
+        rows = cursor.fetchall()                             # all answer rows: [(session_id, [event_names]), ...]
 
-    return dict(rows)                                        # turn the rows into {session_id: [steps]} and hand it back
+    return dict(rows)                                        # turn the rows into {session_id: [event_names]} and hand it back
