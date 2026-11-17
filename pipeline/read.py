@@ -10,7 +10,7 @@ WITH batch AS (
     LIMIT %(limit)s
 )
 SELECT session_id,
-       array_agg(payload->>'event') AS steps
+       array_agg(payload->>'event' ORDER BY recorded_at) AS steps
 FROM session_telemetry_events
 WHERE session_id IN (SELECT session_id FROM batch)
 GROUP BY session_id
