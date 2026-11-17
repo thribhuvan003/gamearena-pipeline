@@ -1,6 +1,7 @@
-# __main__.py: the start of the program. Runs when you type: python -m pipeline
+# __main__.py: the start of the program. The functions below are in the order they run:
+# main -> run_command -> run_one_round -> tag_new_sessions, or main -> show_command.
 
-import argparse                                              # reads options you type, like --once
+import argparse                                              # reads the command you type, like: run --limit 20
 import time                                                  # lets us wait (sleep) between rounds
 
 import psycopg                                               # the database library (here only to recognise its errors)
@@ -8,11 +9,77 @@ import psycopg                                               # the database libr
 from pipeline import config                                  # settings: batch size, wait time, database
 from pipeline import db                                      # opens the database connection
 from pipeline import read                                    # reads the next batch of sessions
-from pipeline import store                                   # saves the tags
+from pipeline import show                                    # answers questions (show status, ...)
+from pipeline import store                                   # saves tags and writes the job diary
 from pipeline import tags                                    # decides each session's tag
 
 
-def tag_new_sessions(conn, run_id, limit=None):              # ONE ROUND: tag batches until nothing is left (or the limit is reached)
+def main():                                                  # 1. read the command, then do it
+    parser = argparse.ArgumentParser(prog="python -m pipeline", description="Tag GameArena sessions and answer questions about them.")   # a reader for the command you typed
+    commands = parser.add_subparsers(dest="command", required=True)   # the first word must be a command: run or show
+
+    run_parser = commands.add_parser("run", help="tag sessions")   # command 1: run
+    run_parser.add_argument("--once", action="store_true", help="tag what is waiting, then exit")   # option: --once
+    run_parser.add_argument("--limit", type=int, help="tag at most N sessions, then exit")         # option: --limit 20
+
+    show_parser = commands.add_parser("show", help="answer a question; changes nothing")          # command 2: show
+    show_parser.add_argument("question", choices=sorted(show.QUESTIONS), help="what to show")    # e.g. status
+
+    args = parser.parse_args()                               # read what was typed, e.g. args.command = "run", args.limit = 20
+
+    if args.command == "run":                                # "python -m pipeline run ..."
+        run_command(args)                                    # -> do the work
+    else:                                                    # "python -m pipeline show ..."
+        show_command(args)                                   # -> answer the question
+
+
+def run_command(args):                                       # 2. keep doing rounds until told to stop
+    print(f"Pipeline started: database {config.DB_NAME} on {config.DB_HOST}:{config.DB_PORT}, batch size {config.BATCH_SIZE}")   # what it's connected to
+
+    try:                                                     # watch for Ctrl+C anywhere in the loop below
+        while True:                                          # keep running round after round
+            try:                                             # watch for database problems in this round
+                with db.connect() as conn:                   # open the connection; it closes itself after
+                    total = run_one_round(conn, args.limit)  # do one round, recorded in the job diary
+
+                print(f"Done. {total} sessions tagged this round")   # e.g. "Done. 20 sessions tagged this round"
+
+            except psycopg.OperationalError as error:        # the database could not be reached
+                if args.once or args.limit is not None:      # a one-off run...
+                    raise                                    # ...stops and shows the error
+
+                print(f"Database not reachable, will try again: {error}")   # otherwise report it and try next round
+
+            if args.once or args.limit is not None:          # --once or --limit means: just one round
+                break                                        # stop
+
+            print(f"Waiting {config.WAIT_SECONDS} s for new sessions (Ctrl+C to stop)")   # say we're waiting
+            time.sleep(config.WAIT_SECONDS)                  # wait, then the loop starts again
+
+    except KeyboardInterrupt:                                # you pressed Ctrl+C
+        print("Stopped with Ctrl+C. Saved batches are kept; an unfinished batch was not saved.")
+
+    print("Pipeline stopped")                                # always the last line
+
+
+def run_one_round(conn, limit):                              # 3. one round, written in the job diary from start to finish
+    run_id = store.start_run(conn)                           # diary: write "running", get this run's ID
+    conn.commit()                                            # save that row now, so it's visible while the run works
+
+    try:                                                     # if anything breaks during the round...
+        total = tag_new_sessions(conn, run_id, limit)        # tag batches until done (or the limit)
+    except Exception as error:                               # ...we land here
+        conn.rollback()                                      # throw away the unfinished batch (finished batches stay saved)
+        store.finish_run(conn, run_id, "failed", f"{type(error).__name__}: {error}")   # diary: "failed" + what went wrong
+        conn.commit()                                        # save that diary line
+        raise                                                # then let the error carry on, so it is shown
+
+    store.finish_run(conn, run_id, "ok")                     # diary: "ok" + how many this run saved
+    conn.commit()                                            # save that
+    return total                                             # hand back how many were tagged
+
+
+def tag_new_sessions(conn, run_id, limit=None):              # 4. tag batches until nothing is left (or the limit is reached)
     total = 0                                                # how many sessions this round tagged so far
 
     while True:                                              # repeat until there is nothing left (the returns below)
@@ -31,60 +98,19 @@ def tag_new_sessions(conn, run_id, limit=None):              # ONE ROUND: tag ba
 
         session_tags = {}                                    # empty box for this batch's results: {session_id: tag}
 
-        for session_id, event_names in sessions.items():           # go through the sessions one by one
+        for session_id, event_names in sessions.items():     # go through the sessions one by one
             session_tags[session_id] = tags.tag_session(event_names)   # work out its tag and write it next to its ID
 
         store.save_tags(conn, session_tags, run_id)          # save the whole batch in one call, marked with this run's ID
-
         conn.commit()                                        # make it permanent (safe even if the program crashes after this)
 
         total += len(session_tags)                           # add this batch's size to the round's total
-
         print(f"Saved {len(session_tags)} tags (total {total})")   # e.g. "Saved 200 tags (total 400)"
 
 
-def main():                                                  # where the program starts
-    parser = argparse.ArgumentParser(prog="python -m pipeline", description="Tag ended sessions as connected, failed or no_attempt.")   # a reader for the command you typed
-    parser.add_argument("--once", action="store_true", help="tag what is there, then exit")   # option: --once (typed = True)
-    parser.add_argument("--limit", type=int, help="tag at most N sessions, then exit")     # option: --limit 20 (a number)
-    args = parser.parse_args()                               # read what was typed: args.once (True/False), args.limit (a number or None)
-
-    print("Pipeline started")                                # show that it started
-
-    print(f"Database: {config.DB_NAME}")                     # show which database it uses
-    print(f"Host: {config.DB_HOST}")                         # where that database is
-    print(f"Port: {config.DB_PORT}")                         # which door
-    print(f"Batch size: {config.BATCH_SIZE}")                # how many sessions per batch
-
-    try:                                                     # watch for Ctrl+C anywhere in the loop below
-        while True:                                          # keep running round after round
-            try:                                             # watch for database problems in this round
-                with db.connect() as conn:                   # open the connection; it closes itself after
-                    run_id = store.start_run(conn)           # job diary: write "running", get this run's ID
-                    conn.commit()                            # save that row now, so it's visible while the run works
-                    total = tag_new_sessions(conn, run_id, args.limit)   # do one round (stops early if --limit was given)
-                    store.finish_run(conn, run_id, "ok", total)          # job diary: write "ok" and how many were tagged
-                    conn.commit()                            # save that
-
-                print(f"Done. {total} sessions tagged this round")   # e.g. "Done. 6501 sessions tagged this round"
-
-            except psycopg.OperationalError as error:        # the database could not be reached
-                if args.once:                                # with --once...
-                    raise                                    # ...stop and show the error
-
-                print(f"Database not reachable, will try again: {error}")   # otherwise report it and try next round
-
-            if args.once or args.limit is not None:          # with --once or --limit...
-                break                                        # ...stop after one round
-
-            print(f"Waiting {config.WAIT_SECONDS} s for new sessions (Ctrl+C to stop)")   # say we're waiting
-
-            time.sleep(config.WAIT_SECONDS)                  # wait 30 seconds, then the loop starts again
-
-    except KeyboardInterrupt:                                # you pressed Ctrl+C
-        print("Stopped with Ctrl+C. Saved batches are kept; an unfinished batch was not saved.")
-
-    print("Pipeline stopped")                                # always the last line
+def show_command(args):                                      # 5. answer a question, e.g. "show status"
+    with db.connect() as conn:                               # open the connection; it closes itself after
+        show.QUESTIONS[args.question](conn)                  # find the function for that question and run it
 
 
 if __name__ == "__main__":                                   # only when you start this file directly...

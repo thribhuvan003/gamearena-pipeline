@@ -36,17 +36,16 @@ FINISH_RUN_SQL = """
 UPDATE pipeline_runs                                         -- change an existing row in the job diary
 SET finished_at = now(),                                     -- the finish time = right now
     status = %(status)s,                                     -- 'ok' or 'failed'
-    sessions_tagged = %(sessions_tagged)s,                   -- how many sessions this run processed
+    sessions_tagged = (SELECT count(*) FROM session_tags WHERE run_id = %(run_id)s),   -- count what this run really saved
     error = %(error)s                                        -- what went wrong (empty if it went fine)
 WHERE run_id = %(run_id)s                                    -- only the row of THIS run
 """
 
 
-def finish_run(conn, run_id, status, sessions_tagged, error=None):   # write "the run has ended" in the job diary
-    parameters = {                                           # fill the 4 blanks in the SQL:
+def finish_run(conn, run_id, status, error=None):            # write "the run has ended" in the job diary
+    parameters = {                                           # fill the 3 blanks in the SQL:
         "run_id": run_id,                                    # which row (the ID start_run gave back)
         "status": status,                                    # 'ok' or 'failed'
-        "sessions_tagged": sessions_tagged,                  # how many sessions it tagged
         "error": error,                                      # the error text, or None
     }
     conn.execute(FINISH_RUN_SQL, parameters)                 # run the SQL
