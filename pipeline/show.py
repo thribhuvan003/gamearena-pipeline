@@ -16,7 +16,7 @@ WHERE e.event_type = 'session_ended'                         -- ...have ended...
 
 LAST_RUNS_SQL = """
 SELECT started_at, status, sessions_tagged, error            -- when, how it went, how many, what went wrong
-FROM pipeline_runs                                           -- from the job diary
+FROM pipeline_runs                                           -- from the run history
 ORDER BY started_at DESC                                     -- newest first
 LIMIT 5                                                      -- only the last 5
 """
@@ -31,7 +31,7 @@ def show_status(conn):                                       # "what do we have 
     waiting = conn.execute(WAITING_SQL).fetchone()[0]        # how many ended sessions still have no tag
     print(f"Waiting to be tagged: {waiting:,}")              # e.g. "Waiting to be tagged: 0"
 
-    print("Last runs:")                                      # heading for the job diary
+    print("Last runs:")                                      # heading for the run history
     for started_at, status, sessions_tagged, error in conn.execute(LAST_RUNS_SQL).fetchall():   # each of the last 5 runs
         line = f"  {started_at:%Y-%m-%d %H:%M}  {status:<7} {sessions_tagged:,} sessions"   # e.g. "2026-11-17 14:12  ok  20 sessions"
         print(line + (f"  ({error})" if error else ""))      # add the error text only if the run failed

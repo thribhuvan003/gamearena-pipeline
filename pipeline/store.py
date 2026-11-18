@@ -23,18 +23,18 @@ def save_tags(conn, results, run_id):                        # results = {sessio
 
 
 START_RUN_SQL = """
-INSERT INTO pipeline_runs (status)                           -- add one new row to the job diary, setting only its status
+INSERT INTO pipeline_runs (status)                           -- add one new row to the run history, setting only its status
 VALUES ('running')                                           -- the status is 'running' (= picked up, working now)
 RETURNING run_id                                             -- give back the new row's ID (made up by the database)
 """
 
 
-def start_run(conn):                                         # write "a run has started" in the job diary
+def start_run(conn):                                         # write "a run has started" in the run history
     return conn.execute(START_RUN_SQL).fetchone()[0]         # run the SQL, take the first row's first value = the run_id
 
 
 FINISH_RUN_SQL = """
-UPDATE pipeline_runs                                         -- change an existing row in the job diary
+UPDATE pipeline_runs                                         -- change an existing row in the run history
 SET finished_at = now(),                                     -- the finish time = right now
     status = %(status)s,                                     -- 'ok' or 'failed'
     sessions_tagged = (SELECT count(*) FROM session_tags WHERE run_id = %(run_id)s),   -- count what this run really saved
@@ -43,7 +43,7 @@ WHERE run_id = %(run_id)s                                    -- only the row of 
 """
 
 
-def finish_run(conn, run_id, status, error=None):            # write "the run has ended" in the job diary
+def finish_run(conn, run_id, status, error=None):            # write "the run has ended" in the run history
     parameters = {                                           # fill the 3 blanks in the SQL:
         "run_id": run_id,                                    # which row (the ID start_run gave back)
         "status": status,                                    # 'ok' or 'failed'

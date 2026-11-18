@@ -10,7 +10,7 @@ from pipeline import config                                  # settings: batch s
 from pipeline import db                                      # opens the database connection
 from pipeline import read                                    # reads the next batch of sessions
 from pipeline import show                                    # answers questions (show status, ...)
-from pipeline import store                                   # saves tags and writes the job diary
+from pipeline import store                                   # saves tags and writes the run history
 from pipeline import tags                                    # decides each session's tag
 
 
@@ -40,7 +40,7 @@ def run_command(args):                                       # 2. keep doing rou
         while True:                                          # keep running round after round
             try:                                             # watch for database problems in this round
                 with db.connect() as conn:                   # open the connection; it closes itself after
-                    total = run_one_round(conn, args.limit)  # do one round, recorded in the job diary
+                    total = run_one_round(conn, args.limit)  # do one round, recorded in the run history
 
                 print(f"Done. {total} sessions tagged this round")   # e.g. "Done. 20 sessions tagged this round"
 
@@ -62,19 +62,19 @@ def run_command(args):                                       # 2. keep doing rou
     print("Pipeline stopped")                                # always the last line
 
 
-def run_one_round(conn, limit):                              # 3. one round, written in the job diary from start to finish
-    run_id = store.start_run(conn)                           # diary: write "running", get this run's ID
+def run_one_round(conn, limit):                              # 3. one round, written in the run history from start to finish
+    run_id = store.start_run(conn)                           # run history: write "running", get this run's ID
     conn.commit()                                            # save that row now, so it's visible while the run works
 
     try:                                                     # if anything breaks during the round...
         total = tag_new_sessions(conn, run_id, limit)        # tag batches until done (or the limit)
     except Exception as error:                               # ...we land here
         conn.rollback()                                      # throw away the unfinished batch (finished batches stay saved)
-        store.finish_run(conn, run_id, "failed", f"{type(error).__name__}: {error}")   # diary: "failed" + what went wrong
-        conn.commit()                                        # save that diary line
+        store.finish_run(conn, run_id, "failed", f"{type(error).__name__}: {error}")   # run history: "failed" + what went wrong
+        conn.commit()                                        # save that run history line
         raise                                                # then let the error carry on, so it is shown
 
-    store.finish_run(conn, run_id, "ok")                     # diary: "ok" + how many this run saved
+    store.finish_run(conn, run_id, "ok")                     # run history: "ok" + how many this run saved
     conn.commit()                                            # save that
     return total                                             # hand back how many were tagged
 

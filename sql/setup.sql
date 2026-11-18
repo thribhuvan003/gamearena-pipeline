@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS session_tags (                                    -- 
     run_id UUID NULL                                                         -- which run tagged it (links to pipeline_runs)
 );
 
-CREATE TABLE IF NOT EXISTS pipeline_runs (                                   -- the job diary: one row per run of the pipeline
+CREATE TABLE IF NOT EXISTS pipeline_runs (                                   -- the run history: one row per run of the pipeline
     run_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),                       -- this run's own ID, made up automatically
     started_at TIMESTAMPTZ NOT NULL DEFAULT now(),                           -- when the run started (filled in automatically)
     finished_at TIMESTAMPTZ NULL,                                            -- when it finished (empty while it is still running)
