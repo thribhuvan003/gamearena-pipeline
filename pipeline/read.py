@@ -1,6 +1,6 @@
 # read.py: asks the database for the next batch of sessions to tag. It only reads, never changes anything.
 
-# SQL: pick up to N ended sessions that have no tag yet, and give each one's start and end time plus its event names, phases and states in time order, up to the moment it ended.
+# SQL: pick up to N ended sessions that have no tag yet, and give each one's start time plus its event names, phases and states in time order, up to the moment it ended.
 EVENTS_SQL = """
 WITH batch AS (
     SELECT e.session_id,
@@ -16,18 +16,17 @@ WITH batch AS (
 )
 SELECT e.session_id,
        min(e.recorded_at) AS started_at,
-       b.ended_at,
        array_agg(coalesce(e.payload->>'event', e.event_type::STRING) ORDER BY e.recorded_at) AS event_names,
        array_agg(e.payload->>'phase' ORDER BY e.recorded_at) AS phases,
        array_agg(e.payload->>'state' ORDER BY e.recorded_at) AS states
 FROM session_telemetry_events e
 JOIN batch b ON b.session_id = e.session_id
 WHERE e.recorded_at <= b.ended_at
-GROUP BY e.session_id, b.ended_at
+GROUP BY e.session_id
 """
 
 
-def read_sessions(conn, limit):                              # reads the next batch of ended, untagged sessions; returns {session_id: {started_at, ended_at, event_names, phases, states}}, stores nothing
+def read_sessions(conn, limit):                              # reads the next batch of ended, untagged sessions; returns {session_id: {started_at, event_names, phases, states}}. Called by tag_new_sessions for each batch
 
     if limit <= 0:
         raise ValueError("Batch size must be positive")
@@ -37,10 +36,9 @@ def read_sessions(conn, limit):                              # reads the next ba
         rows = cursor.fetchall()
 
     sessions = {}
-    for session_id, started_at, ended_at, event_names, phases, states in rows:
+    for session_id, started_at, event_names, phases, states in rows:
         sessions[session_id] = {
             "started_at": started_at,
-            "ended_at": ended_at,
             "event_names": event_names,
             "phases": phases,
             "states": states,

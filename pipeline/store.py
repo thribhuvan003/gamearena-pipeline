@@ -8,20 +8,20 @@ RETURNING run_id
 """
 
 
-def start_run(conn):                                         # stores a new 'running' row in pipeline_runs; returns its run_id
+def start_run(conn):                                         # stores a new 'running' row in pipeline_runs and returns its run_id. Called by run_one_round at the start of a round
     return conn.execute(START_RUN_SQL).fetchone()[0]
 
 
-# SQL: turn the 5 lists (IDs, tags, reasons, start times, end times) into rows and save them all at once, stamped with this run's ID.
+# SQL: turn the 4 lists (IDs, tags, reasons, start times) into rows and save them all at once, stamped with this run's ID.
 SAVE_SQL = """
-UPSERT INTO session_tags (session_id, tag, reason, started_at, ended_at, run_id)
-SELECT session_id, tag, reason, started_at, ended_at, %(run_id)s::UUID
-FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[], %(ended)s::TIMESTAMPTZ[])
-     AS t(session_id, tag, reason, started_at, ended_at)
+UPSERT INTO session_tags (session_id, tag, reason, started_at, run_id)
+SELECT session_id, tag, reason, started_at, %(run_id)s::UUID
+FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[])
+     AS t(session_id, tag, reason, started_at)
 """
 
 
-def save_tags(conn, results, run_id):                        # stores one batch of tags, reasons and start/end times in session_tags, each stamped with run_id, in one database call
+def save_tags(conn, results, run_id):                        # stores one batch of tags, reasons and start times in session_tags, stamped with run_id, in one call. Called by tag_new_sessions once per batch
     if not results:
         return
 
@@ -30,7 +30,6 @@ def save_tags(conn, results, run_id):                        # stores one batch 
         "tags": [result["tag"] for result in results.values()],
         "reasons": [result["reason"] for result in results.values()],
         "started": [result["started_at"] for result in results.values()],
-        "ended": [result["ended_at"] for result in results.values()],
         "run_id": run_id,
     }
 
@@ -49,7 +48,7 @@ WHERE run_id = %(run_id)s
 """
 
 
-def finish_run(conn, run_id, status, error=None):            # stores the end of the run in its pipeline_runs row: finish time, ok or failed, how many sessions, the error
+def finish_run(conn, run_id, status, error=None):            # stores the end of the run in its pipeline_runs row: finish time, ok or failed, how many, the error. Called by run_one_round when the round ends or breaks
     parameters = {
         "run_id": run_id,
         "status": status,

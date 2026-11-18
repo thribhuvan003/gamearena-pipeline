@@ -25,7 +25,7 @@ LIMIT 5
 """
 
 
-def show_status(conn):                                       # prints the tag totals, how many sessions are waiting and the last 5 runs; stores nothing
+def show_status(conn):                                       # prints the tag totals, how many are waiting and the last 5 runs; stores nothing. Called by show_command for 'show status' (through QUESTIONS)
     totals = conn.execute(TAG_TOTALS_SQL).fetchall()
     tagged = sum(count for tag, count in totals)
     breakdown = ", ".join(f"{tag} {count:,}" for tag, count in totals)
