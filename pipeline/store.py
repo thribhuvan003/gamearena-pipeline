@@ -1,4 +1,16 @@
-# store.py: saves the tags. One database call per batch, however many sessions it has.
+# store.py: writes to our 2 tables: the run history (pipeline_runs) and the tags (session_tags).
+# The functions below are in the order they run: start_run -> save_tags (once per batch) -> finish_run.
+
+START_RUN_SQL = """
+INSERT INTO pipeline_runs (status)                           -- add one new row to the run history, setting only its status
+VALUES ('running')                                           -- the status is 'running' (= picked up, working now)
+RETURNING run_id                                             -- give back the new row's ID (made up by the database)
+"""
+
+
+def start_run(conn):                                         # write "a run has started" in the run history
+    return conn.execute(START_RUN_SQL).fetchone()[0]         # run the SQL, take the first row's first value = the run_id
+
 
 SAVE_SQL = """
 UPSERT INTO session_tags (session_id, tag, reason, run_id)   -- insert each row, or replace it if that session is already there
@@ -20,17 +32,6 @@ def save_tags(conn, results, run_id):                        # results = {sessio
 
     with conn.cursor() as cursor:                            # open a cursor (closes itself after)
         cursor.execute(SAVE_SQL, parameters)                 # save the whole batch in one call
-
-
-START_RUN_SQL = """
-INSERT INTO pipeline_runs (status)                           -- add one new row to the run history, setting only its status
-VALUES ('running')                                           -- the status is 'running' (= picked up, working now)
-RETURNING run_id                                             -- give back the new row's ID (made up by the database)
-"""
-
-
-def start_run(conn):                                         # write "a run has started" in the run history
-    return conn.execute(START_RUN_SQL).fetchone()[0]         # run the SQL, take the first row's first value = the run_id
 
 
 FINISH_RUN_SQL = """

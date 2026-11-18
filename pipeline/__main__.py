@@ -11,7 +11,7 @@ from pipeline import db                                      # opens the databas
 from pipeline import read                                    # reads the next batch of sessions
 from pipeline import show                                    # answers questions (show status, ...)
 from pipeline import store                                   # saves tags and writes the run history
-from pipeline import tags                                    # decides each session's tag
+from pipeline import tags                                    # decides each session's tag and reason
 
 
 def main():                                                  # 1. read the command, then do it
@@ -68,7 +68,7 @@ def run_one_round(conn, limit):                              # 3. one round, wri
 
     try:                                                     # if anything breaks during the round...
         total = tag_new_sessions(conn, run_id, limit)        # tag batches until done (or the limit)
-    except Exception as error:                               # ...we land here
+    except BaseException as error:                           # ...we land here (BaseException also catches Ctrl+C)
         conn.rollback()                                      # throw away the unfinished batch (finished batches stay saved)
         store.finish_run(conn, run_id, "failed", f"{type(error).__name__}: {error}")   # run history: "failed" + what went wrong
         conn.commit()                                        # save that run history line
@@ -79,7 +79,7 @@ def run_one_round(conn, limit):                              # 3. one round, wri
     return total                                             # hand back how many were tagged
 
 
-def tag_new_sessions(conn, run_id, limit=None):              # 4. tag batches until nothing is left (or the limit is reached)
+def tag_new_sessions(conn, run_id, limit):            # 4. tag batches until nothing is left (or the limit is reached)
     total = 0                                                # how many sessions this round tagged so far
 
     while True:                                              # repeat until there is nothing left (the returns below)
@@ -91,7 +91,7 @@ def tag_new_sessions(conn, run_id, limit=None):              # 4. tag batches un
                 return total                                 # then stop this round
             batch_size = min(batch_size, remaining)          # never take more than what's left (e.g. 20, not 200)
 
-        sessions = read.read_sessions(conn, batch_size)      # next untagged ended sessions: {session_id: bundle of facts}
+        sessions = read.read_sessions(conn, batch_size)      # next untagged ended sessions: {session_id: bundle of its events}
 
         if not sessions:                                     # nothing left to tag?
             return total                                     # then this round is done; hand back the count
