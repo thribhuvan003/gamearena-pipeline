@@ -1,42 +1,45 @@
 # show.py: answers questions about what the pipeline has done. Only reads, never changes anything.
 
+# SQL: how many sessions have each tag, biggest first.
 TAG_TOTALS_SQL = """
-SELECT tag, count(*) AS sessions                             -- each tag and how many sessions have it
-FROM session_tags                                            -- from our results table
-GROUP BY tag                                                 -- one row per tag
-ORDER BY sessions DESC                                       -- biggest first
+SELECT tag, count(*) AS sessions
+FROM session_tags
+GROUP BY tag
+ORDER BY sessions DESC
 """
 
+# SQL: how many ended sessions have no tag yet.
 WAITING_SQL = """
-SELECT count(DISTINCT e.session_id)                          -- how many different sessions...
-FROM session_telemetry_events e                              -- ...in the raw events...
-WHERE e.event_type = 'session_ended'                         -- ...have ended...
-  AND NOT EXISTS (SELECT 1 FROM session_tags t WHERE t.session_id = e.session_id)   -- ...but have no tag yet
+SELECT count(DISTINCT e.session_id)
+FROM session_telemetry_events e
+WHERE e.event_type = 'session_ended'
+  AND NOT EXISTS (SELECT 1 FROM session_tags t WHERE t.session_id = e.session_id)
 """
 
+# SQL: the last 5 runs from the run history, newest first.
 LAST_RUNS_SQL = """
-SELECT started_at, status, sessions_tagged, error            -- when, how it went, how many, what went wrong
-FROM pipeline_runs                                           -- from the run history
-ORDER BY started_at DESC                                     -- newest first
-LIMIT 5                                                      -- only the last 5
+SELECT started_at, status, sessions_tagged, error
+FROM pipeline_runs
+ORDER BY started_at DESC
+LIMIT 5
 """
 
 
-def show_status(conn):                                       # "what do we have so far?"
-    totals = conn.execute(TAG_TOTALS_SQL).fetchall()         # [(tag, count), ...]
-    tagged = sum(count for tag, count in totals)             # add up all the tags
-    breakdown = ", ".join(f"{tag} {count:,}" for tag, count in totals)   # e.g. "connected 5,614, failed 880"
-    print(f"Tagged sessions: {tagged:,}   ({breakdown})")    # one line with the totals
+def show_status(conn):                                       # print the tag totals, how many are waiting, and the last 5 runs
+    totals = conn.execute(TAG_TOTALS_SQL).fetchall()
+    tagged = sum(count for tag, count in totals)
+    breakdown = ", ".join(f"{tag} {count:,}" for tag, count in totals)
+    print(f"Tagged sessions: {tagged:,}   ({breakdown})")
 
-    waiting = conn.execute(WAITING_SQL).fetchone()[0]        # how many ended sessions still have no tag
-    print(f"Waiting to be tagged: {waiting:,}")              # e.g. "Waiting to be tagged: 0"
+    waiting = conn.execute(WAITING_SQL).fetchone()[0]
+    print(f"Waiting to be tagged: {waiting:,}")
 
-    print("Last runs:")                                      # heading for the run history
-    for started_at, status, sessions_tagged, error in conn.execute(LAST_RUNS_SQL).fetchall():   # each of the last 5 runs
-        line = f"  {started_at:%Y-%m-%d %H:%M}  {status:<7} {sessions_tagged:,} sessions"   # e.g. "2026-11-17 14:12  ok  20 sessions"
-        print(line + (f"  ({error})" if error else ""))      # add the error text only if the run failed
+    print("Last runs:")
+    for started_at, status, sessions_tagged, error in conn.execute(LAST_RUNS_SQL).fetchall():
+        line = f"  {started_at:%Y-%m-%d %H:%M}  {status:<7} {sessions_tagged:,} sessions"
+        print(line + (f"  ({error})" if error else ""))
 
 
-QUESTIONS = {                                                # every question 'show' can answer: name -> function
+QUESTIONS = {
     "status": show_status,
 }

@@ -1,53 +1,55 @@
 # store.py: writes to our 2 tables: the run history (pipeline_runs) and the tags (session_tags).
-# The functions below are in the order they run: start_run -> save_tags (once per batch) -> finish_run.
 
+# SQL: add a new run to the run history with status 'running', and give back its ID.
 START_RUN_SQL = """
-INSERT INTO pipeline_runs (status)                           -- add one new row to the run history, setting only its status
-VALUES ('running')                                           -- the status is 'running' (= picked up, working now)
-RETURNING run_id                                             -- give back the new row's ID (made up by the database)
+INSERT INTO pipeline_runs (status)
+VALUES ('running')
+RETURNING run_id
 """
 
 
-def start_run(conn):                                         # write "a run has started" in the run history
-    return conn.execute(START_RUN_SQL).fetchone()[0]         # run the SQL, take the first row's first value = the run_id
+def start_run(conn):                                         # write "a run has started" in the run history and return its run_id
+    return conn.execute(START_RUN_SQL).fetchone()[0]
 
 
+# SQL: turn the 3 lists (IDs, tags, reasons) into rows and save them all at once, stamped with this run's ID.
 SAVE_SQL = """
-UPSERT INTO session_tags (session_id, tag, reason, run_id)   -- insert each row, or replace it if that session is already there
-SELECT session_id, tag, reason, %(run_id)s::UUID             -- the session, its tag, its reason, and the run that tagged it
-FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[]) AS t(session_id, tag, reason)   -- 3 lists -> rows: (id1, tag1, reason1)...
+UPSERT INTO session_tags (session_id, tag, reason, run_id)
+SELECT session_id, tag, reason, %(run_id)s::UUID
+FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[]) AS t(session_id, tag, reason)
 """
 
 
-def save_tags(conn, results, run_id):                        # results = {session_id: {"tag": ..., "reason": ...}} for one batch
-    if not results:                                          # nothing to save?
-        return                                               # then do nothing
+def save_tags(conn, results, run_id):                        # save one batch of {session_id: {"tag": ..., "reason": ...}} in one database call
+    if not results:
+        return
 
-    parameters = {                                           # fill the 4 blanks in the SQL:
-        "ids": list(results.keys()),                         # all the session IDs, as a list
-        "tags": [result["tag"] for result in results.values()],         # their tags, in the same order
-        "reasons": [result["reason"] for result in results.values()],   # their reasons (None if not failed), same order
-        "run_id": run_id,                                    # the same run ID for every row in this batch
+    parameters = {
+        "ids": list(results.keys()),
+        "tags": [result["tag"] for result in results.values()],
+        "reasons": [result["reason"] for result in results.values()],
+        "run_id": run_id,
     }
 
-    with conn.cursor() as cursor:                            # open a cursor (closes itself after)
-        cursor.execute(SAVE_SQL, parameters)                 # save the whole batch in one call
+    with conn.cursor() as cursor:
+        cursor.execute(SAVE_SQL, parameters)
 
 
+# SQL: close this run in the run history: finish time, ok/failed, how many sessions it saved, and the error if any.
 FINISH_RUN_SQL = """
-UPDATE pipeline_runs                                         -- change an existing row in the run history
-SET finished_at = now(),                                     -- the finish time = right now
-    status = %(status)s,                                     -- 'ok' or 'failed'
-    sessions_tagged = (SELECT count(*) FROM session_tags WHERE run_id = %(run_id)s),   -- count what this run really saved
-    error = %(error)s                                        -- what went wrong (empty if it went fine)
-WHERE run_id = %(run_id)s                                    -- only the row of THIS run
+UPDATE pipeline_runs
+SET finished_at = now(),
+    status = %(status)s,
+    sessions_tagged = (SELECT count(*) FROM session_tags WHERE run_id = %(run_id)s),
+    error = %(error)s
+WHERE run_id = %(run_id)s
 """
 
 
-def finish_run(conn, run_id, status, error=None):            # write "the run has ended" in the run history
-    parameters = {                                           # fill the 3 blanks in the SQL:
-        "run_id": run_id,                                    # which row (the ID start_run gave back)
-        "status": status,                                    # 'ok' or 'failed'
-        "error": error,                                      # the error text, or None
+def finish_run(conn, run_id, status, error=None):            # write "the run has ended" (ok or failed) in the run history
+    parameters = {
+        "run_id": run_id,
+        "status": status,
+        "error": error,
     }
-    conn.execute(FINISH_RUN_SQL, parameters)                 # run the SQL
+    conn.execute(FINISH_RUN_SQL, parameters)
