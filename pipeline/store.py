@@ -8,7 +8,7 @@ RETURNING run_id
 """
 
 
-def start_run(conn):                                         # write "a run has started" in the run history and return its run_id
+def start_run(conn):                                         # stores a new 'running' row in pipeline_runs; returns its run_id
     return conn.execute(START_RUN_SQL).fetchone()[0]
 
 
@@ -20,7 +20,7 @@ FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[]) AS t(ses
 """
 
 
-def save_tags(conn, results, run_id):                        # save one batch of {session_id: {"tag": ..., "reason": ...}} in one database call
+def save_tags(conn, results, run_id):                        # stores one batch of tags and reasons in session_tags, each stamped with run_id, in one database call
     if not results:
         return
 
@@ -46,7 +46,7 @@ WHERE run_id = %(run_id)s
 """
 
 
-def finish_run(conn, run_id, status, error=None):            # write "the run has ended" (ok or failed) in the run history
+def finish_run(conn, run_id, status, error=None):            # stores the end of the run in its pipeline_runs row: finish time, ok or failed, how many sessions, the error
     parameters = {
         "run_id": run_id,
         "status": status,

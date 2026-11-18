@@ -14,7 +14,7 @@ from pipeline import store
 from pipeline import tags
 
 
-def main():                                                  # read the typed command (run or show) and hand it to the right function
+def main():                                                  # reads the typed command (run or show) and hands it to run_command or show_command; stores nothing
     parser = argparse.ArgumentParser(prog="python -m pipeline", description="Tag GameArena sessions and answer questions about them.")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -33,7 +33,7 @@ def main():                                                  # read the typed co
         show_command(args)
 
 
-def run_command(args):                                       # do rounds every WAIT_SECONDS until Ctrl+C, or just one with --once / --limit
+def run_command(args):                                       # does one round (--once / --limit), or a round every WAIT_SECONDS until Ctrl+C; stores nothing itself, prints progress
     print(f"Pipeline started: database {config.DB_NAME} on {config.DB_HOST}:{config.DB_PORT}, batch size {config.BATCH_SIZE}")
 
     try:
@@ -62,7 +62,7 @@ def run_command(args):                                       # do rounds every W
     print("Pipeline stopped")
 
 
-def run_one_round(conn, limit):                              # one round, written in the run history: running at the start, ok or failed at the end
+def run_one_round(conn, limit):                              # does one round and records it in pipeline_runs (running, then ok or failed); returns how many sessions it tagged
     run_id = store.start_run(conn)
     conn.commit()
 
@@ -79,7 +79,7 @@ def run_one_round(conn, limit):                              # one round, writte
     return total
 
 
-def tag_new_sessions(conn, run_id, limit):                   # read, tag and save batches until none are left (or the limit is reached); return the count
+def tag_new_sessions(conn, run_id, limit):                   # reads, tags and saves sessions 200 at a time until none are left or the limit is hit; stores them in session_tags, returns the count
     total = 0
 
     while True:
@@ -110,7 +110,7 @@ def tag_new_sessions(conn, run_id, limit):                   # read, tag and sav
         print(f"Saved {len(results)} tags (total {total})")
 
 
-def show_command(args):                                      # answer a question, e.g. "show status", by running its function from show.QUESTIONS
+def show_command(args):                                      # answers a question (e.g. status) by running its function from show.QUESTIONS; stores nothing, only prints
     with db.connect() as conn:
         show.QUESTIONS[args.question](conn)
 

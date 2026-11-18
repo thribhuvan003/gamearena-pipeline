@@ -25,7 +25,7 @@ GROUP BY e.session_id
 """
 
 
-def read_sessions(conn, limit):                              # read the next batch: {session_id: {"event_names": [...], "phases": [...], "states": [...]}}
+def read_sessions(conn, limit):                              # reads the next batch of ended, untagged sessions; returns {session_id: {event_names, phases, states}}, stores nothing
 
     if limit <= 0:
         raise ValueError("Batch size must be positive")

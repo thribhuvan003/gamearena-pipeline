@@ -1,7 +1,7 @@
 # tags.py: decides each session's tag and, if it failed, its reason. No database here, only the rules.
 
 
-def tag_session(session):                                    # connected if it ever connected, failed if it only tried, no_attempt if it never tried
+def tag_session(session):                                    # returns connected (it connected), failed (it only tried) or no_attempt (it never tried); stores nothing
     event_names = session["event_names"]
 
     if "pipeline.connect.success" in event_names:
@@ -13,7 +13,7 @@ def tag_session(session):                                    # connected if it e
     return "no_attempt"
 
 
-def failure_reason(session, tag):                            # why a failed session failed (None if it didn't fail); checked top to bottom, first match wins
+def failure_reason(session, tag):                            # returns why a failed session failed (first match wins), or None if it didn't fail; stores nothing
     if tag != "failed":
         return None
 
@@ -35,7 +35,7 @@ def failure_reason(session, tag):                            # why a failed sess
     return "no_video"
 
 
-def last_failure_phase(session):                             # the phase of the session's last connection error: pre-connect, connecting, or None
+def last_failure_phase(session):                             # returns the phase of the session's last connection error (pre-connect / connecting), or None; stores nothing
     phase = None
     for name, event_phase in zip(session["event_names"], session["phases"]):
         if name == "pipeline.connect.failure":
@@ -43,7 +43,7 @@ def last_failure_phase(session):                             # the phase of the 
     return phase
 
 
-def video_failed(session):                                   # True if the video connection (WebRTC) ever went to "failed"
+def video_failed(session):                                   # returns True if the video connection (WebRTC) ever went to failed; stores nothing
     for name, state in zip(session["event_names"], session["states"]):
         if name == "webrtc.connection.state" and state == "failed":
             return True
