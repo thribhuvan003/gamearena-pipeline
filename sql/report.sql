@@ -28,11 +28,12 @@ SELECT count(*) AS all_sessions,
 FROM sessions
 LEFT JOIN session_tags t USING (session_id);
 
--- 4. Per day (the day each session started): how many sessions, and what % connected and failed.
+-- 4. Per day (the day each session started): how many sessions, how many connected, how many didn't connect, and the % that connected.
 SELECT started_at::DATE AS day,
        count(*) AS sessions,
-       round(100.0 * count(*) FILTER (WHERE tag = 'connected') / count(*), 1) AS connected_percent,
-       round(100.0 * count(*) FILTER (WHERE tag = 'failed') / count(*), 1) AS failed_percent
+       count(*) FILTER (WHERE tag = 'connected') AS connected,
+       count(*) FILTER (WHERE tag <> 'connected') AS did_not_connect,
+       round(100.0 * count(*) FILTER (WHERE tag = 'connected') / count(*), 1) AS connected_percent
 FROM session_tags
 GROUP BY day
 ORDER BY day;
