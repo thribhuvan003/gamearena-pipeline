@@ -101,7 +101,7 @@ def tag_new_sessions(conn, run_id, limit):                   # reads, tags and s
         for session_id, session in sessions.items():
             tag = tags.tag_session(session)
             reason = tags.failure_reason(session, tag)
-            results[session_id] = {"tag": tag, "reason": reason}
+            results[session_id] = {"tag": tag, "reason": reason, "started_at": session["started_at"], "ended_at": session["ended_at"]}
 
         store.save_tags(conn, results, run_id)
         conn.commit()

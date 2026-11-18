@@ -12,15 +12,16 @@ def start_run(conn):                                         # stores a new 'run
     return conn.execute(START_RUN_SQL).fetchone()[0]
 
 
-# SQL: turn the 3 lists (IDs, tags, reasons) into rows and save them all at once, stamped with this run's ID.
+# SQL: turn the 5 lists (IDs, tags, reasons, start times, end times) into rows and save them all at once, stamped with this run's ID.
 SAVE_SQL = """
-UPSERT INTO session_tags (session_id, tag, reason, run_id)
-SELECT session_id, tag, reason, %(run_id)s::UUID
-FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[]) AS t(session_id, tag, reason)
+UPSERT INTO session_tags (session_id, tag, reason, started_at, ended_at, run_id)
+SELECT session_id, tag, reason, started_at, ended_at, %(run_id)s::UUID
+FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[], %(ended)s::TIMESTAMPTZ[])
+     AS t(session_id, tag, reason, started_at, ended_at)
 """
 
 
-def save_tags(conn, results, run_id):                        # stores one batch of tags and reasons in session_tags, each stamped with run_id, in one database call
+def save_tags(conn, results, run_id):                        # stores one batch of tags, reasons and start/end times in session_tags, each stamped with run_id, in one database call
     if not results:
         return
 
@@ -28,6 +29,8 @@ def save_tags(conn, results, run_id):                        # stores one batch 
         "ids": list(results.keys()),
         "tags": [result["tag"] for result in results.values()],
         "reasons": [result["reason"] for result in results.values()],
+        "started": [result["started_at"] for result in results.values()],
+        "ended": [result["ended_at"] for result in results.values()],
         "run_id": run_id,
     }
 

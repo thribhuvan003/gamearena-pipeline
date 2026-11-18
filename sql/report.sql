@@ -28,19 +28,12 @@ SELECT count(*) AS all_sessions,
 FROM sessions
 LEFT JOIN session_tags t USING (session_id);
 
--- 4. Per day (the day each session ended): how many sessions, and what % connected and failed.
-WITH ended AS (
-    SELECT session_id, min(recorded_at) AS ended_at
-    FROM session_telemetry_events
-    WHERE event_type = 'session_ended'
-    GROUP BY session_id
-)
-SELECT ended_at::DATE AS day,
+-- 4. Per day (the day each session started): how many sessions, and what % connected and failed.
+SELECT started_at::DATE AS day,
        count(*) AS sessions,
-       round(100.0 * count(*) FILTER (WHERE t.tag = 'connected') / count(*), 1) AS connected_percent,
-       round(100.0 * count(*) FILTER (WHERE t.tag = 'failed') / count(*), 1) AS failed_percent
-FROM ended
-JOIN session_tags t USING (session_id)
+       round(100.0 * count(*) FILTER (WHERE tag = 'connected') / count(*), 1) AS connected_percent,
+       round(100.0 * count(*) FILTER (WHERE tag = 'failed') / count(*), 1) AS failed_percent
+FROM session_tags
 GROUP BY day
 ORDER BY day;
 
