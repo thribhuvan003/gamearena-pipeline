@@ -8,7 +8,7 @@ db := "docker exec -i cockroachdb ./cockroach sql --insecure -d gamearena_analyt
 default:
     @just --list
 
-# create our 2 tables if they don't exist yet (safe to run again)
+# create our 3 tables if they don't exist yet (safe to run again)
 setup:
     Get-Content sql/setup.sql | {{db}}
 
@@ -41,7 +41,7 @@ report-file:
 explore:
     Get-Content sql/explore.sql | {{db}}
 
-# empty our 2 tables so the next run starts from zero (raw telemetry is not touched)
-[confirm("Delete every row in session_tags and pipeline_runs?")]
+# empty our 3 tables so the next run starts from zero (raw telemetry is not touched)
+[confirm("Delete every row in session_tags, connection_tags and pipeline_runs?")]
 reset:
-    {{db}} -e "DELETE FROM session_tags WHERE true; DELETE FROM pipeline_runs WHERE true;"
+    {{db}} -e "DELETE FROM session_tags WHERE true; DELETE FROM connection_tags WHERE true; DELETE FROM pipeline_runs WHERE true;"

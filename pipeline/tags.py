@@ -1,4 +1,4 @@
-# tags.py: decides each session's tag and, if it failed, its reason. No database here, only the rules.
+# tags.py: decides each session's and each client connection's tag and, if it didn't connect, its reason. No database here, only the rules.
 
 
 def tag_session(session):                                    # returns connected (it connected), failed (it only tried) or no_attempt (it never tried). Called by tag_new_sessions for each session
@@ -31,6 +31,34 @@ def failure_reason(session, tag):                            # returns why a fai
     event_names = session["event_names"]
     if "host_connected" not in event_names or "client_connected" not in event_names:
         return "someone_never_joined"
+
+    return "no_video"
+
+
+def tag_connection(connection):                              # returns connected (this connection got video), unknown (the app sent nothing on it) or not_connected. Called by tag_new_sessions for each client connection
+    if "pipeline.connect.success" in connection["event_names"]:
+        return "connected"
+
+    if connection["app_events"] == 0:
+        return "unknown"
+
+    return "not_connected"
+
+
+def connection_reason(connection, tag):                      # returns why a client connection didn't connect (same order as failure_reason; "never joined" doesn't apply to one connection), or None. Called by tag_new_sessions right after tag_connection
+    if tag != "not_connected":
+        return None
+
+    phase = last_failure_phase(connection)
+    if phase == "pre-connect":
+        return "setup_error"
+    if phase == "connecting":
+        return "error_while_connecting"
+    if phase is not None:
+        return "error_other"
+
+    if video_failed(connection):
+        return "video_connection_failed"
 
     return "no_video"
 

@@ -79,7 +79,7 @@ def run_one_round(conn, limit):                              # does one round an
     return total
 
 
-def tag_new_sessions(conn, run_id, limit):                   # reads, tags and saves sessions 200 at a time until none are left or the limit is hit; returns the count. Called by run_one_round to do the work
+def tag_new_sessions(conn, run_id, limit):                   # reads, tags and saves sessions (and their client connections) 200 sessions at a time until none are left or the limit is hit; returns the session count. Called by run_one_round to do the work
     total = 0
 
     while True:
@@ -103,11 +103,20 @@ def tag_new_sessions(conn, run_id, limit):                   # reads, tags and s
             reason = tags.failure_reason(session, tag)
             results[session_id] = {"tag": tag, "reason": reason, "started_at": session["started_at"]}
 
+        connections = read.read_connections(conn, list(sessions))
+        connection_results = {}
+
+        for connection_id, connection in connections.items():
+            tag = tags.tag_connection(connection)
+            reason = tags.connection_reason(connection, tag)
+            connection_results[connection_id] = {"session_id": connection["session_id"], "tag": tag, "reason": reason, "started_at": connection["started_at"]}
+
         store.save_tags(conn, results, run_id)
+        store.save_connection_tags(conn, connection_results, run_id)
         conn.commit()
 
         total += len(results)
-        print(f"Saved {len(results)} tags (total {total})")
+        print(f"Saved {len(results)} sessions and {len(connection_results)} client connections (total {total} sessions)")
 
 
 def show_command(args):                                      # answers a question (e.g. status) by running its function from show.QUESTIONS; stores nothing, only prints. Called by main for 'show'

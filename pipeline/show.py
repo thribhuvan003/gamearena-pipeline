@@ -8,6 +8,14 @@ GROUP BY tag
 ORDER BY sessions DESC
 """
 
+# SQL: how many client connections have each tag, biggest first.
+CONNECTION_TOTALS_SQL = """
+SELECT tag, count(*) AS connections
+FROM connection_tags
+GROUP BY tag
+ORDER BY connections DESC
+"""
+
 # SQL: how many ended sessions have no tag yet.
 WAITING_SQL = """
 SELECT count(DISTINCT e.session_id)
@@ -25,11 +33,16 @@ LIMIT 5
 """
 
 
-def show_status(conn):                                       # prints the tag totals, how many are waiting and the last 5 runs; stores nothing. Called by show_command for 'show status' (through QUESTIONS)
+def show_status(conn):                                       # prints the session and client connection totals, how many sessions are waiting and the last 5 runs; stores nothing. Called by show_command for 'show status' (through QUESTIONS)
     totals = conn.execute(TAG_TOTALS_SQL).fetchall()
     tagged = sum(count for tag, count in totals)
     breakdown = ", ".join(f"{tag} {count:,}" for tag, count in totals)
     print(f"Tagged sessions: {tagged:,}   ({breakdown})")
+
+    totals = conn.execute(CONNECTION_TOTALS_SQL).fetchall()
+    tagged = sum(count for tag, count in totals)
+    breakdown = ", ".join(f"{tag} {count:,}" for tag, count in totals)
+    print(f"Tagged client connections: {tagged:,}   ({breakdown})")
 
     waiting = conn.execute(WAITING_SQL).fetchone()[0]
     print(f"Waiting to be tagged: {waiting:,}")

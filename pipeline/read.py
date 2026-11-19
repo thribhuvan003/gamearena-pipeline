@@ -1,4 +1,4 @@
-# read.py: asks the database for the next batch of sessions to tag. It only reads, never changes anything.
+# read.py: asks the database for the next batch of sessions to tag, and their client connections. It only reads, never changes anything.
 
 # SQL: pick up to N ended sessions that have no tag yet, and give each one's start time plus its event names, phases and states in time order, up to the moment it ended.
 EVENTS_SQL = """
@@ -44,3 +44,46 @@ def read_sessions(conn, limit):                              # reads the next ba
             "states": states,
         }
     return sessions
+
+
+# SQL: for the given sessions, every client connection with its start time, how many events the app itself sent on it, and its event names, phases and states in time order, up to the moment its session ended.
+CONNECTIONS_SQL = """
+WITH ended AS (
+    SELECT session_id, min(recorded_at) AS ended_at
+    FROM session_telemetry_events
+    WHERE event_type = 'session_ended'
+      AND session_id = ANY(%(ids)s::UUID[])
+    GROUP BY session_id
+)
+SELECT e.connection_id,
+       e.session_id,
+       min(e.recorded_at) AS started_at,
+       count(*) FILTER (WHERE e.source <> 'system') AS app_events,
+       array_agg(coalesce(e.payload->>'event', e.event_type::STRING) ORDER BY e.recorded_at) AS event_names,
+       array_agg(e.payload->>'phase' ORDER BY e.recorded_at) AS phases,
+       array_agg(e.payload->>'state' ORDER BY e.recorded_at) AS states
+FROM session_telemetry_events e
+JOIN ended d ON d.session_id = e.session_id
+WHERE e.connection_role = 'client'
+  AND e.connection_id IS NOT NULL
+  AND e.recorded_at <= d.ended_at
+GROUP BY e.connection_id, e.session_id
+"""
+
+
+def read_connections(conn, session_ids):                     # reads the client connections of these sessions; returns {connection_id: {session_id, started_at, app_events, event_names, phases, states}}. Called by tag_new_sessions for each batch
+    with conn.cursor() as cursor:
+        cursor.execute(CONNECTIONS_SQL, {"ids": session_ids})
+        rows = cursor.fetchall()
+
+    connections = {}
+    for connection_id, session_id, started_at, app_events, event_names, phases, states in rows:
+        connections[connection_id] = {
+            "session_id": session_id,
+            "started_at": started_at,
+            "app_events": app_events,
+            "event_names": event_names,
+            "phases": phases,
+            "states": states,
+        }
+    return connections
