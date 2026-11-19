@@ -1,4 +1,4 @@
--- report.sql (just report): the founder reports. Sessions first (did the player get in, and why not), then client connections (retries and drops inside a session). Days are the session's start day in UTC.
+-- report.sql (just report): analytics. Reports 1-5 are sessions (did the player get in, and why not); 6-8 are client connections (one session can have several). Days are the session's start day in UTC.
 
 -- 1. Overall: sessions, connected, failed (tried but never connected), no_attempt (never tried), and the % that connected.
 SELECT count(*) AS sessions,
@@ -71,55 +71,33 @@ WHERE t.tag = 'failed'
 GROUP BY 1, 2, 3, 4, 5, 6
 ORDER BY sessions DESC;
 
--- 6. Client connections that didn't connect, one row per kind (each connection gets exactly one kind, so the rows add up to not_connected): in a session that never connected; a retry before the player got in; a reconnect after the earlier connection lost its video/network link (the real drops); a reconnect after a clean end (not a proven drop); opened while an earlier one was still working (not a drop). Columns split each kind by reason.
-WITH ended AS (
-    SELECT session_id, min(recorded_at) AS ended_at
-    FROM session_telemetry_events
-    WHERE event_type = 'session_ended'
-    GROUP BY session_id
-),
-life AS (
-    SELECT e.connection_id,
-           coalesce(min(e.recorded_at) FILTER (WHERE e.event_type = 'client_disconnected'), max(e.recorded_at)) AS ended_at,
-           bool_or(e.payload->>'event' = 'pipeline.connection.dropped'
-                   OR (e.payload->>'event' IN ('webrtc.connection.state', 'ice.connection.state')
-                       AND e.payload->>'state' IN ('disconnected', 'failed'))) AS link_lost
-    FROM session_telemetry_events e
-    JOIN ended d ON d.session_id = e.session_id
-    WHERE e.connection_role = 'client'
-      AND e.connection_id IS NOT NULL
-      AND e.recorded_at <= d.ended_at
-    GROUP BY e.connection_id
-),
-not_connected AS (
-    SELECT DISTINCT ON (c.connection_id)
-           c.connection_id, c.session_id, c.reason, c.started_at,
-           p.connection_id AS previous_ok,
-           EXISTS (SELECT 1 FROM connection_tags o WHERE o.session_id = c.session_id AND o.tag = 'connected') AS session_connected
-    FROM connection_tags c
-    LEFT JOIN connection_tags p ON p.session_id = c.session_id AND p.tag = 'connected' AND p.started_at <= c.started_at
-    WHERE c.tag = 'not_connected'
-    ORDER BY c.connection_id, p.started_at DESC
-),
-kinds AS (
-    SELECT n.session_id,
-           n.reason,
-           CASE
-               WHEN NOT n.session_connected THEN 'in_session_never_connected'
-               WHEN n.previous_ok IS NULL THEN 'retried_before_success'
-               WHEN l.ended_at > n.started_at THEN 'opened_while_still_connected'
-               WHEN l.link_lost THEN 'reconnect_after_link_lost'
-               ELSE 'reconnect_after_clean_end'
-           END AS kind
-    FROM not_connected n
-    LEFT JOIN life l ON l.connection_id = n.previous_ok
-)
-SELECT kind,
+-- 6. Connection summary: all client connections, how many recorded a success, how many had app events but no success (not_connected), how many had no app events (unknown), and the % connected.
+SELECT count(*) AS client_connections,
+       count(*) FILTER (WHERE tag = 'connected') AS connected,
+       count(*) FILTER (WHERE tag = 'not_connected') AS not_connected,
+       count(*) FILTER (WHERE tag = 'unknown') AS unknown,
+       round(100.0 * count(*) FILTER (WHERE tag = 'connected') / nullif(count(*), 0), 1) AS connected_percent
+FROM connection_tags;
+
+-- 7. Daily connection summary: the same, per day (the day the connection started, UTC).
+SELECT started_at::DATE AS day,
+       count(*) AS client_connections,
+       count(*) FILTER (WHERE tag = 'connected') AS connected,
+       count(*) FILTER (WHERE tag = 'not_connected') AS not_connected,
+       count(*) FILTER (WHERE tag = 'unknown') AS unknown,
+       round(100.0 * count(*) FILTER (WHERE tag = 'connected') / count(*), 1) AS connected_percent
+FROM connection_tags
+GROUP BY day
+ORDER BY day;
+
+-- 8. Connection failure reasons: why not_connected connections had no success, how many sessions they were in, and how many of them were in sessions that still connected overall (the failures a session-level view hides).
+SELECT c.reason,
        count(*) AS connections,
-       count(DISTINCT session_id) AS sessions,
-       count(*) FILTER (WHERE reason = 'no_video') AS no_video,
-       count(*) FILTER (WHERE reason = 'video_connection_failed') AS video_connection_failed,
-       count(*) FILTER (WHERE reason IN ('setup_error', 'error_while_connecting', 'error_other')) AS error_logged
-FROM kinds
-GROUP BY kind
+       count(DISTINCT c.session_id) AS sessions,
+       count(*) FILTER (WHERE s.tag = 'connected') AS in_connected_sessions,
+       round(100.0 * count(*) / sum(count(*)) OVER (), 1) AS percent_of_not_connected
+FROM connection_tags c
+JOIN session_tags s USING (session_id)
+WHERE c.tag = 'not_connected'
+GROUP BY c.reason
 ORDER BY connections DESC;

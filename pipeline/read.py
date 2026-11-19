@@ -26,7 +26,7 @@ GROUP BY e.session_id
 """
 
 
-def read_sessions(conn, limit):                              # reads the next batch of ended, untagged sessions; returns {session_id: {started_at, event_names, phases, states}}. Called by tag_new_sessions for each batch
+def read_sessions(conn, limit):                              # Reads the next batch of ended, untagged sessions with their events. Called by tag_new_sessions
     with conn.cursor() as cursor:
         cursor.execute(EVENTS_SQL, {"limit": limit})
         rows = cursor.fetchall()
@@ -67,7 +67,7 @@ GROUP BY e.connection_id, e.session_id
 """
 
 
-def read_connections(conn, session_ids):                     # reads the client connections of these sessions; returns {connection_id: {session_id, started_at, app_events, event_names, phases, states}}. Called by tag_new_sessions for each batch
+def read_connections(conn, session_ids):                     # Reads the client connections of those sessions with their events. Called by tag_new_sessions
     with conn.cursor() as cursor:
         cursor.execute(CONNECTIONS_SQL, {"ids": session_ids})
         rows = cursor.fetchall()

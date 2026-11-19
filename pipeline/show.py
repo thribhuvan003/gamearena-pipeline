@@ -34,7 +34,7 @@ LIMIT 5
 """
 
 
-def show_status(conn):                                       # prints the session and client connection totals, how many sessions are waiting and the last 5 runs; stores nothing. Called by status_command
+def show_status(conn):                                       # Prints tag totals, sessions waiting and the last 5 runs. Called by status_command
     for name, sql in (("sessions", TAG_TOTALS_SQL), ("client connections", CONNECTION_TOTALS_SQL)):
         totals = conn.execute(sql).fetchall()
         breakdown = ", ".join(f"{tag} {count:,}" for tag, count in totals)

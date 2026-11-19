@@ -13,7 +13,7 @@ from pipeline import store
 from pipeline import tags
 
 
-def main():                                                  # reads the typed command (run or status) and hands it on; stores nothing. Called at the bottom of this file when you type python -m pipeline
+def main():                                                  # Reads the command (run or status). Called when you type python -m pipeline
     parser = argparse.ArgumentParser(prog="python -m pipeline", description="Tag GameArena sessions and their client connections.")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -31,7 +31,7 @@ def main():                                                  # reads the typed c
         status_command()
 
 
-def run_command(args):                                       # does one round (--once / --limit) or a round every WAIT_SECONDS until Ctrl+C; stores nothing itself. Called by main for 'run'
+def run_command(args):                                       # Runs one round, or a round every WAIT_SECONDS until Ctrl+C. Called by main
     print(f"Pipeline started: database {config.DB_NAME} on {config.DB_HOST}:{config.DB_PORT}, batch size {config.BATCH_SIZE}")
     once = args.once or args.limit is not None
 
@@ -61,7 +61,7 @@ def run_command(args):                                       # does one round (-
     print("Pipeline stopped")
 
 
-def run_one_round(conn, limit):                              # does one round and records it in pipeline_runs (running, then ok or failed); returns how many sessions it tagged. Called by run_command, once per round
+def run_one_round(conn, limit):                              # Runs one round and records it in pipeline_runs. Called by run_command
     run_id = store.start_run(conn)
     conn.commit()
 
@@ -78,7 +78,7 @@ def run_one_round(conn, limit):                              # does one round an
     return total
 
 
-def tag_new_sessions(conn, run_id, limit):                   # reads, tags and saves one batch of sessions and their client connections at a time (one commit each) until none are left or the limit is hit; returns the session count. Called by run_one_round
+def tag_new_sessions(conn, run_id, limit):                   # Per batch: read, tag and save sessions and their client connections. Called by run_one_round
     total = 0
 
     while True:
@@ -113,7 +113,7 @@ def tag_new_sessions(conn, run_id, limit):                   # reads, tags and s
         print(f"Saved {len(sessions)} sessions and {len(connections)} client connections (total {total} sessions)")
 
 
-def status_command():                                        # prints the totals and the last runs by calling show.show_status; stores nothing. Called by main for 'status'
+def status_command():                                        # Prints the processing status. Called by main
     with db.connect() as conn:
         show.show_status(conn)
 

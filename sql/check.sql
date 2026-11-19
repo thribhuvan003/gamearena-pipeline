@@ -57,7 +57,7 @@ SELECT count(*) AS ended_sessions,
 FROM expected x
 LEFT JOIN session_tags t USING (session_id);
 
--- Check 2, client connections: the same rules as tags.py tag_connection / connection_reason, compared with connection_tags.
+-- Check 2, client connections: the same rules as tags.py tag_connection / connection_reason, compared with connection_tags; sessions_wrong = a connection saved under the wrong session.
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
     FROM session_telemetry_events
@@ -66,6 +66,7 @@ WITH ended AS (
 ),
 connections AS (
     SELECT e.connection_id,
+           e.session_id,
            min(e.recorded_at) AS started_at,
            CASE
                WHEN bool_or(e.payload->>'event' = 'pipeline.connect.success') THEN 'connected'
@@ -78,7 +79,7 @@ connections AS (
     WHERE e.connection_role = 'client'
       AND e.connection_id IS NOT NULL
       AND e.recorded_at <= s.ended_at
-    GROUP BY e.connection_id
+    GROUP BY e.connection_id, e.session_id
 ),
 last_error AS (
     SELECT DISTINCT ON (e.connection_id) e.connection_id, e.payload->>'phase' AS phase
@@ -92,6 +93,7 @@ last_error AS (
 ),
 expected AS (
     SELECT c.connection_id,
+           c.session_id,
            c.started_at,
            c.tag,
            CASE
@@ -108,6 +110,7 @@ expected AS (
 SELECT count(*) AS client_connections,
        count(t.connection_id) AS tagged,
        count(*) FILTER (WHERE t.connection_id IS NULL) AS not_tagged_yet,
+       count(*) FILTER (WHERE t.session_id <> x.session_id) AS sessions_wrong,
        count(*) FILTER (WHERE t.tag <> x.tag) AS tags_wrong,
        count(*) FILTER (WHERE t.connection_id IS NOT NULL AND t.reason IS DISTINCT FROM x.reason) AS reasons_wrong,
        count(*) FILTER (WHERE t.started_at <> x.started_at) AS dates_wrong

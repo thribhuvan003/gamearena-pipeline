@@ -1,7 +1,7 @@
 # tags.py: decides each session's and each client connection's tag and, if it didn't connect, its reason. No database here, only the rules.
 
 
-def tag_session(session):                                    # returns connected (it connected), failed (it only tried) or no_attempt (it never tried). Called by tag_new_sessions for each session
+def tag_session(session):                                    # connected, failed or no_attempt. Called by tag_new_sessions
     event_names = session["event_names"]
 
     if "pipeline.connect.success" in event_names:
@@ -13,7 +13,7 @@ def tag_session(session):                                    # returns connected
     return "no_attempt"
 
 
-def failure_reason(session, tag):                            # returns why a failed session failed (first match wins), or None if it didn't fail. Called by tag_new_sessions right after tag_session
+def failure_reason(session, tag):                            # Why a failed session failed (first match wins), else None. Called by tag_new_sessions
     if tag != "failed":
         return None
 
@@ -35,7 +35,7 @@ def failure_reason(session, tag):                            # returns why a fai
     return "no_video"
 
 
-def tag_connection(connection):                              # returns connected (this connection got video), unknown (the app sent nothing on it) or not_connected. Called by tag_new_sessions for each client connection
+def tag_connection(connection):                              # connected, not_connected or unknown. Called by tag_new_sessions
     if "pipeline.connect.success" in connection["event_names"]:
         return "connected"
 
@@ -45,7 +45,7 @@ def tag_connection(connection):                              # returns connected
     return "not_connected"
 
 
-def connection_reason(connection, tag):                      # returns why a client connection didn't connect (same order as failure_reason; "never joined" doesn't apply to one connection), or None. Called by tag_new_sessions right after tag_connection
+def connection_reason(connection, tag):                      # Why a not_connected connection had no success (first match wins), else None. Called by tag_new_sessions
     if tag != "not_connected":
         return None
 
@@ -63,7 +63,7 @@ def connection_reason(connection, tag):                      # returns why a cli
     return "no_video"
 
 
-def last_failure_phase(session):                             # returns the phase of the session's last connection error (pre-connect / connecting), or None. Called by failure_reason and connection_reason to see if and when an error was logged
+def last_failure_phase(session):                             # Phase of the last pipeline.connect.failure, else None. Called by failure_reason and connection_reason
     phase = None
     for name, event_phase in zip(session["event_names"], session["phases"]):
         if name == "pipeline.connect.failure":
@@ -71,7 +71,7 @@ def last_failure_phase(session):                             # returns the phase
     return phase
 
 
-def video_failed(session):                                   # returns True if the video connection (WebRTC) ever went to failed. Called by failure_reason and connection_reason when no error was logged
+def video_failed(session):                                   # True if webrtc.connection.state ever went to failed. Called by failure_reason and connection_reason
     for name, state in zip(session["event_names"], session["states"]):
         if name == "webrtc.connection.state" and state == "failed":
             return True

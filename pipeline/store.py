@@ -8,7 +8,7 @@ RETURNING run_id
 """
 
 
-def start_run(conn):                                         # stores a new 'running' row in pipeline_runs and returns its run_id. Called by run_one_round at the start of a round
+def start_run(conn):                                         # Adds a 'running' row to pipeline_runs and returns its run_id. Called by run_one_round
     return conn.execute(START_RUN_SQL).fetchone()[0]
 
 
@@ -21,7 +21,7 @@ FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(starte
 """
 
 
-def save_tags(conn, sessions, run_id):                       # stores one batch of sessions (tag, reason, start time) in session_tags, stamped with run_id, in one call. Called by tag_new_sessions once per batch
+def save_tags(conn, sessions, run_id):                       # Saves a batch of sessions to session_tags in one call. Called by tag_new_sessions
     parameters = {
         "ids": list(sessions.keys()),
         "tags": [session["tag"] for session in sessions.values()],
@@ -41,7 +41,7 @@ FROM unnest(%(ids)s::UUID[], %(sessions)s::UUID[], %(tags)s::STRING[], %(reasons
 """
 
 
-def save_connection_tags(conn, connections, run_id):         # stores one batch of client connections (session, tag, reason, start time) in connection_tags, stamped with run_id, in one call. Called by tag_new_sessions once per batch
+def save_connection_tags(conn, connections, run_id):         # Saves a batch of client connections to connection_tags in one call. Called by tag_new_sessions
     parameters = {
         "ids": list(connections.keys()),
         "sessions": [connection["session_id"] for connection in connections.values()],
@@ -64,7 +64,7 @@ WHERE run_id = %(run_id)s
 """
 
 
-def finish_run(conn, run_id, status, error=None):            # stores the end of the run in its pipeline_runs row: finish time, ok or failed, how many sessions, the error. Called by run_one_round when the round ends or breaks
+def finish_run(conn, run_id, status, error=None):            # Marks the run ok or failed, with its count and error. Called by run_one_round
     parameters = {
         "run_id": run_id,
         "status": status,
