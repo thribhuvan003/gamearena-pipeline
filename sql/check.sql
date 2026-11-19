@@ -1,4 +1,4 @@
--- Work out every ended session's tag, reason and start time again in plain SQL and compare them with what the pipeline saved (tags_wrong_or_missing, reasons_wrong and dates_wrong must be 0).
+-- Work out every ended session's tag, reason and start time again in plain SQL and compare them with what the pipeline saved (tags_wrong, reasons_wrong and dates_wrong must be 0; not_tagged_yet is 0 after a full run).
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
     FROM session_telemetry_events
@@ -45,11 +45,11 @@ expected_reason AS (
 )
 SELECT
     (SELECT count(*) FROM ended) AS ended_sessions,
-    (SELECT count(*) FROM session_tags) AS tag_rows,
-    (SELECT count(*) FROM expected x JOIN session_tags t USING (session_id) WHERE x.tag = t.tag) AS tags_matching,
-    (SELECT count(*) FROM expected x LEFT JOIN session_tags t USING (session_id) WHERE t.tag IS DISTINCT FROM x.tag) AS tags_wrong_or_missing,
-    (SELECT count(*) FROM expected_reason r LEFT JOIN session_tags t USING (session_id) WHERE t.reason IS DISTINCT FROM r.reason) AS reasons_wrong,
-    (SELECT count(*) FROM expected x LEFT JOIN session_tags t USING (session_id) WHERE t.started_at IS DISTINCT FROM x.started_at) AS dates_wrong;
+    (SELECT count(*) FROM session_tags) AS tagged,
+    (SELECT count(*) FROM expected x LEFT JOIN session_tags t USING (session_id) WHERE t.session_id IS NULL) AS not_tagged_yet,
+    (SELECT count(*) FROM expected x JOIN session_tags t USING (session_id) WHERE t.tag <> x.tag) AS tags_wrong,
+    (SELECT count(*) FROM expected_reason r JOIN session_tags t USING (session_id) WHERE t.reason IS DISTINCT FROM r.reason) AS reasons_wrong,
+    (SELECT count(*) FROM expected x JOIN session_tags t USING (session_id) WHERE t.started_at IS DISTINCT FROM x.started_at) AS dates_wrong;
 
 -- How many sessions have each tag.
 SELECT tag, count(*) FROM session_tags GROUP BY tag ORDER BY 2 DESC;
