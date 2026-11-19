@@ -56,7 +56,7 @@ Overall session outcomes.
 ```
 
 ### 2. Daily session summary
-Session outcomes per day (UTC). Early rows are low-volume test days.
+Session outcomes per day (UTC).
 ```
      day     | sessions | connected | failed | no_attempt | connected_percent
 -------------+----------+-----------+--------+------------+--------------------

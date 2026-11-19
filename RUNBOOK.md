@@ -117,7 +117,7 @@ Notes:
 - Don't add session and connection numbers together. A `connected` session can contain `not_connected` connections.
 
 ## 7. Reports
-`just report` prints these, in this order. Days are UTC. [SAMPLE-OUTPUT.md](SAMPLE-OUTPUT.md) shows what every command prints.
+`just report` prints these, in this order. Days are UTC. [SAMPLE-OUTPUT.md](SAMPLE-OUTPUT.md) shows sample pipeline and analytics outputs.
 
 | # | Report | Purpose |
 |---|---|---|
@@ -153,6 +153,16 @@ WHERE (started_at AT TIME ZONE 'UTC')::DATE = '2026-10-13' GROUP BY tag, reason 
 -- connection failure reasons
 SELECT reason, count(*) AS connections FROM connection_tags
 WHERE tag = 'not_connected' GROUP BY reason ORDER BY connections DESC;
+
+-- tagged sessions with client connections missing from connection_tags (events up to the session's end)
+SELECT DISTINCT e.session_id
+FROM session_telemetry_events e
+JOIN session_tags s ON s.session_id = e.session_id
+WHERE e.connection_role = 'client' AND e.connection_id IS NOT NULL
+  AND e.recorded_at <= (SELECT min(x.recorded_at) FROM session_telemetry_events x
+                        WHERE x.session_id = e.session_id AND x.event_type = 'session_ended')
+  AND NOT EXISTS (SELECT 1 FROM connection_tags c WHERE c.connection_id = e.connection_id)
+LIMIT 20;
 ```
 
 ## 9. Troubleshooting
@@ -164,7 +174,7 @@ WHERE tag = 'not_connected' GROUP BY reason ORDER BY connections DESC;
 | sessions are waiting | `just run` |
 | `no_end_event` in `just check` is above 0 | those sessions never sent `session_ended`, so they can't be tagged |
 | `just check` shows a `*_wrong` above 0 | find the affected rows by comparing the tag tables with the raw events (section 8), and check the rules in `pipeline/tags.py` |
-| connection `not_tagged_yet` stays above 0 after `just run` | first find which sessions they belong to: `SELECT session_id, count(*) FROM session_tags s WHERE NOT EXISTS (SELECT 1 FROM connection_tags c WHERE c.session_id = s.session_id) GROUP BY 1;` lists tagged sessions without connections (some sessions genuinely have none). If they were tagged before `connection_tags` existed, `just reset` then `just run` fills them in |
+| connection `not_tagged_yet` stays above 0 after `just run` | list the affected sessions with the last query in section 8 (it also finds sessions missing only some connections). If they were tagged before `connection_tags` existed, `just reset` then `just run` fills them in |
 | the pipeline needs to stop | Ctrl+C |
 | `just` is not recognised | install it (section 2) and reopen the terminal |
 | a report shows unexpected numbers | check the definitions in section 6, then inspect the affected rows (section 8) |
