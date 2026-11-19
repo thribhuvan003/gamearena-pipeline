@@ -117,7 +117,7 @@ Notes:
 - Don't add session and connection numbers together. A `connected` session can contain `not_connected` connections.
 
 ## 7. Reports
-`just report` prints these, in this order. Days are UTC.
+`just report` prints these, in this order. Days are UTC. [SAMPLE-OUTPUT.md](SAMPLE-OUTPUT.md) shows what every command prints.
 
 | # | Report | Purpose |
 |---|---|---|
