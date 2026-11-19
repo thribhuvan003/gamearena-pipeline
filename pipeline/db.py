@@ -5,7 +5,7 @@ import psycopg
 from pipeline import config
 
 
-def connect():                                               # opens a connection to the database (gives up after 5 seconds) and returns it. Called by run_command and show_command before any SQL
+def connect():                                               # opens a connection to the database (gives up after 5 seconds) and returns it. Called by run_command and status_command before any SQL
     return psycopg.connect(
         host=config.DB_HOST,
         port=config.DB_PORT,
