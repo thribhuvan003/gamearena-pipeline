@@ -24,7 +24,7 @@ It works in batches of `BATCH_SIZE` sessions. A session and its connections are 
 | `just live` | tags new sessions every `WAIT_SECONDS`; **Ctrl+C stops it** |
 | `just status` | totals for sessions and client connections, sessions waiting, last 5 runs with how long they took |
 | `just check` | two rows (sessions, then client connections): every `*_wrong` must be 0; `not_tagged_yet` is 0 after a full run |
-| `just report` | the 7 reports (section 5) |
+| `just report` | the 6 reports (section 5) |
 | `just report-file` | saves the reports to `Documents\gamearena-notes\report.txt` (they contain error texts, so not in the repo) |
 | `just explore` | the raw data's tables, columns, event names and payload fields |
 | `just reset` | empties our 3 tables (asks first; raw data untouched) |
@@ -75,8 +75,14 @@ The rules are in `pipeline/tags.py`; `sql/check.sql` re-checks them in plain SQL
 3. **Failure reasons**: what to fix first, with % of failed sessions.
 4. **Reasons per day**: which reason caused a bad day.
 5. **Exact app errors**: the last error behind each failed session (code, phase, stage, error text), with a short `error_id`, sessions affected and first/last seen. The rows add up to report 3's error reasons.
-6. **Client connections**: connected / not_connected / unknown, and the not_connected ones split into `retried_before_success` (the player got in later), `dropped_after_success` (the player was in, then lost it), and `in_session_never_connected`. `sessions_with_a_drop` = how many games were hit by a drop.
-7. **Why connections didn't connect**: report 6's split, per reason.
+6. **Client connections that didn't connect**: one row per kind, split by reason. The 5 rows add up to `not_connected`:
+   - `in_session_never_connected`: the player never got in at all.
+   - `retried_before_success`: it failed, but the player got in later.
+   - `reconnect_after_link_lost`: the player was in, the earlier connection's video or network link was lost, and this reconnect failed. **These are the real mid-game drops.**
+   - `reconnect_after_clean_end`: the earlier connection ended without a lost-link signal (e.g. a reload). Not a proven drop.
+   - `opened_while_still_connected`: the earlier connection was still working. Not a drop.
+
+   Limit: "link lost" means it happened at some point on the earlier connection before the session ended, not necessarily right before the reconnect.
 
 ## 6. Useful queries
 SQL shell: `docker exec -it cockroachdb ./cockroach sql --insecure -d gamearena_analytics` (leave with `\q`).

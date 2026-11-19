@@ -71,38 +71,55 @@ WHERE t.tag = 'failed'
 GROUP BY 1, 2, 3, 4, 5, 6
 ORDER BY sessions DESC;
 
--- 6. Client connections: how many got video, and of those that didn't, how many were retries before the player got in, drops after the player was already in, or in sessions that never connected. unknown = the app sent nothing on it, so not counted as a failure.
-WITH first_ok AS (
-    SELECT session_id, min(started_at) AS first_ok_at
-    FROM connection_tags
-    WHERE tag = 'connected'
+-- 6. Client connections that didn't connect, one row per kind (each connection gets exactly one kind, so the rows add up to not_connected): in a session that never connected; a retry before the player got in; a reconnect after the earlier connection lost its video/network link (the real drops); a reconnect after a clean end (not a proven drop); opened while an earlier one was still working (not a drop). Columns split each kind by reason.
+WITH ended AS (
+    SELECT session_id, min(recorded_at) AS ended_at
+    FROM session_telemetry_events
+    WHERE event_type = 'session_ended'
     GROUP BY session_id
+),
+life AS (
+    SELECT e.connection_id,
+           coalesce(min(e.recorded_at) FILTER (WHERE e.event_type = 'client_disconnected'), max(e.recorded_at)) AS ended_at,
+           bool_or(e.payload->>'event' = 'pipeline.connection.dropped'
+                   OR (e.payload->>'event' IN ('webrtc.connection.state', 'ice.connection.state')
+                       AND e.payload->>'state' IN ('disconnected', 'failed'))) AS link_lost
+    FROM session_telemetry_events e
+    JOIN ended d ON d.session_id = e.session_id
+    WHERE e.connection_role = 'client'
+      AND e.connection_id IS NOT NULL
+      AND e.recorded_at <= d.ended_at
+    GROUP BY e.connection_id
+),
+not_connected AS (
+    SELECT DISTINCT ON (c.connection_id)
+           c.connection_id, c.session_id, c.reason, c.started_at,
+           p.connection_id AS previous_ok,
+           EXISTS (SELECT 1 FROM connection_tags o WHERE o.session_id = c.session_id AND o.tag = 'connected') AS session_connected
+    FROM connection_tags c
+    LEFT JOIN connection_tags p ON p.session_id = c.session_id AND p.tag = 'connected' AND p.started_at <= c.started_at
+    WHERE c.tag = 'not_connected'
+    ORDER BY c.connection_id, p.started_at DESC
+),
+kinds AS (
+    SELECT n.session_id,
+           n.reason,
+           CASE
+               WHEN NOT n.session_connected THEN 'in_session_never_connected'
+               WHEN n.previous_ok IS NULL THEN 'retried_before_success'
+               WHEN l.ended_at > n.started_at THEN 'opened_while_still_connected'
+               WHEN l.link_lost THEN 'reconnect_after_link_lost'
+               ELSE 'reconnect_after_clean_end'
+           END AS kind
+    FROM not_connected n
+    LEFT JOIN life l ON l.connection_id = n.previous_ok
 )
-SELECT count(*) AS client_connections,
-       count(*) FILTER (WHERE c.tag = 'connected') AS connected,
-       count(*) FILTER (WHERE c.tag = 'not_connected') AS not_connected,
-       count(*) FILTER (WHERE c.tag = 'unknown') AS unknown,
-       count(*) FILTER (WHERE c.tag = 'not_connected' AND c.started_at < f.first_ok_at) AS retried_before_success,
-       count(*) FILTER (WHERE c.tag = 'not_connected' AND c.started_at >= f.first_ok_at) AS dropped_after_success,
-       count(*) FILTER (WHERE c.tag = 'not_connected' AND f.session_id IS NULL) AS in_session_never_connected,
-       count(DISTINCT c.session_id) FILTER (WHERE c.tag = 'not_connected' AND c.started_at >= f.first_ok_at) AS sessions_with_a_drop
-FROM connection_tags c
-LEFT JOIN first_ok f USING (session_id);
-
--- 7. Why client connections didn't connect, split the same way as report 6.
-WITH first_ok AS (
-    SELECT session_id, min(started_at) AS first_ok_at
-    FROM connection_tags
-    WHERE tag = 'connected'
-    GROUP BY session_id
-)
-SELECT c.reason,
-       count(*) AS not_connected,
-       count(*) FILTER (WHERE c.started_at < f.first_ok_at) AS retried_before_success,
-       count(*) FILTER (WHERE c.started_at >= f.first_ok_at) AS dropped_after_success,
-       count(*) FILTER (WHERE f.session_id IS NULL) AS in_session_never_connected
-FROM connection_tags c
-LEFT JOIN first_ok f USING (session_id)
-WHERE c.tag = 'not_connected'
-GROUP BY c.reason
-ORDER BY not_connected DESC;
+SELECT kind,
+       count(*) AS connections,
+       count(DISTINCT session_id) AS sessions,
+       count(*) FILTER (WHERE reason = 'no_video') AS no_video,
+       count(*) FILTER (WHERE reason = 'video_connection_failed') AS video_connection_failed,
+       count(*) FILTER (WHERE reason IN ('setup_error', 'error_while_connecting', 'error_other')) AS error_logged
+FROM kinds
+GROUP BY kind
+ORDER BY connections DESC;
