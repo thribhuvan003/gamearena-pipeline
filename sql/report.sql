@@ -9,7 +9,7 @@ SELECT count(*) AS sessions,
 FROM session_tags;
 
 -- 2. Per day: is it getting better or worse? The same columns, one row per day.
-SELECT started_at::DATE AS day,
+SELECT (started_at AT TIME ZONE 'UTC')::DATE AS day,
        count(*) AS sessions,
        count(*) FILTER (WHERE tag = 'connected') AS connected,
        count(*) FILTER (WHERE tag = 'failed') AS failed,
@@ -29,7 +29,7 @@ GROUP BY reason
 ORDER BY sessions DESC;
 
 -- 4. Which problem caused each bad day: failed sessions per day split by reason (only days with failures).
-SELECT started_at::DATE AS day,
+SELECT (started_at AT TIME ZONE 'UTC')::DATE AS day,
        count(*) FILTER (WHERE reason = 'setup_error') AS setup_error,
        count(*) FILTER (WHERE reason = 'no_video') AS no_video,
        count(*) FILTER (WHERE reason = 'video_connection_failed') AS video_connection_failed,
@@ -63,8 +63,8 @@ SELECT t.reason,
        l.payload->>'stage' AS stage,
        l.payload->>'reason' AS error_text,
        count(*) AS sessions,
-       min(l.recorded_at)::DATE AS first_seen,
-       max(l.recorded_at)::DATE AS last_seen
+       (min(l.recorded_at) AT TIME ZONE 'UTC')::DATE AS first_seen,
+       (max(l.recorded_at) AT TIME ZONE 'UTC')::DATE AS last_seen
 FROM last_error l
 JOIN session_tags t USING (session_id)
 WHERE t.tag = 'failed'
@@ -80,7 +80,7 @@ SELECT count(*) AS client_connections,
 FROM connection_tags;
 
 -- 7. Daily connection summary: the same, per day (the day the connection started, UTC).
-SELECT started_at::DATE AS day,
+SELECT (started_at AT TIME ZONE 'UTC')::DATE AS day,
        count(*) AS client_connections,
        count(*) FILTER (WHERE tag = 'connected') AS connected,
        count(*) FILTER (WHERE tag = 'not_connected') AS not_connected,

@@ -34,7 +34,7 @@ report:
 
 # Save the reports to Documents\gamearena-report.txt
 report-file:
-    Get-Content sql/report.sql | {{db}} | Out-File -Encoding utf8 "$HOME\Documents\gamearena-report.txt"; Write-Output "Saved to $HOME\Documents\gamearena-report.txt"
+    Get-Content sql/report.sql | {{db}} | Out-File -Encoding utf8 "$HOME\Documents\gamearena-report.txt"; if ($LASTEXITCODE -eq 0) { Write-Output "Saved to $HOME\Documents\gamearena-report.txt" } else { Write-Error "Report failed; see the error above"; exit 1 }
 
 # Inspect the raw data
 explore:

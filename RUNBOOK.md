@@ -148,7 +148,7 @@ FROM session_telemetry_events WHERE connection_id = 'CONNECTION_ID' ORDER BY rec
 
 -- session results on one date
 SELECT tag, reason, count(*) FROM session_tags
-WHERE started_at::DATE = '2026-10-13' GROUP BY tag, reason ORDER BY 3 DESC;
+WHERE (started_at AT TIME ZONE 'UTC')::DATE = '2026-10-13' GROUP BY tag, reason ORDER BY 3 DESC;
 
 -- connection failure reasons
 SELECT reason, count(*) AS connections FROM connection_tags
@@ -160,11 +160,11 @@ WHERE tag = 'not_connected' GROUP BY reason ORDER BY connections DESC;
 |---|---|
 | database connection fails (timeout) | check that Docker is running, that `docker ps` lists `cockroachdb`, and the `DB_*` settings |
 | a run fails | `just status` shows the error next to the run. Fix the cause and `just run` again; saved batches are kept |
-| a run shows `still running` but nothing happens | the database was lost mid-run, so the run couldn't record its end. The next run continues normally |
+| a run shows `still running` but nothing happens | the process ended unexpectedly (crash, killed, machine or database lost), so the run couldn't record its end. The next run continues normally |
 | sessions are waiting | `just run` |
 | `no_end_event` in `just check` is above 0 | those sessions never sent `session_ended`, so they can't be tagged |
 | `just check` shows a `*_wrong` above 0 | find the affected rows by comparing the tag tables with the raw events (section 8), and check the rules in `pipeline/tags.py` |
-| connection `not_tagged_yet` stays above 0 after `just run` | those sessions were tagged before `connection_tags` existed. To fill them in, clear and re-run: `just reset`, then `just run` |
+| connection `not_tagged_yet` stays above 0 after `just run` | first find which sessions they belong to: `SELECT session_id, count(*) FROM session_tags s WHERE NOT EXISTS (SELECT 1 FROM connection_tags c WHERE c.session_id = s.session_id) GROUP BY 1;` lists tagged sessions without connections (some sessions genuinely have none). If they were tagged before `connection_tags` existed, `just reset` then `just run` fills them in |
 | the pipeline needs to stop | Ctrl+C |
 | `just` is not recognised | install it (section 2) and reopen the terminal |
 | a report shows unexpected numbers | check the definitions in section 6, then inspect the affected rows (section 8) |
