@@ -1,4 +1,4 @@
-# justfile: the pipeline's commands. Run them in PowerShell from this folder (local setup: CockroachDB in the Docker container "cockroachdb"). Type `just` to list them.
+# justfile: the pipeline's commands. See RUNBOOK.md.
 
 set shell := ["powershell.exe", "-NoProfile", "-Command"]
 
@@ -32,17 +32,9 @@ check:
 report:
     Get-Content sql/report.sql | {{db}}
 
-# Save the reports to Documents\gamearena-report.txt
-report-file:
-    Get-Content sql/report.sql | {{db}} | Out-File -Encoding utf8 "$HOME\Documents\gamearena-report.txt"; if ($LASTEXITCODE -eq 0) { Write-Output "Saved to $HOME\Documents\gamearena-report.txt" } else { Write-Error "Report failed; see the error above"; exit 1 }
-
-# Preview the generated tables (newest 10 rows of each)
+# Preview the generated tables (10 rows each, latest start time first)
 tables:
     {{db}} -e "SELECT session_id, tag, reason, started_at, run_id FROM session_tags ORDER BY started_at DESC LIMIT 10; SELECT connection_id, session_id, tag, reason, started_at, run_id FROM connection_tags ORDER BY started_at DESC LIMIT 10; SELECT run_id, started_at, finished_at, status, sessions_tagged, error FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
-
-# Show the newest 20 unsuccessful client connections
-failures:
-    {{db}} -e "SELECT session_id, connection_id, reason, started_at FROM connection_tags WHERE tag = 'not_connected' ORDER BY started_at DESC LIMIT 20;"
 
 # Inspect the raw data (tables, columns, event names)
 explore:

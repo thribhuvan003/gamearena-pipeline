@@ -129,8 +129,6 @@ It prints three tables:
 | Command | What it does |
 |---|---|
 | `just live` | keeps running and tags new sessions every `WAIT_SECONDS` (30); Ctrl+C stops it |
-| `just failures` | 20 not_connected client connections with the latest start time, with their session |
-| `just report-file` | saves the reports to `Documents\gamearena-report.txt` |
 | `just explore` | shows the raw telemetry tables, columns and event names |
 | `just sql` | opens the SQL shell for your own queries (`\q` to leave) |
 
@@ -170,8 +168,12 @@ Host connections and events without a connection ID aren't tagged at connection 
 A reason is what was recorded, not a confirmed root cause; report 5 shows the app's own error. Most failure events carry no connection ID, so setup errors mostly appear only on sessions.
 
 ## Your own queries
-Open the shell with `just sql`, then paste a query. Replace the ID with one from `just tables` or `just failures`.
+Open the shell with `just sql`, then paste a query. Replace the ID with one from `just tables` or the first query.
 ```sql
+-- not_connected client connections, latest first
+SELECT session_id, connection_id, reason, started_at FROM connection_tags
+WHERE tag = 'not_connected' ORDER BY started_at DESC LIMIT 20;
+
 -- all connections of one session
 SELECT connection_id, tag, reason, started_at FROM connection_tags
 WHERE session_id = 'SESSION_ID' ORDER BY started_at;
