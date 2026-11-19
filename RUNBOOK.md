@@ -15,7 +15,7 @@ The pipeline reads GameArena telemetry, classifies ended sessions and their clie
 - Python packages: `pip install -r requirements.txt`
 - just: `winget install --id Casey.Just`, then open a new terminal.
 
-**Run every command in PowerShell, from this project folder** (the one with `justfile`). Type `just` to list them all.
+**Run every command in PowerShell, from this project folder** (the one with `justfile`). Type `just` to list them all. [COMMANDS.md](COMMANDS.md) shows every command, what it does and a sample output.
 
 ## Start here
 The outputs below come from a local run. Long outputs are shortened and IDs are replaced (`SESSION_01`, ...).
