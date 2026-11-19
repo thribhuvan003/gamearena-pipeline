@@ -5,7 +5,7 @@ import psycopg
 from pipeline import config
 
 
-def connect():                                               # Opens a database connection. Called by run_command and status_command
+def connect():                                               # Opens a database connection
     return psycopg.connect(
         host=config.DB_HOST,
         port=config.DB_PORT,

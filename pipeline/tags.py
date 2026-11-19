@@ -1,7 +1,7 @@
 # tags.py: decides each session's and each client connection's tag and, if it didn't connect, its reason. No database here, only the rules.
 
 
-def tag_session(session):                                    # connected, failed or no_attempt. Called by tag_new_sessions
+def tag_session(session):                                    # connected, failed or no_attempt
     event_names = session["event_names"]
 
     if "pipeline.connect.success" in event_names:
@@ -13,7 +13,7 @@ def tag_session(session):                                    # connected, failed
     return "no_attempt"
 
 
-def failure_reason(session, tag):                            # Why a failed session failed (first match wins), else None. Called by tag_new_sessions
+def failure_reason(session, tag):                            # Why a failed session failed (first match wins), else None
     if tag != "failed":
         return None
 
@@ -35,7 +35,7 @@ def failure_reason(session, tag):                            # Why a failed sess
     return "no_video"
 
 
-def tag_connection(connection):                              # connected, not_connected or unknown. Called by tag_new_sessions
+def tag_connection(connection):                              # connected, not_connected or unknown
     if "pipeline.connect.success" in connection["event_names"]:
         return "connected"
 
@@ -45,7 +45,7 @@ def tag_connection(connection):                              # connected, not_co
     return "not_connected"
 
 
-def connection_reason(connection, tag):                      # Why a not_connected connection had no success (first match wins), else None. Called by tag_new_sessions
+def connection_reason(connection, tag):                      # Why a not_connected connection had no success (first match wins), else None
     if tag != "not_connected":
         return None
 
@@ -63,7 +63,7 @@ def connection_reason(connection, tag):                      # Why a not_connect
     return "no_video"
 
 
-def last_failure_phase(session):                             # Phase of the last pipeline.connect.failure, else None. Called by failure_reason and connection_reason
+def last_failure_phase(session):                             # Phase of the last pipeline.connect.failure, else None
     phase = None
     for name, event_phase in zip(session["event_names"], session["phases"]):
         if name == "pipeline.connect.failure":
@@ -71,7 +71,7 @@ def last_failure_phase(session):                             # Phase of the last
     return phase
 
 
-def video_failed(session):                                   # True if webrtc.connection.state ever went to failed. Called by failure_reason and connection_reason
+def video_failed(session):                                   # True if webrtc.connection.state ever went to failed
     for name, state in zip(session["event_names"], session["states"]):
         if name == "webrtc.connection.state" and state == "failed":
             return True

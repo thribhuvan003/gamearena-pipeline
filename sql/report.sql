@@ -1,6 +1,6 @@
--- report.sql (just report): analytics. Reports 1-5 are sessions (did the player get in, and why not); 6-8 are client connections (one session can have several). Days are the session's start day in UTC.
+-- report.sql (just report): analytics. Reports 1-5 are sessions, 6-8 are client connections. Days are UTC.
 
--- 1. Overall: sessions, connected, failed (tried but never connected), no_attempt (never tried), and the % that connected.
+-- 1. Session summary
 SELECT count(*) AS sessions,
        count(*) FILTER (WHERE tag = 'connected') AS connected,
        count(*) FILTER (WHERE tag = 'failed') AS failed,
@@ -8,7 +8,7 @@ SELECT count(*) AS sessions,
        round(100.0 * count(*) FILTER (WHERE tag = 'connected') / nullif(count(*), 0), 1) AS connected_percent
 FROM session_tags;
 
--- 2. Per day: is it getting better or worse? The same columns, one row per day.
+-- 2. Daily session summary
 SELECT (started_at AT TIME ZONE 'UTC')::DATE AS day,
        count(*) AS sessions,
        count(*) FILTER (WHERE tag = 'connected') AS connected,
@@ -19,7 +19,7 @@ FROM session_tags
 GROUP BY day
 ORDER BY day;
 
--- 3. What to fix first: each failure reason, how many sessions, and its % of the failed sessions.
+-- 3. Session failure reasons
 SELECT reason,
        count(*) AS sessions,
        round(100.0 * count(*) / sum(count(*)) OVER (), 1) AS percent_of_failed
@@ -28,7 +28,7 @@ WHERE tag = 'failed'
 GROUP BY reason
 ORDER BY sessions DESC;
 
--- 4. Which problem caused each bad day: failed sessions per day split by reason (only days with failures).
+-- 4. Daily session failures
 SELECT (started_at AT TIME ZONE 'UTC')::DATE AS day,
        count(*) FILTER (WHERE reason = 'setup_error') AS setup_error,
        count(*) FILTER (WHERE reason = 'no_video') AS no_video,
@@ -41,7 +41,7 @@ WHERE tag = 'failed'
 GROUP BY day
 ORDER BY day;
 
--- 5. What exactly went wrong: the app's own error (the LAST one before the end, the one that decided the reason) for each failed session, grouped; error_id is a short name for each distinct error.
+-- 5. Application errors: the last recorded failure of each failed session
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
     FROM session_telemetry_events
@@ -71,7 +71,7 @@ WHERE t.tag = 'failed'
 GROUP BY 1, 2, 3, 4, 5, 6
 ORDER BY sessions DESC;
 
--- 6. Connection summary: all client connections, how many recorded a success, how many had app events but no success (not_connected), how many had no app events (unknown), and the % connected.
+-- 6. Connection summary (connected_percent counts unknown connections in the total)
 SELECT count(*) AS client_connections,
        count(*) FILTER (WHERE tag = 'connected') AS connected,
        count(*) FILTER (WHERE tag = 'not_connected') AS not_connected,
@@ -79,7 +79,7 @@ SELECT count(*) AS client_connections,
        round(100.0 * count(*) FILTER (WHERE tag = 'connected') / nullif(count(*), 0), 1) AS connected_percent
 FROM connection_tags;
 
--- 7. Daily connection summary: the same, per day (the day the connection started, UTC).
+-- 7. Daily connection summary
 SELECT (started_at AT TIME ZONE 'UTC')::DATE AS day,
        count(*) AS client_connections,
        count(*) FILTER (WHERE tag = 'connected') AS connected,
@@ -90,7 +90,7 @@ FROM connection_tags
 GROUP BY day
 ORDER BY day;
 
--- 8. Connection failure reasons: why not_connected connections had no success, how many sessions they were in, and how many of them were in sessions that still connected overall (the failures a session-level view hides).
+-- 8. Connection failure reasons
 SELECT c.reason,
        count(*) AS connections,
        count(DISTINCT c.session_id) AS sessions,

@@ -25,13 +25,16 @@ def main():                                                  # Reads the command
 
     args = parser.parse_args()
 
+    if args.command == "run" and args.limit is not None and args.limit < 1:
+        parser.error("--limit must be 1 or more")
+
     if args.command == "run":
         run_command(args)
     else:
         status_command()
 
 
-def run_command(args):                                       # Runs one round, or a round every WAIT_SECONDS until Ctrl+C. Called by main
+def run_command(args):                                       # Runs one round, or a round every WAIT_SECONDS until Ctrl+C
     print(f"Pipeline started: database {config.DB_NAME} on {config.DB_HOST}:{config.DB_PORT}, batch size {config.BATCH_SIZE}")
     once = args.once or args.limit is not None
 
@@ -61,7 +64,7 @@ def run_command(args):                                       # Runs one round, o
     print("Pipeline stopped")
 
 
-def run_one_round(conn, limit):                              # Runs one round and records it in pipeline_runs. Called by run_command
+def run_one_round(conn, limit):                              # Runs one round and records it in pipeline_runs
     run_id = store.start_run(conn)
     conn.commit()
 
@@ -78,7 +81,7 @@ def run_one_round(conn, limit):                              # Runs one round an
     return total
 
 
-def tag_new_sessions(conn, run_id, limit):                   # Per batch: read, tag and save sessions and their client connections. Called by run_one_round
+def tag_new_sessions(conn, run_id, limit):                   # Per batch: read, tag and save sessions and their client connections
     total = 0
 
     while True:
@@ -113,7 +116,7 @@ def tag_new_sessions(conn, run_id, limit):                   # Per batch: read, 
         print(f"Saved {len(sessions)} sessions and {len(connections)} client connections (total {total} sessions)")
 
 
-def status_command():                                        # Prints the processing status. Called by main
+def status_command():                                        # Prints the processing status
     with db.connect() as conn:
         show.show_status(conn)
 

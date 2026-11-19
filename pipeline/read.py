@@ -1,6 +1,6 @@
 # read.py: asks the database for the next batch of sessions to tag, and their client connections. It only reads, never changes anything.
 
-# SQL (used by read_sessions): pick up to N ended sessions with no tag yet; for each, its start time and its event names, phases and states in time order (id breaks ties), up to the moment it ended.
+# Read the next batch of untagged ended sessions.
 EVENTS_SQL = """
 WITH batch AS (
     SELECT e.session_id,
@@ -26,7 +26,7 @@ GROUP BY e.session_id
 """
 
 
-def read_sessions(conn, limit):                              # Reads the next batch of ended, untagged sessions with their events. Called by tag_new_sessions
+def read_sessions(conn, limit):                              # Reads the next batch of ended, untagged sessions with their events
     with conn.cursor() as cursor:
         cursor.execute(EVENTS_SQL, {"limit": limit})
         rows = cursor.fetchall()
@@ -42,7 +42,7 @@ def read_sessions(conn, limit):                              # Reads the next ba
     return sessions
 
 
-# SQL (used by read_connections): for the given sessions, every client connection with its start time, how many events the app itself sent on it, and its event names, phases and states in time order, up to the moment its session ended.
+# Read client connections for the selected sessions.
 CONNECTIONS_SQL = """
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
@@ -67,7 +67,7 @@ GROUP BY e.connection_id, e.session_id
 """
 
 
-def read_connections(conn, session_ids):                     # Reads the client connections of those sessions with their events. Called by tag_new_sessions
+def read_connections(conn, session_ids):                     # Reads the client connections of those sessions with their events
     with conn.cursor() as cursor:
         cursor.execute(CONNECTIONS_SQL, {"ids": session_ids})
         rows = cursor.fetchall()

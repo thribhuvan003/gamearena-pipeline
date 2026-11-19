@@ -53,7 +53,7 @@ SELECT count(*) AS ended_sessions,
        count(*) FILTER (WHERE t.session_id IS NULL) AS not_tagged_yet,
        count(*) FILTER (WHERE t.tag <> x.tag) AS tags_wrong,
        count(*) FILTER (WHERE t.session_id IS NOT NULL AND t.reason IS DISTINCT FROM x.reason) AS reasons_wrong,
-       count(*) FILTER (WHERE t.started_at <> x.started_at) AS dates_wrong
+       count(*) FILTER (WHERE t.session_id IS NOT NULL AND t.started_at IS DISTINCT FROM x.started_at) AS dates_wrong
 FROM expected x
 LEFT JOIN session_tags t USING (session_id);
 
