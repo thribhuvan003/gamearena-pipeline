@@ -63,7 +63,7 @@ def connection_reason(connection, tag):                      # returns why a cli
     return "no_video"
 
 
-def last_failure_phase(session):                             # returns the phase of the session's last connection error (pre-connect / connecting), or None. Called by failure_reason to see if and when an error was logged
+def last_failure_phase(session):                             # returns the phase of the session's last connection error (pre-connect / connecting), or None. Called by failure_reason and connection_reason to see if and when an error was logged
     phase = None
     for name, event_phase in zip(session["event_names"], session["phases"]):
         if name == "pipeline.connect.failure":
@@ -71,7 +71,7 @@ def last_failure_phase(session):                             # returns the phase
     return phase
 
 
-def video_failed(session):                                   # returns True if the video connection (WebRTC) ever went to failed. Called by failure_reason when no error was logged
+def video_failed(session):                                   # returns True if the video connection (WebRTC) ever went to failed. Called by failure_reason and connection_reason when no error was logged
     for name, state in zip(session["event_names"], session["states"]):
         if name == "webrtc.connection.state" and state == "failed":
             return True

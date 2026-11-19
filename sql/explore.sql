@@ -1,3 +1,5 @@
+-- explore.sql (just explore): shows what is in the raw data. Only reads.
+
 -- Every table in the database.
 SHOW TABLES;
 

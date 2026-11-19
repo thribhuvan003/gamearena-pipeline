@@ -1,5 +1,4 @@
-# __main__.py: the start of the program. The functions below are in the order they run:
-# main -> run_command -> run_one_round -> tag_new_sessions, or main -> show_command.
+# __main__.py: the start of the program; functions in the order they run: main -> run_command -> run_one_round -> tag_new_sessions, or main -> status_command.
 
 import argparse
 import time
@@ -14,27 +13,27 @@ from pipeline import store
 from pipeline import tags
 
 
-def main():                                                  # reads the typed command (run or show) and hands it on; stores nothing. Called at the bottom of this file when you type python -m pipeline
-    parser = argparse.ArgumentParser(prog="python -m pipeline", description="Tag GameArena sessions and answer questions about them.")
+def main():                                                  # reads the typed command (run or status) and hands it on; stores nothing. Called at the bottom of this file when you type python -m pipeline
+    parser = argparse.ArgumentParser(prog="python -m pipeline", description="Tag GameArena sessions and their client connections.")
     commands = parser.add_subparsers(dest="command", required=True)
 
     run_parser = commands.add_parser("run", help="tag sessions")
     run_parser.add_argument("--once", action="store_true", help="tag what is waiting, then exit")
     run_parser.add_argument("--limit", type=int, help="tag at most N sessions, then exit")
 
-    show_parser = commands.add_parser("show", help="answer a question; changes nothing")
-    show_parser.add_argument("question", choices=sorted(show.QUESTIONS), help="what to show")
+    commands.add_parser("status", help="show totals and the last runs; changes nothing")
 
     args = parser.parse_args()
 
     if args.command == "run":
         run_command(args)
     else:
-        show_command(args)
+        status_command()
 
 
 def run_command(args):                                       # does one round (--once / --limit) or a round every WAIT_SECONDS until Ctrl+C; stores nothing itself. Called by main for 'run'
     print(f"Pipeline started: database {config.DB_NAME} on {config.DB_HOST}:{config.DB_PORT}, batch size {config.BATCH_SIZE}")
+    once = args.once or args.limit is not None
 
     try:
         while True:
@@ -45,12 +44,12 @@ def run_command(args):                                       # does one round (-
                 print(f"Done. {total} sessions tagged this round")
 
             except psycopg.OperationalError as error:
-                if args.once or args.limit is not None:
+                if once:
                     raise
 
                 print(f"Database not reachable, will try again: {error}")
 
-            if args.once or args.limit is not None:
+            if once:
                 break
 
             print(f"Waiting {config.WAIT_SECONDS} s for new sessions (Ctrl+C to stop)")
@@ -62,7 +61,7 @@ def run_command(args):                                       # does one round (-
     print("Pipeline stopped")
 
 
-def run_one_round(conn, limit):                              # does one round and records it in pipeline_runs (running, then ok or failed); returns how many it tagged. Called by run_command, once per round
+def run_one_round(conn, limit):                              # does one round and records it in pipeline_runs (running, then ok or failed); returns how many sessions it tagged. Called by run_command, once per round
     run_id = store.start_run(conn)
     conn.commit()
 
@@ -79,7 +78,7 @@ def run_one_round(conn, limit):                              # does one round an
     return total
 
 
-def tag_new_sessions(conn, run_id, limit):                   # reads, tags and saves sessions (and their client connections) 200 sessions at a time until none are left or the limit is hit; returns the session count. Called by run_one_round to do the work
+def tag_new_sessions(conn, run_id, limit):                   # reads, tags and saves one batch of sessions and their client connections at a time (one commit each) until none are left or the limit is hit; returns the session count. Called by run_one_round
     total = 0
 
     while True:
@@ -96,32 +95,27 @@ def tag_new_sessions(conn, run_id, limit):                   # reads, tags and s
         if not sessions:
             return total
 
-        results = {}
-
-        for session_id, session in sessions.items():
-            tag = tags.tag_session(session)
-            reason = tags.failure_reason(session, tag)
-            results[session_id] = {"tag": tag, "reason": reason, "started_at": session["started_at"]}
+        for session in sessions.values():
+            session["tag"] = tags.tag_session(session)
+            session["reason"] = tags.failure_reason(session, session["tag"])
 
         connections = read.read_connections(conn, list(sessions))
-        connection_results = {}
 
-        for connection_id, connection in connections.items():
-            tag = tags.tag_connection(connection)
-            reason = tags.connection_reason(connection, tag)
-            connection_results[connection_id] = {"session_id": connection["session_id"], "tag": tag, "reason": reason, "started_at": connection["started_at"]}
+        for connection in connections.values():
+            connection["tag"] = tags.tag_connection(connection)
+            connection["reason"] = tags.connection_reason(connection, connection["tag"])
 
-        store.save_tags(conn, results, run_id)
-        store.save_connection_tags(conn, connection_results, run_id)
+        store.save_tags(conn, sessions, run_id)
+        store.save_connection_tags(conn, connections, run_id)
         conn.commit()
 
-        total += len(results)
-        print(f"Saved {len(results)} sessions and {len(connection_results)} client connections (total {total} sessions)")
+        total += len(sessions)
+        print(f"Saved {len(sessions)} sessions and {len(connections)} client connections (total {total} sessions)")
 
 
-def show_command(args):                                      # answers a question (e.g. status) by running its function from show.QUESTIONS; stores nothing, only prints. Called by main for 'show'
+def status_command():                                        # prints the totals and the last runs by calling show.show_status; stores nothing. Called by main for 'status'
     with db.connect() as conn:
-        show.QUESTIONS[args.question](conn)
+        show.show_status(conn)
 
 
 if __name__ == "__main__":

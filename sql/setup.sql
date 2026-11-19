@@ -1,3 +1,5 @@
+-- setup.sql (just setup): creates our 3 tables if they don't exist yet; safe to run again.
+
 -- session_tags: one row per tagged session: its tag, its reason (if it failed), when it started, and which run tagged it.
 CREATE TABLE IF NOT EXISTS session_tags (
     session_id UUID PRIMARY KEY,

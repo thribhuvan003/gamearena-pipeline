@@ -16,26 +16,25 @@ setup:
 run n="":
     if ("{{n}}") { python -m pipeline run --limit {{n}} } else { python -m pipeline run --once }
 
-# keep tagging new sessions every 30 s until Ctrl+C
+# keep tagging new sessions every WAIT_SECONDS (default 30 s) until Ctrl+C
 live:
     python -m pipeline run
 
-# totals, how many are waiting, and the last 5 runs
+# totals for sessions and client connections, sessions waiting, and the last 5 runs with how long they took
 status:
-    python -m pipeline show status
+    python -m pipeline status
 
-# prove the tags, reasons and dates (every *_wrong column must be 0)
+# prove the saved tags, reasons and dates (every *_wrong must be 0)
 check:
     Get-Content sql/check.sql | {{db}}
 
-# the 6 founder reports
+# the founder reports
 report:
     Get-Content sql/report.sql | {{db}}
 
-# save the reports to your private notes folder (they contain error texts, so not in this repo)
+# save the reports to your private notes folder to read in full (they contain error texts, so not in this repo)
 report-file:
-    Get-Content sql/report.sql | {{db}} | Out-File "$HOME\Documents\gamearena-notes\report.txt"
-    Write-Output "Saved to $HOME\Documents\gamearena-notes\report.txt"
+    New-Item -ItemType Directory -Force "$HOME\Documents\gamearena-notes" | Out-Null; Get-Content sql/report.sql | {{db}} | Out-File -Encoding utf8 "$HOME\Documents\gamearena-notes\report.txt"; Write-Output "Saved to $HOME\Documents\gamearena-notes\report.txt"
 
 # look at the raw data: tables, columns, event names, payload fields
 explore:
