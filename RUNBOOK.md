@@ -9,13 +9,17 @@ The pipeline reads GameArena telemetry, classifies ended sessions and their clie
 | `pipeline_runs` | processing history: one row per run, with status, sessions processed and any error |
 
 ## Before you start
-- Python 3 installed.
-- Docker Desktop running, with the `cockroachdb` container started (`docker ps` lists it).
-- The telemetry already imported into the database `gamearena_analytics`.
-- Python packages: `pip install -r requirements.txt`
-- just: `winget install --id Casey.Just`, then open a new terminal.
+Works on Linux and Windows.
 
-**Run every command in PowerShell, from this project folder** (the one with `justfile`). Type `just` to list them all. [COMMANDS.md](COMMANDS.md) shows every command, what it does and a sample output.
+- Python 3 installed.
+- Docker running, with the `cockroachdb` container started (`docker ps` lists it).
+- The telemetry already imported into the database `gamearena_analytics`.
+- Python packages: `pip install -r requirements.txt` (on Linux: `pip3`, or inside a virtual environment).
+- just 1.23 or newer (`just --version`):
+  - Linux: `sudo apt install just` (Ubuntu 24.04+ / Debian 13), or a release binary from https://github.com/casey/just/releases
+  - Windows: `winget install --id Casey.Just`, then open a new terminal.
+
+**Run every command in a terminal, from this project folder** (the one with `justfile`). Type `just` to list them all. [COMMANDS.md](COMMANDS.md) shows every command, what it does and a sample output.
 
 ## Start here
 The outputs below come from a local run. Long outputs are shortened and IDs are replaced (`SESSION_01`, ...).

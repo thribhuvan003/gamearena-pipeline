@@ -1,6 +1,8 @@
-# justfile: the pipeline's commands. See RUNBOOK.md.
+# justfile: the pipeline's commands, for Linux and Windows. See RUNBOOK.md.
 
-set shell := ["powershell.exe", "-NoProfile", "-Command"]
+set windows-shell := ["cmd.exe", "/C"]
+
+python := if os_family() == "windows" { "python" } else { "python3" }
 
 db := "docker exec -i cockroachdb ./cockroach sql --insecure -d gamearena_analytics --format=table"
 
@@ -10,27 +12,27 @@ default:
 
 # Create the three generated tables if missing
 setup:
-    Get-Content sql/setup.sql | {{db}}
+    {{db}} < sql/setup.sql
 
 # Process pending sessions (just run 20 = at most 20)
 run n="":
-    python -m pipeline run --once {{ if n == "" { "" } else { "--limit " + n } }}
+    {{python}} -m pipeline run --once {{ if n == "" { "" } else { "--limit " + n } }}
 
 # Run continuously until Ctrl+C
 live:
-    python -m pipeline run
+    {{python}} -m pipeline run
 
 # Show processing status
 status:
-    python -m pipeline status
+    {{python}} -m pipeline status
 
 # Validate the results
 check:
-    Get-Content sql/check.sql | {{db}}
+    {{db}} < sql/check.sql
 
 # Generate analytics reports
 report:
-    Get-Content sql/report.sql | {{db}}
+    {{db}} < sql/report.sql
 
 # Preview the generated tables (10 rows each, latest start time first)
 tables:
@@ -38,7 +40,7 @@ tables:
 
 # Inspect the raw data (tables, columns, event names)
 explore:
-    Get-Content sql/explore.sql | {{db}}
+    {{db}} < sql/explore.sql
 
 # Open the SQL shell (\q to leave)
 sql:

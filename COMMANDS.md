@@ -1,6 +1,6 @@
 # Commands
 
-Every `just` command, what it does, and what it prints. Run them in PowerShell from the project folder.
+Every `just` command, what it does, and what it prints. Run them in a terminal (Linux or Windows) from the project folder.
 
 The outputs come from a local run. Long tables are cut (`... N more rows ...`), IDs are replaced (`SESSION_01`, `CONNECTION_01`, `RUN_01`) and error texts are hidden. Numbers change as new telemetry arrives.
 
