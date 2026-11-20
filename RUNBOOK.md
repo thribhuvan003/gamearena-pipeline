@@ -1,215 +1,130 @@
-# GameArena pipeline: runbook
+# GameArena pipeline — runbook
 
-The pipeline reads GameArena telemetry, classifies ended sessions and their client connections, and records a failure reason where one applies. The source telemetry tables are never modified.
+## Purpose
 
-| Table | Purpose |
-|---|---|
-| `session_tags` | one row per processed session: tag, reason, start time |
-| `connection_tags` | one row per processed client connection: its session, tag, reason, start time |
-| `pipeline_runs` | processing history: one row per run, with status, sessions processed and any error |
+The pipeline reads GameArena telemetry and classifies ended sessions and their client connections. It stores the results for investigation and analytics. It does not modify source telemetry.
 
-## Before you start
-Works on Linux and Windows.
+**Three stored tables** (not three competing reports):
 
-- Python 3 installed.
-- Docker running, with the `cockroachdb` container started (`docker ps` lists it).
-- The telemetry already imported into the database `gamearena_analytics`.
-- Python packages: `pip install -r requirements.txt` (on Linux: `pip3`, or inside a virtual environment).
-- just 1.23 or newer (`just --version`):
-  - Linux: `sudo apt install just` (Ubuntu 24.04+ / Debian 13), or a release binary from https://github.com/casey/just/releases
-  - Windows: `winget install --id Casey.Just`, then open a new terminal.
+| Table | One row represents | Why it exists |
+|---|---|---|
+| `session_tags` | One ended session | Overall session outcome and reason |
+| `connection_tags` | One client connection | Individual connection outcome, linked to its session |
+| `pipeline_runs` | One processing round | When the pipeline ran and whether it succeeded |
 
-**Run every command in a terminal, from this project folder** (the one with `justfile`). Type `just` to list them all. [COMMANDS.md](COMMANDS.md) shows every command, what it does and a sample output.
+One session can contain multiple client connections. The counts must not be added together.
 
-## Start here
-The outputs below come from a local run. Long outputs are shortened and IDs are replaced (`SESSION_01`, ...).
+## Local development: WSL/Linux (recommended) or Windows
 
-**1. Create the tables** (only needed once; repeating it changes nothing)
-```
+These `just` recipes work in Linux/WSL shells and in native Windows terminals. On Windows, **WSL Ubuntu is recommended** because the deployment environment is mainly Linux. The SQL commands use a local Docker CockroachDB container named `cockroachdb`. Production database access is configured separately.
+
+1. Install Python 3, a virtual environment, `just` (version 1.23+), and Docker CLI access. On Ubuntu 24.04 or later: `sudo apt update && sudo apt install python3-venv python3-pip just`. For native Windows, install Python and `just` (`winget install --id Casey.Just`).
+2. In WSL, enable Docker Desktop WSL integration. On Linux or native Windows, start the local container. Verify that `docker ps` lists `cockroachdb`.
+3. Import the telemetry backup first. `just setup` creates only the three *derived* tables; it does not import source telemetry.
+4. From the repository root, on Linux/WSL run:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
 just setup
-```
-
-**2. Try 20 sessions**
-```
 just run 20
-```
-```
-Saved 20 sessions and 31 client connections (total 20 sessions)
-Done. 20 sessions tagged this round
-```
-
-**3. Check those 20**: every `*_wrong` must be 0. `not_tagged_yet` counts what is still waiting.
-```
 just check
-```
-```
- ended_sessions | no_end_event | tagged | not_tagged_yet | tags_wrong | reasons_wrong | dates_wrong
-           6501 |           45 |     20 |           6481 |          0 |             0 |           0
-
- client_connections | tagged | not_tagged_yet | sessions_wrong | tags_wrong | reasons_wrong | dates_wrong
-               9829 |     31 |           9798 |              0 |          0 |             0 |           0
-```
-The first table is sessions, the second client connections.
-
-**4. Tag everything that is waiting**
-```
 just run
-```
-```
-Saved 200 sessions and 287 client connections (total 200 sessions)
-... more 'Saved' lines ...
-Done. 6481 sessions tagged this round
-```
-
-**5. Check everything**: now `not_tagged_yet` is 0 too.
-```
 just check
-```
-```
- ended_sessions | no_end_event | tagged | not_tagged_yet | tags_wrong | reasons_wrong | dates_wrong
-           6501 |           45 |   6501 |              0 |          0 |             0 |           0
-
- client_connections | tagged | not_tagged_yet | sessions_wrong | tags_wrong | reasons_wrong | dates_wrong
-               9829 |   9829 |              0 |              0 |          0 |             0 |           0
-```
-
-**6. See the progress**
-```
-just status
-```
-```
-Tagged sessions: 6,501   (connected 5,614, failed 879, no_attempt 8)
-Tagged client connections: 9,829   (connected 7,533, not_connected 2,109, unknown 187)
-Sessions waiting to be tagged: 0
-Last runs:
-  2026-11-19 11:36  ok      6,481 sessions in 15.0 s
-  2026-11-19 11:36  ok      20 sessions in 2.0 s
-```
-
-**7. Read the reports**
-```
 just report
 ```
-| Report | What it shows |
+
+On native Windows, activate the environment with `.venv\\Scripts\\activate` (PowerShell: `.venv\\Scripts\\Activate.ps1`) and use `python -m pip install -r requirements.txt` before the same `just` commands.
+
+All SQL recipes target the local Docker database `gamearena_analytics`. The Python process uses the `DB_*` environment variables in `pipeline/config.py`; ensure they point to the **same** database. Never use `--insecure` for a production database.
+
+## Commands
+
+| Command | Result |
 |---|---|
-| 1. Session summary | sessions by outcome: connected, failed, no_attempt, % connected |
-| 2. Daily session summary | the same, per day |
-| 3. Session failure reasons | failed sessions grouped by reason |
-| 4. Daily session failures | failure reasons per day |
-| 5. Application errors | failed sessions grouped by their last recorded app error (code, phase, stage, text) |
-| 6. Connection summary | client connections by outcome: connected, not_connected, unknown, % connected |
-| 7. Daily connection summary | the same, per day |
-| 8. Connection failure reasons | not_connected connections by reason, the sessions affected, and how many were in sessions that still connected |
+| `just` | List all commands |
+| `just setup` | Create missing derived tables |
+| `just run 20` | Process up to 20 pending ended sessions and their connections |
+| `just run` | Process every pending ended session in batches |
+| `just live` | Check for new ended sessions every `WAIT_SECONDS` until Ctrl+C |
+| `just status` | Show tags, pending sessions, and recent processing rounds |
+| `just check` | Compare stored tags against raw events |
+| `just report` | Show the four main analytics summaries |
+| `just trends` | Show daily session and connection outcomes |
+| `just errors` | Show recorded errors for failed sessions that have explicit error events |
+| `just tables` | Show up to ten records from each derived table |
+| `just explore` | Show source tables, columns, event names and fields |
+| `just sql` | Open the local SQL shell; exit with `\q` |
+| `just reset` | Delete generated rows and run history; **disposable local databases only** |
 
-- Report 5 only includes failed sessions that recorded a `pipeline.connect.failure` event.
-- Don't add session and connection numbers together: one session can have several connections.
-- Days are UTC. The connection % counts `unknown` connections in the total.
+See [COMMANDS.md](COMMANDS.md) for **sample terminal outputs**. The runbook does not duplicate them.
 
-Example, report 1:
-```
- sessions | connected | failed | no_attempt | connected_percent
-     6501 |      5614 |    879 |          8 |              86.4
-```
+## Understanding the analytics
 
-**8. Look at the saved rows**
-```
-just tables
-```
-It prints three tables:
-| Table | Rows shown |
-|---|---|
-| `session_tags` | 10 sessions with the latest start time |
-| `connection_tags` | 10 client connections with the latest start time |
-| `pipeline_runs` | the 10 latest runs |
+`just report` has four summaries, each answering a different question:
 
-```
- session_id |    tag    |        reason        |          started_at           | run_id
- SESSION_01 | connected | NULL                 | 2026-10-17 08:27:25.968597+00 | RUN_01
- ...
- SESSION_10 | failed    | someone_never_joined | 2026-10-17 07:28:04.750341+00 | RUN_01
-```
+| Report | Unit | Question answered |
+|---|---|---|
+| 1. Session outcomes | Sessions | Did the ended session ever record connection success? |
+| 2. Client connection outcomes | Client connections | Did each individual connection record success? |
+| 3. Failed session reasons | Failed sessions | What classification was assigned to an unsuccessful session? |
+| 4. Unsuccessful connection reasons | Connections without success | Which classifications appeared on individual unsuccessful connections, including within successful sessions? |
 
-## Other commands
-| Command | What it does |
-|---|---|
-| `just live` | keeps running and tags new sessions every `WAIT_SECONDS` (30); Ctrl+C stops it |
-| `just explore` | shows the raw telemetry tables, columns and event names |
-| `just sql` | opens the SQL shell for your own queries (`\q` to leave) |
+`just trends` contains the two *daily versions* of the outcome summaries. `just errors` drills into **actual recorded application error details** for the subset of failed sessions with a `pipeline.connect.failure` event. It is not another independent set of failures. `just tables` previews **stored records**, not aggregated statistics.
 
-Stopping with Ctrl+C is safe: saved batches stay, and the next `just run` continues where it stopped.
+### Classification definitions
 
-**Local maintenance only:** `just reset` deletes every row in all three tables, including the run history (it asks first). `just run` then rebuilds the tags. Don't use it on a shared database.
+| Level | Tag | Exact meaning |
+|---|---|---|
+| Session | `connected` | At least one `pipeline.connect.success` recorded in that session |
+| Session | `failed` | Attempt recorded, no success recorded |
+| Session | `no_attempt` | No attempt and no success recorded |
+| Connection | `connected` | Success recorded for that connection ID |
+| Connection | `not_connected` | Application events recorded for that ID, but no success event |
+| Connection | `unknown` | Only system events recorded for that ID |
 
-## What the tags mean
-Only events up to the session's first `session_ended` count. Tags describe what was recorded, not what the player did.
+The failure reason rules are prioritized: last `pipeline.connect.failure` phase (`pre-connect`, `connecting`, other non-null phase), then `webrtc.connection.state = failed`, then missing host/client join event (sessions only), otherwise `no_video` as a fallback. See `pipeline/tags.py` for exact rules.
 
-**Session tags**
-| Tag | Meaning |
-|---|---|
-| `connected` | a `pipeline.connect.success` event was recorded |
-| `failed` | a `pipeline.connect.attempt` was recorded, but no success |
-| `no_attempt` | neither an attempt nor a success was recorded |
+**Do not interpret** `not_connected` as proof of a dropped connection, `no_video` as proof of a particular root cause, or `unknown` as proof of a user failure. Many failure events have no connection ID and therefore appear only at session level.
 
-**Client connection tags**
-| Tag | Meaning |
-|---|---|
-| `connected` | a success was recorded for this connection |
-| `not_connected` | the app recorded events on this connection, but no success |
-| `unknown` | no app events were recorded on this connection (system events only) |
+## Investigate one connection
 
-Host connections and events without a connection ID aren't tagged at connection level.
+Use `just tables` to find an ID, then `just sql` and query:
 
-**Failure reasons** (for `failed` and `not_connected`). The rules are checked in this order; the first match wins:
-| Reason | Rule |
-|---|---|
-| `setup_error` | the last `pipeline.connect.failure` has phase `pre-connect` |
-| `error_while_connecting` | the last failure has phase `connecting` |
-| `error_other` | the last failure has another phase |
-| `video_connection_failed` | `webrtc.connection.state` reached `failed` |
-| `someone_never_joined` | sessions only: no `host_connected` or no `client_connected` |
-| `no_video` | no rule above matched |
-
-A reason is what was recorded, not a confirmed root cause; report 5 shows the app's own error. Most failure events carry no connection ID, so setup errors mostly appear only on sessions.
-
-## Your own queries
-Open the shell with `just sql`, then paste a query. Replace the ID with one from `just tables` or the first query.
 ```sql
--- not_connected client connections, latest first
-SELECT session_id, connection_id, reason, started_at FROM connection_tags
-WHERE tag = 'not_connected' ORDER BY started_at DESC LIMIT 20;
+SELECT session_id, connection_id, tag, reason, started_at
+FROM connection_tags
+WHERE tag = 'not_connected'
+ORDER BY started_at DESC LIMIT 20;
 
--- all connections of one session
-SELECT connection_id, tag, reason, started_at FROM connection_tags
-WHERE session_id = 'SESSION_ID' ORDER BY started_at;
+SELECT connection_id, tag, reason, started_at
+FROM connection_tags
+WHERE session_id = 'REPLACE_WITH_REAL_SESSION_UUID'
+ORDER BY started_at;
 
--- one connection's events
-SELECT recorded_at, coalesce(payload->>'event', event_type::STRING) AS event, payload
-FROM session_telemetry_events WHERE connection_id = 'CONNECTION_ID' ORDER BY recorded_at, id;
+SELECT recorded_at, event_type, payload
+FROM session_telemetry_events
+WHERE connection_id = 'REPLACE_WITH_REAL_CONNECTION_UUID'
+ORDER BY recorded_at, id;
 ```
 
-## If something goes wrong
-| Problem | Fix |
+Only events up to a session’s first `session_ended` are classified. Host connections and events without connection IDs are not connection-tagged.
+
+## Troubleshooting
+
+| Symptom | Check |
 |---|---|
-| connection timeout | start Docker, check `docker ps` lists `cockroachdb`, and check the settings below |
-| `relation "session_telemetry_events" does not exist` | check you're on the right database and the telemetry is imported |
-| `just` is not recognised | install it (see Before you start) and open a new terminal |
-| a run failed | `just status` shows the error; fix it and `just run` again |
-| `not_tagged_yet` above 0 | sessions are still waiting: `just run` |
-| a `*_wrong` above 0 | look at the affected rows (`just sql`) and compare them with the rules above; the saved rows may be outdated, or a rule in `pipeline/tags.py` and `sql/check.sql` may differ |
-| `no_end_event` above 0 | no `session_ended` event was found for those sessions, so they aren't tagged |
+| `just` or `python3` missing | Install it in the terminal environment actually running `just` |
+| `docker` not found or container unavailable | Check Docker Desktop WSL integration (or Linux Docker), then `docker ps` |
+| Source table missing | Ensure the backup is imported into `gamearena_analytics` |
+| `just check` shows `*_wrong > 0` | Compare affected raw events and saved tags; do not blindly reset |
+| `not_tagged_yet > 0` after a limited run | Expected; use `just run` to process the remaining ended sessions |
+| `no_end_event > 0` | No end event was found for those sessions; they are not eligible for this pipeline |
+| Run fails | Inspect `just status`, credentials and database reachability |
 
-## Settings
-Python reads these environment variables; the defaults are for this local setup.
+Saved batches survive Ctrl+C. This implementation is intended to run as one pipeline instance at a time. Do not run `just reset` against a shared or production database.
 
-| Variable | Local default |
-|---|---|
-| `DB_HOST` | `127.0.0.1` |
-| `DB_PORT` | `26257` |
-| `DB_NAME` | `gamearena_analytics` |
-| `DB_USER` | `root` |
-| `DB_PASSWORD` | not set |
-| `DB_SSLMODE` | `disable` |
-| `BATCH_SIZE` | `200` |
-| `WAIT_SECONDS` | `30` |
+## Deployment boundary
 
-The justfile's SQL commands (`setup`, `check`, `report`, `tables`, ...) always use the local `cockroachdb` container, whatever these variables say. Keep Python on the same local database.
+On Linux servers, run `python3 -m pipeline run` using secured database settings and a supervised process. The local Docker `just` SQL commands are developer tooling, **not** a production deployment configuration. Dashboard/admin services and access controls are separate future work.

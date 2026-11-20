@@ -30,13 +30,21 @@ status:
 check:
     {{db}} < sql/check.sql
 
-# Generate analytics reports
+# Four main analytics summaries
 report:
     {{db}} < sql/report.sql
 
-# Preview the generated tables (10 rows each, latest start time first)
+# Daily session and connection outcomes
+trends:
+    {{db}} < sql/trends.sql
+
+# Detailed errors recorded for failed sessions
+errors:
+    {{db}} < sql/errors.sql
+
+# Preview ten rows from each generated table
 tables:
-    {{db}} -e "SELECT session_id, tag, reason, started_at, run_id FROM session_tags ORDER BY started_at DESC LIMIT 10; SELECT connection_id, session_id, tag, reason, started_at, run_id FROM connection_tags ORDER BY started_at DESC LIMIT 10; SELECT run_id, started_at, finished_at, status, sessions_tagged, error FROM pipeline_runs ORDER BY started_at DESC LIMIT 10;"
+    {{db}} < sql/tables.sql
 
 # Inspect the raw data (tables, columns, event names)
 explore:
