@@ -54,6 +54,10 @@ explore:
 sql:
     docker exec -it cockroachdb ./cockroach sql --insecure -d gamearena_analytics
 
+# Start the dashboard at http://localhost:3000 (Ctrl+C stops it)
+dashboard:
+    cd dashboard && npm install && npm run dev
+
 # Clear the generated tables (raw telemetry is not touched)
 [confirm("Delete every row in session_tags, connection_tags and pipeline_runs?")]
 reset:

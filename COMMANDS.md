@@ -121,4 +121,4 @@ RUN_01 | <timestamp> | <timestamp> | ok     |            6501 | NULL
 
 ## Other commands
 
-`just explore` displays the source schema and available event names. `just sql` opens an interactive SQL shell; exit with `\q`. `just reset` deletes derived records only and is for **disposable local databases**, never shared environments. See [RUNBOOK.md](RUNBOOK.md) for installation and troubleshooting.
+`just explore` displays the source schema and available event names. `just sql` opens an interactive SQL shell; exit with `\q`. `just dashboard` starts the dashboard at http://localhost:3000 (Ctrl+C stops it); it shows the same numbers as `just report`, plus the sessions behind each failure reason. `just reset` deletes derived records only and is for **disposable local databases**, never shared environments. See [RUNBOOK.md](RUNBOOK.md) for installation and troubleshooting.

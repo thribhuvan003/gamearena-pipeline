@@ -1,0 +1,106 @@
+/* globals.css: the only stylesheet. */
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #f6f7f9;
+  color: #1c1f24;
+}
+
+main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+h2 {
+  margin: 32px 0 8px;
+  font-size: 17px;
+}
+
+a {
+  color: #1d5fd1;
+}
+
+.hint {
+  margin: 0 0 12px;
+  color: #5b6270;
+  font-size: 14px;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.card-label {
+  color: #5b6270;
+  font-size: 13px;
+}
+
+.card-value {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 4px 0;
+}
+
+.card-note {
+  color: #5b6270;
+  font-size: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #e1e4e8;
+  font-size: 14px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eef0f2;
+}
+
+th {
+  color: #5b6270;
+  font-weight: 500;
+  background: #fafbfc;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+tr.selected {
+  background: #eaf1fd;
+}
+
+@media (max-width: 600px) {
+  th,
+  td {
+    padding: 6px 8px;
+  }
+}

@@ -56,6 +56,7 @@ All SQL recipes target the local Docker database `gamearena_analytics`. The Pyth
 | `just tables` | Show up to ten records from each derived table |
 | `just explore` | Show source tables, columns, event names and fields |
 | `just sql` | Open the local SQL shell; exit with `\q` |
+| `just dashboard` | Start the dashboard at http://localhost:3000 (needs Node.js 20+); Ctrl+C stops it. See [dashboard/README.md](dashboard/README.md) |
 | `just reset` | Delete generated rows and run history; **disposable local databases only** |
 
 See [COMMANDS.md](COMMANDS.md) for **sample terminal outputs**. The runbook does not duplicate them.

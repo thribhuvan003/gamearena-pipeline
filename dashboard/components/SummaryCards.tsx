@@ -1,0 +1,29 @@
+// SummaryCards.tsx: section 1, the totals for sessions and for client connections.
+
+import Card from "./Card";
+import { formatNumber } from "@/lib/format";
+import { getConnectionSummary, getSessionSummary } from "@/lib/queries";
+
+export default async function SummaryCards() {                    // Reads both summaries and shows two rows of cards. Called by the dashboard page, first section
+  const [sessions, connections] = await Promise.all([getSessionSummary(), getConnectionSummary()]);
+
+  return (
+    <section>
+      <h2>Sessions</h2>
+      <div className="cards">
+        <Card label="Sessions" value={formatNumber(sessions.sessions)} note="ended sessions tagged" />
+        <Card label="Connected" value={formatNumber(sessions.connected)} note={`${sessions.connected_percent ?? 0}% of sessions`} />
+        <Card label="Failed" value={formatNumber(sessions.failed)} note="tried, no success" />
+        <Card label="No attempt" value={formatNumber(sessions.no_attempt)} note="no attempt recorded" />
+      </div>
+
+      <h2>Client connections</h2>
+      <div className="cards">
+        <Card label="Client connections" value={formatNumber(connections.client_connections)} note="one session can have several" />
+        <Card label="Connected" value={formatNumber(connections.connected)} note={`${connections.connected_percent ?? 0}% of connections`} />
+        <Card label="Not connected" value={formatNumber(connections.not_connected)} note="app events, no success" />
+        <Card label="Unknown" value={formatNumber(connections.unknown)} note="no app events" />
+      </div>
+    </section>
+  );
+}
