@@ -1,12 +1,10 @@
 {
-  "name": "gamearena-web",
+  "name": "gamearena-dashboard",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
-    "build": "next build",
-    "start": "next start -H 127.0.0.1",
-    "lint": "eslint"
+    "build": "next build"
   },
   "dependencies": {
     "next": "16.4.6",
@@ -19,8 +17,6 @@
     "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.6",
     "typescript": "^5"
   }
 }
