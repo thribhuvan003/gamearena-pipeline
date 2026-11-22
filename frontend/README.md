@@ -1,6 +1,6 @@
 # GameArena dashboard
 
-A small read-only dashboard over the pipeline's results (the pipeline is the parent folder). It runs on your own machine only, because the pages show real session IDs.
+A small read-only dashboard over the pipeline's results (the pipeline is in `../backend`). It runs on your own machine only, because the pages show real session IDs.
 
 ## Problem statement
 **What data we have:** the pipeline's three tables in CockroachDB:
@@ -14,7 +14,7 @@ The raw events are in `session_telemetry_events`.
 
 **Out of scope for now:** charts, error categories, hours streamed, deployment, changing the pipeline or the database.
 
-**Rules:** the dashboard only reads (`SELECT`), uses the same SQL as the pipeline's `sql/report.sql`, and every number must match `just report`.
+**Rules:** the dashboard only reads (`SELECT`), uses the same SQL as the pipeline's `backend/sql/report.sql`, and every number must match `just report`.
 
 ## What the page shows
 | Section | Shows |
@@ -30,7 +30,7 @@ Needs Node.js 20+, the `cockroachdb` Docker container running, and the pipeline 
 ```
 just dashboard
 ```
-That installs the packages and starts it. Without just, run `npm install` then `npm run dev` in this `dashboard` folder.
+That installs the packages and starts it. Without just, run `npm install` then `npm run dev` in this `frontend` folder.
 Then open http://localhost:3000 (or http://127.0.0.1:3000). It only listens on this machine, not the network. Ctrl+C stops it.
 
 It uses the pipeline's settings and defaults (`DB_HOST` 127.0.0.1, `DB_PORT` 26257, `DB_NAME` gamearena_analytics, `DB_USER` root, `DB_PASSWORD` not set). To change them, put them in a `.env.local` file here.
