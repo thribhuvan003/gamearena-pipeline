@@ -1,6 +1,5 @@
-// SummaryCards.tsx: section 1, the totals for sessions and for client connections.
+// SummaryCards.tsx: section 1, the totals for sessions and for client connections, one card per number.
 
-import Card from "./Card";
 import { formatNumber } from "@/lib/format";
 import { getConnectionSummary, getSessionSummary, type Range } from "@/lib/queries";
 
@@ -25,5 +24,15 @@ export default async function SummaryCards({ range }: { range: Range }) {   // R
         <Card label="Unknown" value={formatNumber(connections.unknown)} note="no app events" />
       </div>
     </section>
+  );
+}
+
+function Card({ label, value, note }: { label: string; value: string; note: string }) {   // One box: label, big number, small note. Called by SummaryCards above for each total
+  return (
+    <div className="card">
+      <div className="card-label">{label}</div>
+      <div className="card-value">{value}</div>
+      <div className="card-note">{note}</div>
+    </div>
   );
 }

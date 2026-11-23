@@ -43,9 +43,8 @@ It uses the pipeline's settings and defaults (`DB_HOST` 127.0.0.1, `DB_PORT` 262
 | `app/page.tsx` | the dashboard page |
 | `app/session/[id]/page.tsx` | one session's page |
 | `app/layout.tsx`, `app/globals.css` | the HTML frame, title and the only stylesheet |
-| `components/*.tsx` | the date filter, cards, tables and chart, one file each (`ErrorChart.tsx` is the only one that runs in the browser) |
-| `lib/queries.ts` | every SQL the dashboard runs, in one place |
-| `lib/db.ts` | the database connection |
+| `components/*.tsx` | one file per section on the page: date filter, summary cards, reasons, session list, errors, error chart (`ErrorChart.tsx` is the only one that runs in the browser) |
+| `lib/queries.ts` | the data: the database connection and every SQL the dashboard runs |
 | `lib/format.ts` | number and time formatting |
 
 ## Check it

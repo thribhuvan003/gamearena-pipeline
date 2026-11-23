@@ -1,6 +1,22 @@
-// queries.ts: every SQL the dashboard runs, all read-only. The first three use the same SQL as the pipeline's backend/sql/report.sql, plus an optional date range.
+// queries.ts: the dashboard's data: the database connection and every SQL it runs, all read-only. The first three use the same SQL as the pipeline's backend/sql/report.sql, plus an optional date range.
 
-import { query } from "./db";
+import { connection } from "next/server";
+import { Pool } from "pg";
+
+// One connection pool, with the same settings and defaults as the pipeline.
+const pool = new Pool({
+  host: process.env.DB_HOST ?? "127.0.0.1",
+  port: Number(process.env.DB_PORT ?? 26257),
+  database: process.env.DB_NAME ?? "gamearena_analytics",
+  user: process.env.DB_USER ?? "root",
+  password: process.env.DB_PASSWORD,
+});
+
+async function query<Row>(sql: string, params: unknown[] = []): Promise<Row[]> {   // Runs one SELECT with $1, $2 parameters and returns its rows. Called by every function below; connection() makes it run on each page load, so the numbers are always live
+  await connection();
+  const result = await pool.query(sql, params);
+  return result.rows as Row[];
+}
 
 // A date range picked on the page: "YYYY-MM-DD" days in UTC, both included; null = no limit on that side.
 export type Range = { from: string | null; to: string | null };
