@@ -8,6 +8,7 @@ export type ConnectionSummary = { client_connections: string; connected: string;
 export type ReasonRow = { reason: string; failed_sessions: string; percent_of_failed: string };
 export type ErrorRow = { event: string; events: string; sessions: string; connected_sessions: string };
 export type SessionRow = { session_id: string; tag: string; reason: string | null; started_at: Date };
+export type SessionListRow = SessionRow & { total: string };
 export type ConnectionRow = { connection_id: string; tag: string; reason: string | null; started_at: Date };
 
 export async function getSessionSummary(): Promise<SessionSummary> {      // Sessions by outcome (report 1). Called by SummaryCards for the first row of cards
@@ -60,10 +61,10 @@ export async function getErrorFrequency(): Promise<ErrorRow[]> {          // How
     ORDER BY events DESC`);
 }
 
-export async function getSessionsByReason(reason: string): Promise<SessionRow[]> {   // The failed sessions with one reason. Called by SessionList when a reason is clicked
-  // Failed sessions with this reason, latest first (at most 500).
-  return query<SessionRow>(`
-    SELECT session_id, tag, reason, started_at
+export async function getSessionsByReason(reason: string): Promise<SessionListRow[]> {   // The latest 500 failed sessions with one reason, each carrying the real total. Called by SessionList when a reason is clicked
+  // Failed sessions with this reason, latest first (at most 500); total = all matching sessions, counted before the LIMIT.
+  return query<SessionListRow>(`
+    SELECT session_id, tag, reason, started_at, count(*) OVER () AS total
     FROM session_tags
     WHERE tag = 'failed' AND reason = $1
     ORDER BY started_at DESC, session_id
