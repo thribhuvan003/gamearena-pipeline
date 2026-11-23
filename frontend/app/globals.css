@@ -98,6 +98,27 @@ tr.selected {
   background: #eaf1fd;
 }
 
+.filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
+.filter .hint {
+  margin: 0;
+  width: 100%;
+}
+
+.chart {
+  background: #fff;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  padding: 12px 8px 4px 0;
+}
+
 @media (max-width: 600px) {
   th,
   td {

@@ -2,10 +2,10 @@
 
 import Card from "./Card";
 import { formatNumber } from "@/lib/format";
-import { getConnectionSummary, getSessionSummary } from "@/lib/queries";
+import { getConnectionSummary, getSessionSummary, type Range } from "@/lib/queries";
 
-export default async function SummaryCards() {                    // Reads both summaries and shows two rows of cards. Called by the dashboard page, first section
-  const [sessions, connections] = await Promise.all([getSessionSummary(), getConnectionSummary()]);
+export default async function SummaryCards({ range }: { range: Range }) {   // Reads both summaries for the range and shows two rows of cards. Called by the dashboard page, first section
+  const [sessions, connections] = await Promise.all([getSessionSummary(range), getConnectionSummary(range)]);
 
   return (
     <section>

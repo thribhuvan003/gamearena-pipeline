@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { formatNumber, formatTime } from "@/lib/format";
-import { getSessionsByReason } from "@/lib/queries";
+import { getSessionsByReason, type Range } from "@/lib/queries";
 
-export default async function SessionList({ reason }: { reason: string }) {   // Lists the failed sessions with this reason, each linking to its page. Called by the dashboard page after a reason is clicked
-  const rows = await getSessionsByReason(reason);
+export default async function SessionList({ reason, range }: { reason: string; range: Range }) {   // Lists the failed sessions with this reason in the range, each linking to its page. Called by the dashboard page after a reason is clicked
+  const rows = await getSessionsByReason(reason, range);
   const total = rows[0]?.total ?? "0";
 
   return (

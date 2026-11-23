@@ -1,10 +1,10 @@
 // ErrorTable.tsx: how often each error-level event was recorded.
 
 import { formatNumber } from "@/lib/format";
-import { getErrorFrequency } from "@/lib/queries";
+import { getErrorFrequency, type Range } from "@/lib/queries";
 
-export default async function ErrorTable() {                     // Lists error events by frequency. Called by the dashboard page, after the failure reasons
-  const rows = await getErrorFrequency();
+export default async function ErrorTable({ range }: { range: Range }) {   // Lists error events by frequency for the range. Called by the dashboard page, after the failure reasons
+  const rows = await getErrorFrequency(range);
 
   return (
     <section>

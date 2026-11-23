@@ -12,17 +12,19 @@ The raw events are in `session_telemetry_events`.
 
 **What we want to see:** the numbers first, then the sessions behind them.
 
-**Out of scope for now:** charts, error categories, hours streamed, deployment, changing the pipeline or the database.
+**Out of scope for now:** error categories, hours streamed, deployment, changing the pipeline or the database.
 
 **Rules:** the dashboard only reads (`SELECT`), uses the same SQL as the pipeline's `backend/sql/report.sql`, and every number must match `just report`.
 
 ## What the page shows
 | Section | Shows |
 |---|---|
+| Date filter | pick From and To (UTC days, both included) and press Show; every section below uses that period. Empty = all dates |
 | Sessions | total, connected, failed, no_attempt, % connected (report 1) |
 | Client connections | total, connected, not_connected, unknown, % connected (report 2) |
 | Why sessions failed | failed sessions per reason (report 3). Click a reason to list its sessions |
 | Errors recorded | every error-level event as the app named it: times recorded, sessions it happened in, and how many of those sessions still connected |
+| Errors per day | a bar chart (Recharts): how many times each error was recorded per day, one colour per error |
 | Session page | click a session ID: its outcome and its client connections |
 
 ## Run it
@@ -41,10 +43,10 @@ It uses the pipeline's settings and defaults (`DB_HOST` 127.0.0.1, `DB_PORT` 262
 | `app/page.tsx` | the dashboard page |
 | `app/session/[id]/page.tsx` | one session's page |
 | `app/layout.tsx`, `app/globals.css` | the HTML frame, title and the only stylesheet |
-| `components/*.tsx` | the cards and tables, one file each |
+| `components/*.tsx` | the date filter, cards, tables and chart, one file each (`ErrorChart.tsx` is the only one that runs in the browser) |
 | `lib/queries.ts` | every SQL the dashboard runs, in one place |
 | `lib/db.ts` | the database connection |
 | `lib/format.ts` | number and time formatting |
 
 ## Check it
-`just report`: report 1 equals the Sessions cards, report 2 the Client connections cards, report 3 the failure reasons.
+With no dates picked, `just report` matches the page: report 1 = Sessions cards, report 2 = Client connections cards, report 3 = failure reasons.
