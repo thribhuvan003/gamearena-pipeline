@@ -25,7 +25,7 @@ export type Range = { from: string | null; to: string | null };
 export type SessionSummary = { sessions: string; connected: string; failed: string; no_attempt: string; connected_percent: string | null };
 export type ConnectionSummary = { client_connections: string; connected: string; not_connected: string; unknown: string; connected_percent: string | null };
 export type ReasonRow = { reason: string; failed_sessions: string; percent_of_failed: string };
-export type ErrorRow = { event: string; events: string; sessions: string; connected_sessions: string };
+export type ErrorRow = { event: string; events: string; sessions: string; not_connected_sessions: string; connected_sessions: string };
 export type ErrorDayRow = { day: string; event: string; events: string };
 export type SessionRow = { session_id: string; tag: string; reason: string | null; started_at: Date };
 export type SessionListRow = SessionRow & { total: string };
@@ -82,18 +82,19 @@ export async function getFailureReasons(range: Range): Promise<ReasonRow[]> {   
     ORDER BY failed_sessions DESC`, [range.from, range.to]);
 }
 
-export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {          // How often each error-level event was recorded in the range. Called by ErrorTable (Sravya's error frequency)
-  // Every error-level event as the app named it: how many times, in how many sessions, and how many of those sessions still connected.
+export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {          // Each error-level event in the range, ordered by how many sessions it hit that did not connect. Called by ErrorTable (Sravya's error frequency)
+  // Every error-level event as the app named it: times recorded, sessions it happened in, how many of those sessions failed to connect (failed or no_attempt) and how many connected anyway. Most harmful first.
   return query<ErrorRow>(`
     SELECT coalesce(e.payload->>'event', e.event_type::STRING) AS event,
            count(*) AS events,
            count(DISTINCT e.session_id) AS sessions,
+           count(DISTINCT e.session_id) FILTER (WHERE t.tag IN ('failed', 'no_attempt')) AS not_connected_sessions,
            count(DISTINCT e.session_id) FILTER (WHERE t.tag = 'connected') AS connected_sessions
     FROM session_telemetry_events e
     LEFT JOIN session_tags t ON t.session_id = e.session_id
     WHERE e.level = 'error' AND ${IN_RANGE("e.recorded_at")}
     GROUP BY 1
-    ORDER BY events DESC`, [range.from, range.to]);
+    ORDER BY not_connected_sessions DESC, events DESC`, [range.from, range.to]);
 }
 
 export async function getErrorsPerDay(range: Range): Promise<ErrorDayRow[]> {         // How many times each error-level event was recorded per day (UTC) in the range. Called by ErrorTrend for the daily bar chart
