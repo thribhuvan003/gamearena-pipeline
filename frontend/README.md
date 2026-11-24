@@ -23,8 +23,8 @@ The raw events are in `session_telemetry_events`.
 | Sessions | total, connected, failed, no_attempt, % connected (report 1) |
 | Client connections | total, connected, not_connected, unknown, % connected (report 2) |
 | Why sessions failed | failed sessions per reason (report 3). Click a reason to list its sessions |
-| Errors recorded | every error-level event as the app named it: times recorded, sessions it happened in, and how many of those sessions still connected |
-| Errors per day | a bar chart (Recharts): how many times each error was recorded per day, one colour per error |
+| Errors recorded | every error-level event as the app named it, most harmful first: times recorded, sessions, how many did not connect and how many connected anyway |
+| Errors in sessions that didn't connect, per day | a bar chart (Recharts): per day, how many sessions that never connected recorded each error, one colour per error |
 | Session page | click a session ID: its outcome and its client connections |
 
 ## Run it

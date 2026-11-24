@@ -26,7 +26,7 @@ export type SessionSummary = { sessions: string; connected: string; failed: stri
 export type ConnectionSummary = { client_connections: string; connected: string; not_connected: string; unknown: string; connected_percent: string | null };
 export type ReasonRow = { reason: string; failed_sessions: string; percent_of_failed: string };
 export type ErrorRow = { event: string; events: string; sessions: string; not_connected_sessions: string; connected_sessions: string };
-export type ErrorDayRow = { day: string; event: string; events: string };
+export type ErrorDayRow = { day: string; event: string; sessions: string };
 export type SessionRow = { session_id: string; tag: string; reason: string | null; started_at: Date };
 export type SessionListRow = SessionRow & { total: string };
 export type ConnectionRow = { connection_id: string; tag: string; reason: string | null; started_at: Date };
@@ -97,14 +97,15 @@ export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {    
     ORDER BY not_connected_sessions DESC, events DESC`, [range.from, range.to]);
 }
 
-export async function getErrorsPerDay(range: Range): Promise<ErrorDayRow[]> {         // How many times each error-level event was recorded per day (UTC) in the range. Called by ErrorTrend for the daily bar chart
-  // One row per day and error event: the day, the event name, and how many times it was recorded that day.
+export async function getErrorsPerDay(range: Range): Promise<ErrorDayRow[]> {         // Per day (UTC) and error: how many sessions that did not connect recorded it. Called by ErrorTrend for the daily bar chart
+  // One row per day and error event: the day, the event name, and how many failed or no_attempt sessions recorded it that day.
   return query<ErrorDayRow>(`
-    SELECT (recorded_at AT TIME ZONE 'UTC')::DATE::STRING AS day,
-           coalesce(payload->>'event', event_type::STRING) AS event,
-           count(*) AS events
-    FROM session_telemetry_events
-    WHERE level = 'error' AND ${IN_RANGE("recorded_at")}
+    SELECT (e.recorded_at AT TIME ZONE 'UTC')::DATE::STRING AS day,
+           coalesce(e.payload->>'event', e.event_type::STRING) AS event,
+           count(DISTINCT e.session_id) AS sessions
+    FROM session_telemetry_events e
+    JOIN session_tags t ON t.session_id = e.session_id
+    WHERE e.level = 'error' AND t.tag IN ('failed', 'no_attempt') AND ${IN_RANGE("e.recorded_at")}
     GROUP BY 1, 2
     ORDER BY 1, 2`, [range.from, range.to]);
 }
