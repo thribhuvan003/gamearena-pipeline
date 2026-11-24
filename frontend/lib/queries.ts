@@ -35,6 +35,15 @@ export type ConnectionRow = { connection_id: string; tag: string; reason: string
 const IN_RANGE = (column: string) =>
   `($1::DATE IS NULL OR ${column} >= $1::DATE::TIMESTAMPTZ) AND ($2::DATE IS NULL OR ${column} < ($2::DATE + 1)::TIMESTAMPTZ)`;
 
+export async function getDataDays(): Promise<{ first: string | null; last: string | null }> {   // The first and last day (UTC) that has tagged sessions. Called by DateFilter to show which dates have data and limit the date boxes
+  // Earliest and latest session start day.
+  const rows = await query<{ first: string | null; last: string | null }>(`
+    SELECT (min(started_at) AT TIME ZONE 'UTC')::DATE::STRING AS first,
+           (max(started_at) AT TIME ZONE 'UTC')::DATE::STRING AS last
+    FROM session_tags`);
+  return rows[0];
+}
+
 export async function getSessionSummary(range: Range): Promise<SessionSummary> {      // Sessions by outcome (report 1), for sessions that started in the range. Called by SummaryCards for the first row of cards
   // Sessions: total, connected, failed, no_attempt, and % connected.
   const rows = await query<SessionSummary>(`

@@ -10,21 +10,25 @@ export default async function ErrorTable({ range }: { range: Range }) {   // Lis
     <section>
       <h2>Errors recorded</h2>
       <p className="hint">Every error-level event, named as the app sent it. Events = times recorded; sessions = how many sessions it happened in.</p>
-      <table>
-        <thead>
-          <tr><th>Event</th><th className="num">Events</th><th className="num">Sessions</th><th className="num">Of which connected</th></tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.event}>
-              <td>{row.event}</td>
-              <td className="num">{formatNumber(row.events)}</td>
-              <td className="num">{formatNumber(row.sessions)}</td>
-              <td className="num">{formatNumber(row.connected_sessions)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {rows.length === 0 ? (
+        <p className="hint">No errors in this period.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr><th>Event</th><th className="num">Events</th><th className="num">Sessions</th><th className="num">Of which connected</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.event}>
+                <td>{row.event}</td>
+                <td className="num">{formatNumber(row.events)}</td>
+                <td className="num">{formatNumber(row.sessions)}</td>
+                <td className="num">{formatNumber(row.connected_sessions)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </section>
   );
 }
