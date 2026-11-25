@@ -12,6 +12,31 @@ export function formatClock(value: Date): string {         // A timestamp -> "20
   return value.toISOString().slice(0, 23).replace("T", " ");
 }
 
+export function shortId(id: string): string {             // A UUID's first 8 characters, for lists; the full ID stays in a title or the facts. Called by the reason sheet and session view
+  return id.slice(0, 8);
+}
+
+export function formatSeconds(value: string | null): string {   // "33" -> "33 s", "172" -> "2 min 52 s", null -> "-". Called by the client list
+  if (value === null) return "-";
+  const seconds = Number(value);
+  return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
+}
+
+export function rangeQuery(range: { from: string | null; to: string | null }): { from?: string; to?: string } {   // The date range as URL query values, leaving out empty sides. Called by every link that must keep the picked dates
+  return { ...(range.from ? { from: range.from } : {}), ...(range.to ? { to: range.to } : {}) };
+}
+
+// Events shown muted in a timeline: ice.candidate.error (most clients that hit it still connect) and ws_error (in 6,136 of 6,546 sessions, connected ones too).
+const MUTED_EVENTS = new Set(["ice.candidate.error", "ws_error"]);
+
+export function isMuted(event: string): boolean {          // True for an event shown muted. Called by the session timeline
+  return MUTED_EVENTS.has(event);
+}
+
+export function reasonLabel(reason: string): string {      // The pipeline's reason as shown on screen: no_video -> "no info" (tried, no success, and no failure event or failed video state recorded), others unchanged. Called wherever a reason is shown
+  return reason === "no_video" ? "no info" : reason;
+}
+
 // Private bits that can appear inside the app's free-text messages: addresses, links, IDs and long tokens.
 const PRIVATE = [
   /\b(?:https?|wss?|stuns?|turns?|ftp|mailto):\S+/gi,                                       // links, and video relay (STUN/TURN) server addresses

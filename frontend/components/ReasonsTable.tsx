@@ -1,34 +1,45 @@
-// ReasonsTable.tsx: failed sessions per reason. Each reason links to its sessions.
+// ReasonsTable.tsx: client connections that didn't connect, per reason, as a list; clicking a reason opens its sheet on the same page.
 
 import Link from "next/link";
-import { formatNumber } from "@/lib/format";
-import { getFailureReasons, type Range } from "@/lib/queries";
+import { formatNumber, rangeQuery, reasonLabel } from "@/lib/format";
+import { getConnectionReasons, getFailureReasons, type Range } from "@/lib/queries";
 
-export default async function ReasonsTable({ selected, range }: { selected?: string; range: Range }) {   // Lists the failure reasons with counts for the range. Called by the dashboard page; `selected` highlights the clicked reason
-  const rows = await getFailureReasons(range);
-  const dates = { ...(range.from ? { from: range.from } : {}), ...(range.to ? { to: range.to } : {}) };
+export default async function ReasonsTable({ reason, range }: { reason?: string; range: Range }) {   // Lists the client reasons for the range, the open one selected, then the reasons that exist only per session. Called by the dashboard page
+  const [rows, sessionReasons] = await Promise.all([getConnectionReasons(range), getFailureReasons(range)]);
+  const clientReasons = new Set(rows.map((row) => row.reason));
+  const sessionOnly = sessionReasons.filter((row) => !clientReasons.has(row.reason));
 
   return (
     <section>
-      <h2>Why sessions failed</h2>
-      <p className="hint">Reasons come from the pipeline&apos;s rules (backend/pipeline/tags.py), mainly the phase of the last recorded failure.</p>
-      {rows.length === 0 ? (
-        <p className="hint">No failed sessions in this period.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr><th>Reason</th><th className="num">Failed sessions</th><th className="num">% of failed</th></tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.reason} className={row.reason === selected ? "selected" : undefined}>
-                <td><Link href={{ pathname: "/", query: { ...dates, reason: row.reason } }}>{row.reason}</Link></td>
-                <td className="num">{formatNumber(row.failed_sessions)}</td>
-                <td className="num">{row.percent_of_failed}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <h2>Why client connections didn&apos;t connect</h2>
+      <p className="hint">no info = tried, but no failure event or failed video state was recorded.</p>
+      {rows.length === 0 && <p className="hint">No client connections that didn&apos;t connect in this period.</p>}
+      {(rows.length > 0 || sessionOnly.length > 0) && (
+        <div className="list">
+          {rows.map((row) => (
+            <Link
+              key={row.reason}
+              href={{ pathname: "/", query: { ...rangeQuery(range), reason: row.reason } }}
+              scroll={false}
+              className={row.reason === reason ? "list-row selected" : "list-row"}
+            >
+              <span className="row-main mono">{reasonLabel(row.reason)}</span>
+              <span className="row-end">{formatNumber(row.clients)} <span className="muted">{row.percent}%</span></span>
+              <span className="chevron">›</span>
+            </Link>
+          ))}
+          {sessionOnly.length > 0 && (
+            <div className="list-row muted">
+              <span className="row-main">
+                Only per session:{" "}
+                {sessionOnly.map((row, i) => (
+                  <span key={row.reason}>{i > 0 && ", "}<span className="mono">{reasonLabel(row.reason)}</span> {formatNumber(row.failed_sessions)}</span>
+                ))}{" "}
+                failed sessions
+              </span>
+            </div>
+          )}
+        </div>
       )}
     </section>
   );

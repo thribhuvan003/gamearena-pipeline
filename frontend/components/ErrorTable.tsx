@@ -1,42 +1,60 @@
-// ErrorTable.tsx: the events the app logged as errors, ordered by how many sessions that didn't connect had them.
+// ErrorTable.tsx: the errors the app logged, counted per client connection, warnings last, then the errors that name no client.
 
 import { formatNumber } from "@/lib/format";
-import { getErrorFrequency, type Range } from "@/lib/queries";
+import { getErrorFrequency, getUntiedErrors, type Range } from "@/lib/queries";
 
-export default async function ErrorTable({ range }: { range: Range }) {   // Lists error events for the range, ordered by sessions that did not connect. Called by the dashboard page, after the failure reasons
-  const rows = await getErrorFrequency(range);
+export default async function ErrorTable({ range }: { range: Range }) {   // Shows each error with the client connections it hit, then the errors with no client. Called by the dashboard page, after the failure reasons
+  const [rows, untied] = await Promise.all([getErrorFrequency(range), getUntiedErrors(range)]);
 
   return (
     <section>
-      <h2>Errors recorded</h2>
-      <p className="hint">
-        Every event the app logged as an error, named as the app sent it, ordered by sessions that didn&apos;t connect. An error in a session that connected anyway did not stop the whole session from connecting. Sessions not yet tagged count in neither of the last two columns.
-      </p>
+      <h2>Errors recorded, per client connection</h2>
+      <p className="hint">Counted per client connection. ice.candidate.error is a warning: most clients that hit it connected anyway.</p>
       {rows.length === 0 ? (
-        <p className="hint">No errors in this period.</p>
+        <p className="hint">No errors tied to a client connection in this period.</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Event</th>
-              <th className="num">Times</th>
-              <th className="num">Sessions</th>
-              <th className="num">Didn&apos;t connect</th>
-              <th className="num">Connected anyway</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.event}>
-                <td>{row.event}</td>
-                <td className="num">{formatNumber(row.events)}</td>
-                <td className="num">{formatNumber(row.sessions)}</td>
-                <td className="num">{formatNumber(row.not_connected_sessions)}</td>
-                <td className="num">{formatNumber(row.connected_sessions)}</td>
+        <div className="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Error</th>
+                <th className="num">Clients hit</th>
+                <th className="num">Didn&apos;t connect</th>
+                <th className="num">Connected anyway</th>
+                <th className="num">% didn&apos;t connect</th>
               </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.error} className={row.warning ? "muted" : undefined}>
+                  <td>
+                    <span className="mono">{row.error}</span>
+                    {row.warning && <> <span className="badge badge-warning">warning</span></>}
+                    <div className="id">{formatNumber(row.events)} times</div>
+                  </td>
+                  <td className="num">{formatNumber(row.clients)}</td>
+                  <td className="num">{formatNumber(row.not_connected_clients)}</td>
+                  <td className="num">{formatNumber(row.connected_clients)}</td>
+                  <td className="num">{row.not_connected_percent ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {untied.length > 0 && (
+        <>
+          <h3>Not tied to a client</h3>
+          <p className="hint">Errors that name no client connection, per session.</p>
+          <div className="list">
+            {untied.map((row) => (
+              <div key={row.error} className="list-row">
+                <span className="row-main mono">{row.error}</span>
+                <span className="row-end">{formatNumber(row.events)} times · {formatNumber(row.sessions)} sessions</span>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </>
       )}
     </section>
   );
