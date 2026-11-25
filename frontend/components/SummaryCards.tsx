@@ -5,34 +5,30 @@ import { getClientCounts, getSessionCounts, type CohortKey, type Range } from "@
 
 export default async function SummaryCards({ range }: { range: Range }) {
   const [sessions, clients] = await Promise.all([getSessionCounts(range), getClientCounts(range)]);
-  const clientShare = (value: string) => Number(clients.clients) > 0
-    ? `${percent(value, clients.clients)}% of measured connections`
-    : undefined;
+  const share = (part: string, total: string, unit: string) =>
+    Number(total) > 0 ? `${percent(part, total)}% of ${unit}` : undefined;
 
   return (
-    <section aria-labelledby="health-title">
-      <h2 id="health-title">Connection health</h2>
-      <p className="hint">An app session can have several client connections.</p>
-      <div className="stats health-stats">
-        <Stat range={range} list="app_sessions" label="App sessions" value={sessions.app_sessions} sub="All sessions in this period" />
-        <Stat range={range} list="clients" label="Measured connections" value={clients.clients} sub="Client connections with telemetry" />
-        <Stat range={range} list="clients_connected" label="Connected" value={clients.clients_connected} sub={clientShare(clients.clients_connected)} />
-        <Stat range={range} list="clients_not_connected" label="Didn’t connect" value={clients.clients_not_connected} sub={clientShare(clients.clients_not_connected)} />
-      </div>
-      <div className="coverage">
-        <div>
-          <strong>Session data coverage</strong>
-          <span>
-            <Link href={link(range, { list: "with_telemetry" })} scroll={false}>{formatNumber(sessions.with_telemetry)} with telemetry</Link>
-            {" · "}
-            <Link href={link(range, { list: "no_telemetry" })} scroll={false}>{formatNumber(sessions.no_telemetry)} without telemetry</Link>
-          </span>
+    <div className="metric-groups">
+      <section aria-labelledby="sessions-title">
+        <h2 id="sessions-title">App sessions</h2>
+        <div className="stats health-stats session-stats">
+          <Stat range={range} list="app_sessions" label="Total sessions" value={sessions.app_sessions} />
+          <Stat range={range} list="with_telemetry" label="With telemetry" value={sessions.with_telemetry} sub={share(sessions.with_telemetry, sessions.app_sessions, "sessions")} />
+          <Stat range={range} list="no_telemetry" label="Without telemetry" value={sessions.no_telemetry} sub={share(sessions.no_telemetry, sessions.app_sessions, "sessions")} />
         </div>
-        {Number(clients.clients_unknown) > 0 && (
-          <Link href={link(range, { list: "clients_unknown" })} scroll={false}>{formatNumber(clients.clients_unknown)} connections with unknown outcomes</Link>
-        )}
-      </div>
-    </section>
+      </section>
+      <section aria-labelledby="connections-title">
+        <h2 id="connections-title">Client connections</h2>
+        <p className="hint">Connections with telemetry. Each app session can have several.</p>
+        <div className="stats health-stats">
+          <Stat range={range} list="clients" label="Measured connections" value={clients.clients} />
+          <Stat range={range} list="clients_connected" label="Connected" value={clients.clients_connected} sub={share(clients.clients_connected, clients.clients, "connections")} />
+          <Stat range={range} list="clients_not_connected" label="Didn’t connect" value={clients.clients_not_connected} sub={share(clients.clients_not_connected, clients.clients, "connections")} />
+          <Stat range={range} list="clients_unknown" label="Unknown outcome" value={clients.clients_unknown} sub={share(clients.clients_unknown, clients.clients, "connections")} />
+        </div>
+      </section>
+    </div>
   );
 }
 

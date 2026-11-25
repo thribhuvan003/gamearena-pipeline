@@ -2,6 +2,7 @@
 
 "use client";
 
+import { eventLabel } from "@/lib/format";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function ErrorChart({ days, series }: { days: Record<string, number | string>[]; series: { name: string; colour: string }[] }) {   // Draws one bar per day, split by error, in the colours ErrorTrend picked. Called by ErrorTrend with the counts it read on the server
@@ -17,7 +18,7 @@ export default function ErrorChart({ days, series }: { days: Record<string, numb
             cursor={{ fill: "currentColor", fillOpacity: 0.06 }}
           />
           {series.map(({ name, colour }) => (
-            <Bar key={name} name={name} dataKey={(day) => day[name] ?? 0} stackId="errors" fill={colour} />
+            <Bar key={name} name={eventLabel(name)} dataKey={(day) => day[name] ?? 0} stackId="errors" fill={colour} />
           ))}
         </BarChart>
       </ResponsiveContainer>

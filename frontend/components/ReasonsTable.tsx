@@ -23,7 +23,7 @@ export default async function ReasonsTable({ range, sheet }: { range: Range; she
               >
                 <span className="row-main">
                   <strong>{reasonLabel(row.reason)}</strong>
-                  {row.reason === "no_video" && <span className="reason-detail">An attempt was recorded, but the logs don’t establish a cause.</span>}
+                  {row.reason === "no_video" && <span className="reason-detail">The logs don’t establish a cause.</span>}
                 </span>
                 <span className="row-end"><strong>{formatNumber(row.clients)}</strong><small>{row.percent}%</small></span>
                 <span className="chevron" aria-hidden="true">›</span>

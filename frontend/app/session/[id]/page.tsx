@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import SessionView from "@/components/SessionView";
+import { shortId } from "@/lib/format";
 import { isUuid, readSheet } from "@/lib/links";
 
 export default function SessionPage({ params, searchParams }: PageProps<"/session/[id]">) {   // Lays out the session page. Next.js calls it on every visit to /session/<id>
@@ -25,7 +26,7 @@ async function SessionPageBody({ params, searchParams }: PageProps<"/session/[id
   return (
     <>
       <div className="page-head">
-        <h1 className="mono">{id}</h1>
+        <h1>Session {shortId(id)}</h1>
       </div>
       <SessionView
         id={id}

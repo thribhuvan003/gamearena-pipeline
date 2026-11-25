@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import ErrorChart from "./ErrorChart";
-import { formatNumber, redact } from "@/lib/format";
+import { eventLabel, formatNumber, redact } from "@/lib/format";
 import { getErrorKey, getErrorSeries, type ErrorKeyRow, type ErrorSeriesRow, type Range } from "@/lib/queries";
 
 const COLOURS = ["#0a84ff", "#ff9f0a", "#30d158", "#bf5af2", "#ff375f"];
@@ -33,57 +33,59 @@ export default async function ErrorTrend({ range }: { range: Range }) {   // Spl
   const folded = key.filter((row) => row.field === "clients" && !named.has(row.error));
 
   return (
-    <section>
-      <h2>Daily error breakdown</h2>
-      <p className="hint">The five most common errors among connections that didn’t connect, by event day (UTC). A connection can appear in several series.</p>
-      {rows.length === 0 ? (
-        <p className="hint">No errors in client connections that didn&apos;t connect in this period.</p>
-      ) : (
-        <>
-          <ErrorChart days={[...days.values()]} series={series} />
-          <div className="list">
-            {totals.map((row, i) => (
-              <div key={row.series} className={row.warning ? "list-row muted" : "list-row"}>
-                <span className="swatch" style={{ background: series[i].colour }} />
-                <div className="row-main">
-                  {row.series === OTHER ? OTHER : <span className="mono">{row.series}</span>}
-                  {row.warning && <> <span className="badge badge-warning">warning</span></>}
-                  <details className="more">
-                    <summary>Details</summary>
-                    <dl className="kv">
-                      {row.series === OTHER ? (
-                        <>
-                          <dt>Errors</dt>
-                          <dd>
-                            {folded.map((error, j) => (
-                              <Fragment key={error.error}>
-                                {j > 0 && ", "}
-                                <span className="mono">{error.error}</span> ({formatNumber(error.events)})
+    <details className="disclosure diagnostics-panel trend-disclosure">
+      <summary>Daily error breakdown</summary>
+      <div className="disclosure-body">
+        <p className="hint">The five most common errors among connections that didn’t connect, by event day (UTC). A connection can appear in several series.</p>
+        {rows.length === 0 ? (
+          <p className="hint">No errors in client connections that didn&apos;t connect in this period.</p>
+        ) : (
+          <>
+            <ErrorChart days={[...days.values()]} series={series} />
+            <div className="list">
+              {totals.map((row, i) => (
+                <div key={row.series} className={row.warning ? "list-row muted" : "list-row"}>
+                  <span className="swatch" style={{ background: series[i].colour }} />
+                  <div className="row-main">
+                    {row.series === OTHER ? OTHER : eventLabel(row.series)}
+                    {row.warning && <> <span className="badge badge-warning">warning</span></>}
+                    <details className="more">
+                      <summary>Details</summary>
+                      <dl className="kv">
+                        {row.series === OTHER ? (
+                          <>
+                            <dt>Errors</dt>
+                            <dd>
+                              {folded.map((error, j) => (
+                                <Fragment key={error.error}>
+                                  {j > 0 && ", "}
+                                  <span className="mono">{error.error}</span> ({formatNumber(error.events)})
+                                </Fragment>
+                              ))}
+                            </dd>
+                          </>
+                        ) : (
+                          FIELDS.map(({ field, label }) => {
+                            const values = key.filter((value) => value.error === row.series && value.field === field);
+                            if (values.length === 0) return null;
+                            return (
+                              <Fragment key={field}>
+                                <dt>{label}</dt>
+                                <dd>{values.map((value) => `${redact(value.value) ?? "none"} (${formatNumber(value.events)})`).join(", ")}</dd>
                               </Fragment>
-                            ))}
-                          </dd>
-                        </>
-                      ) : (
-                        FIELDS.map(({ field, label }) => {
-                          const values = key.filter((value) => value.error === row.series && value.field === field);
-                          if (values.length === 0) return null;
-                          return (
-                            <Fragment key={field}>
-                              <dt>{label}</dt>
-                              <dd>{values.map((value) => `${redact(value.value) ?? "none"} (${formatNumber(value.events)})`).join(", ")}</dd>
-                            </Fragment>
-                          );
-                        })
-                      )}
-                    </dl>
-                  </details>
+                            );
+                          })
+                        )}
+                      </dl>
+                    </details>
+                  </div>
+                  <span className="row-end">{formatNumber(row.clients)}</span>
                 </div>
-                <span className="row-end">{formatNumber(row.clients)}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </section>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </details>
   );
 }

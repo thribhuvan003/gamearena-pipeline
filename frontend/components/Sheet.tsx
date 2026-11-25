@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import Pager from "./Pager";
 import SessionView from "./SessionView";
 import SheetFrame from "./SheetFrame";
-import { formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
+import { eventLabel, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
 import { isUuid, link, linkString, searchPrefix, type Sheet as SheetState } from "@/lib/links";
 import {
   COHORTS, getClientPage, getCohortCount, getReasonErrors, getReasonSteps, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
@@ -60,7 +60,7 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   const arg = sheet.arg ?? null;
   const page = sheet.page ?? 0;
   const prefix = searchPrefix(sheet.filter) ?? undefined;
-  const shownArg = arg === null ? null : key === "session_reason" || key === "client_reason" ? reasonLabel(arg) : arg;
+  const shownArg = arg === null ? null : key === "session_reason" || key === "client_reason" ? reasonLabel(arg) : eventLabel(arg);
   const [total, rows, steps, errors] = await Promise.all([
     getCohortCount(key, arg, range, prefix),
     cohort.unit === "sessions"
@@ -71,7 +71,9 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   ]);
   const unit = cohort.unit === "sessions" ? "sessions" : "client connections";
 
-  const title = shownArg === null ? cohort.title : `${cohort.title} · ${shownArg}`;
+  const title = key === "client_error" || key === "untied_error"
+    ? shownArg ?? cohort.title
+    : shownArg === null ? cohort.title : `${cohort.title} · ${shownArg}`;
 
   return {
     label: title,
@@ -82,7 +84,7 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
           <div className="stat-value">{formatNumber(total)}</div>
           <div className="stat-sub">{prefix ? "Matching " : ""}{unit}</div>
           {arg === "no_video" && (key === "session_reason" || key === "client_reason") && (
-            <p className="row-meta">An attempt was recorded, but the logs don’t establish a cause.</p>
+            <p className="row-meta">The logs don’t establish a cause.</p>
           )}
         </div>
         <div className="sheet-section">

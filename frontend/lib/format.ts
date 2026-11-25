@@ -57,8 +57,9 @@ const REASON_LABELS: Record<string, string> = {
   no_video: "Reason unknown",
   setup_error: "Setup failed",
   video_connection_failed: "Video connection failed",
-  someone_never_joined: "A client never joined",
+  someone_never_joined: "Host or client join missing",
   error_while_connecting: "Error while connecting",
+  error_other: "Other connection error",
 };
 
 export function reasonLabel(reason: string): string {
@@ -78,4 +79,24 @@ const PRIVATE = [
 
 export function redact(text: string | null): string | null {   // Replaces addresses, links, IDs and tokens in a message with [hidden]. Called by the session timeline before any app message is shown
   return text && PRIVATE.reduce((out, pattern) => out.replace(pattern, "[hidden]"), text);
+}
+
+const EVENT_LABELS: Record<string, string> = {
+  "pipeline.connect.attempt": "Connection attempt",
+  "pipeline.connect.success": "Connection succeeded",
+  "pipeline.connect.failure": "Connection failed",
+  "pipeline.connection.dropped": "Connection dropped",
+  "ice.candidate.error": "Network candidate warning",
+  "ice.connection.state": "Network connection state",
+  "webrtc.connection.state": "WebRTC connection state",
+  "media.decode.error": "Video decoding error",
+  "media.first_decode": "First video frame decoded",
+  "ws.reconnect.exhausted": "WebSocket retries exhausted",
+  ws_error: "WebSocket warning",
+};
+
+export function eventLabel(signature: string): string {
+  const [name, code] = signature.split(" ", 2);
+  const label = EVENT_LABELS[name] ?? name.replaceAll(/[._]/g, " ").replace(/^./, (first) => first.toUpperCase());
+  return code ? `${label} · Code ${code}` : label;
 }

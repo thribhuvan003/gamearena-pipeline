@@ -1,68 +1,83 @@
-// ErrorTable.tsx: the errors the app logged, counted per client connection, warnings last, then the errors that name no client, counted in affected sessions.
-
 import Link from "next/link";
-import { formatNumber } from "@/lib/format";
+import { eventLabel, formatNumber } from "@/lib/format";
 import { link } from "@/lib/links";
-import { getErrorFrequency, getUntiedErrors, type Range } from "@/lib/queries";
+import { getErrorFrequency, getUntiedErrors, type ErrorRow, type Range, type UntiedErrorRow } from "@/lib/queries";
 
-export default async function ErrorTable({ range }: { range: Range }) {   // Shows each error with the client connections it hit (the count opens that client_error list), then the errors with no client (each opens its untied_error list). Called by the dashboard page, after the failure reasons
+export default async function ErrorTable({ range }: { range: Range }) {
   const [rows, untied] = await Promise.all([getErrorFrequency(range), getUntiedErrors(range)]);
+  const errors = rows.filter((row) => !row.warning).sort((a, b) => Number(b.clients) - Number(a.clients));
+  const warnings = rows.filter((row) => row.warning);
 
   return (
-    <section>
-      <h2>Errors recorded, per client connection</h2>
-      <p className="hint">The failure share uses connections with a known outcome. A recorded error can occur on a connection that succeeded.</p>
-      {rows.length === 0 ? (
-        <p className="hint">No errors tied to a client connection in this period.</p>
-      ) : (
-        <div className="table-card">
-          <table>
-            <thead>
-              <tr>
-                <th>Error</th>
-                <th className="num">Clients</th>
-                <th className="num">Didn&apos;t connect</th>
-                <th className="num">Connected anyway</th>
-                <th className="num">Failure share</th>
-                <th className="num">Not tagged</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.error} className={row.warning ? "muted" : undefined}>
-                  <td>
-                    <span className="mono">{row.error}</span>
-                    {row.warning && <> <span className="badge badge-warning">warning</span></>}
-                    <div className="id">{formatNumber(row.events)} times</div>
-                  </td>
-                  <td className="num">
-                    <Link href={link(range, { list: "client_error", arg: row.error })} scroll={false}>{formatNumber(row.clients)}</Link>
-                  </td>
-                  <td className="num">{formatNumber(row.not_connected_clients)}</td>
-                  <td className="num">{formatNumber(row.connected_clients)}</td>
-                  <td className="num">{row.not_connected_percent === null ? "—" : `${row.not_connected_percent}%`}</td>
-                  <td className="num">{formatNumber(row.not_tagged_clients)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {untied.length > 0 && (
-        <>
-          <h3>Not tied to a client</h3>
-          <p className="hint">Errors that name no client connection; counted in affected sessions.</p>
-          <div className="list">
-            {untied.map((row) => (
-              <Link key={row.error} className="list-row" href={link(range, { list: "untied_error", arg: row.error })} scroll={false}>
-                <span className="row-main mono">{row.error}</span>
-                <span className="row-end">{formatNumber(row.events)} times · {formatNumber(row.sessions)} sessions</span>
-                <span className="chevron">›</span>
-              </Link>
-            ))}
+    <section className="diagnostics-panel diagnostics-errors" aria-labelledby="logged-errors-title">
+      <h3 id="logged-errors-title">Recorded errors</h3>
+      <div className="diagnostics-grid">
+        <div>
+          <h4>By client connection</h4>
+          <p className="hint">Counts show connections with telemetry.</p>
+          {errors.length === 0 && <p className="hint">No client errors recorded.</p>}
+          <div className="diagnostic-list">
+            {errors.slice(0, 5).map((row) => <ClientError key={row.error} row={row} range={range} />)}
           </div>
-        </>
-      )}
+          {errors.length > 5 && (
+            <details className="disclosure nested-disclosure">
+              <summary>More client errors <span className="disclosure-value">{formatNumber(String(errors.length - 5))}</span></summary>
+              <div className="diagnostic-list">{errors.slice(5).map((row) => <ClientError key={row.error} row={row} range={range} />)}</div>
+            </details>
+          )}
+          {warnings.length > 0 && (
+            <details className="disclosure nested-disclosure">
+              <summary>Warnings</summary>
+              <div className="diagnostic-list">{warnings.map((row) => <ClientError key={row.error} row={row} range={range} />)}</div>
+            </details>
+          )}
+        </div>
+        <div>
+          <h4>By app session</h4>
+          <p className="hint">These events name a session but no client.</p>
+          {untied.length === 0 ? <p className="hint">No session errors recorded.</p> : (
+            <div className="diagnostic-list">
+              {untied.map((row) => <SessionError key={row.error} row={row} range={range} />)}
+            </div>
+          )}
+        </div>
+      </div>
     </section>
+  );
+}
+
+function ClientError({ row, range }: { row: ErrorRow; range: Range }) {
+  const unknown = Number(row.clients) - Number(row.connected_clients) - Number(row.not_connected_clients);
+  const stats = [
+    ["Times recorded", formatNumber(row.events)],
+    ["Didn’t connect", formatNumber(row.not_connected_clients)],
+    ["Connected", formatNumber(row.connected_clients)],
+    ["Unknown outcome", formatNumber(String(unknown))],
+    ["Connections without telemetry tags", formatNumber(row.not_tagged_clients)],
+    ["Share that didn’t connect", row.not_connected_percent === null ? "Unavailable" : `${row.not_connected_percent}%`],
+  ];
+  return (
+    <details className="disclosure">
+      <summary>{eventLabel(row.error)} <span className="disclosure-value">{formatNumber(row.clients)}</span></summary>
+      <div className="disclosure-body">
+        <dl className="compact-facts">{stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+        <p className="hint">The share uses connections with a known outcome.</p>
+        <p className="id">{row.error}</p>
+        {Number(row.clients) > 0 && <Link href={link(range, { list: "client_error", arg: row.error })} scroll={false}>View connections ›</Link>}
+      </div>
+    </details>
+  );
+}
+
+function SessionError({ row, range }: { row: UntiedErrorRow; range: Range }) {
+  return (
+    <details className="disclosure">
+      <summary>{eventLabel(row.error)} <span className="disclosure-value">{formatNumber(row.sessions)}</span></summary>
+      <div className="disclosure-body">
+        <p className="hint">{formatNumber(row.events)} times recorded</p>
+        <p className="id">{row.error}</p>
+        <Link href={link(range, { list: "untied_error", arg: row.error })} scroll={false}>View sessions ›</Link>
+      </div>
+    </details>
   );
 }

@@ -636,31 +636,6 @@ details.more > summary::-webkit-details-marker {
   color: var(--text-2);
 }
 
-.health-stats .stat[data-outcome="clients_not_connected"] {
-  border-color: var(--warn);
-}
-
-.coverage {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--s2) var(--s4);
-  padding: var(--s3) 0;
-  color: var(--text-2);
-  font-size: var(--fs-small);
-}
-
-.coverage > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s1) var(--s2);
-}
-
-.coverage strong {
-  color: var(--text);
-}
-
 .overview-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -712,13 +687,9 @@ details.more > summary::-webkit-details-marker {
 }
 
 .daily-values summary,
-.sheet-section details > summary {
+.sheet-section details.more > summary {
   cursor: pointer;
   color: var(--accent);
-}
-
-.diagnostic-link {
-  font-size: var(--fs-small);
 }
 
 .sheet-list-filter {
@@ -731,9 +702,226 @@ details.more > summary::-webkit-details-marker {
   width: min(245px, 100%);
 }
 
-.client-detail-row .row-end {
-  max-width: 40%;
-  white-space: normal;
+/* Shared spacing and controls for the overview, diagnostics, and session details. */
+.metric-groups section, .top-errors, .overview-grid, .diagnostics-content {
+  margin-top: var(--s5);
+}
+
+.health-stats .stat-value {
+  font-size: clamp(27px, 3.4vw, 36px);
+}
+
+.health-stats .stat[data-outcome="clients_not_connected"] {
+  border-color: var(--separator);
+  box-shadow: inset 0 2px var(--warn);
+}
+
+.session-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.section-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+}
+
+.section-line a {
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+  align-items: start;
+}
+
+.diagnostics-panel {
+  min-width: 0;
+  margin: 0;
+  padding: var(--s4);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.diagnostics-content > * + * {
+  margin-top: var(--s4);
+}
+
+.diagnostics-panel h3, .session-group h3 {
+  margin: 0 0 var(--s1);
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.diagnostics-panel h4 {
+  margin: var(--s2) 0 var(--s1);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.diagnostics-errors .diagnostics-grid {
+  gap: var(--s5);
+}
+
+.diagnostic-list > * + *, .nested-disclosure {
+  border-top: 1px solid var(--separator);
+}
+
+.diagnostic-list a.list-row {
+  padding-inline: var(--s2);
+  min-height: 48px;
+}
+
+.diagnostic-list small, .client-details small {
+  display: block;
+  font-size: var(--fs-small);
+  color: var(--text-2);
+  font-weight: 400;
+}
+
+.disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 46px;
+  padding: var(--s2);
+  cursor: pointer;
+  list-style: none;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border: solid var(--text-2);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(-45deg);
+  margin-inline-start: auto;
+  margin-inline-end: var(--s1);
+  flex: 0 0 6px;
+}
+
+.disclosure[open] > summary::after {
+  transform: rotate(45deg);
+}
+
+.disclosure > summary:hover, .client-details.selected > summary {
+  background: var(--accent-bg);
+}
+
+.disclosure-value {
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  text-align: right;
+}
+
+.disclosure > summary:has(.disclosure-value)::after {
+  margin-inline-start: var(--s1);
+}
+
+.disclosure-body {
+  padding: 0 var(--s2) var(--s3);
+  overflow-wrap: anywhere;
+}
+
+.compact-facts {
+  margin: 0 0 var(--s2);
+  font-size: var(--fs-small);
+}
+
+.compact-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+  padding-block: var(--s1);
+}
+
+.compact-facts dt {
+  color: var(--text-2);
+}
+
+.compact-facts dd {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.trend-disclosure > summary {
+  min-height: 30px;
+}
+
+.session-view {
+  max-width: 680px;
+  margin-top: var(--s2);
+}
+
+.session-outcome {
+  padding: var(--s3) 0 var(--s4);
+  border-bottom: 1px solid var(--separator);
+}
+
+.session-outcome h3 {
+  font-size: clamp(30px, 4.5vw, 38px);
+  line-height: 1.1;
+  letter-spacing: -.035em;
+  margin: 0 0 var(--s1);
+}
+
+.session-outcome p {
+  margin: var(--s1) 0 0;
+}
+
+.session-outcome h3[data-status="failed"] {
+  color: var(--bad);
+}
+
+.session-group {
+  margin-top: var(--s5);
+}
+
+.session-group .diagnostic-list {
+  border-radius: var(--radius);
+  border: 1px solid var(--separator);
+  overflow: hidden;
+}
+
+.session-group .disclosure > summary,
+.session-group .disclosure-body,
+.session-group .evidence-row {
+  padding-inline: var(--s3);
+}
+
+.session-group .section-count {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.session-metadata {
+  margin-top: var(--s4);
+  border-top: 1px solid var(--separator);
+}
+
+.evidence-row {
+  padding: var(--s3) 0;
+}
+
+.evidence-row .section-line span {
+  text-align: right;
+  color: var(--text-2);
+  font-size: var(--fs-small);
 }
 
 @media (max-width: 700px) {
@@ -741,28 +929,18 @@ details.more > summary::-webkit-details-marker {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .overview-grid {
+  .overview-grid, .diagnostics-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 400px) {
-  .client-detail-row {
-    display: block;
-  }
-
-  .client-detail-row .row-end {
-    display: inline-block;
-    max-width: none;
-    margin-top: var(--s1);
-    text-align: left;
-  }
-
   .health-stats .stat {
     padding: var(--s3);
   }
 
-  .health-stats .stat-value {
-    font-size: 32px;
+  .client-details .disclosure-value {
+    max-width: 45%;
+    font-size: var(--fs-small);
   }
 }

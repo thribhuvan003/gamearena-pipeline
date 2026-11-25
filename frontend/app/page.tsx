@@ -10,6 +10,7 @@ import ReasonsTable from "@/components/ReasonsTable";
 import SearchBox from "@/components/SearchBox";
 import Sheet from "@/components/Sheet";
 import SummaryCards from "@/components/SummaryCards";
+import TopErrors from "@/components/TopErrors";
 import { link, linkString, readSheet, searchPrefix } from "@/lib/links";
 import { searchIds, type Range } from "@/lib/queries";
 
@@ -53,13 +54,20 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
       </header>
       {diagnostics ? (
         <>
-          <Attention range={range} />
-          <ErrorTable range={range} />
-          <ErrorTrend range={range} />
+          <div className="diagnostics-content">
+            <div className="view-heading">
+              <h2>Diagnostics</h2>
+              <p className="hint">Session patterns and recorded errors for the selected dates.</p>
+            </div>
+            <Attention range={range} />
+            <ErrorTable range={range} />
+            <ErrorTrend range={range} />
+          </div>
         </>
       ) : (
         <>
           <SummaryCards range={range} />
+          <TopErrors range={range} />
           <div className="overview-grid">
             <ReasonsTable range={range} sheet={sheet} />
             <ConnectionTrend range={range} />

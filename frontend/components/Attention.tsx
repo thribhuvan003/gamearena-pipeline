@@ -1,46 +1,63 @@
-// Attention.tsx: the session cohorts worth a look (several attempts, failures, reconnects, no end event) and the failed sessions per reason, each opening its sessions.
-
 import Link from "next/link";
 import { formatNumber, percent, reasonLabel } from "@/lib/format";
 import { link, type Sheet } from "@/lib/links";
-import { COHORTS, getClientCounts, getSessionCounts, getSessionReasons, type Range } from "@/lib/queries";
+import { getClientCounts, getSessionCounts, getSessionReasons, type Range } from "@/lib/queries";
 
-const ROWS = ["several_attempts", "failure", "failure_then_success", "success_then_failure", "reconnected", "reconnected_10", "no_end_event"] as const;
+const MAIN = [
+  ["several_attempts", "Multiple connection attempts"],
+  ["failure", "Recorded connection failure"],
+  ["reconnected", "Client reconnected"],
+] as const;
 
-export default async function Attention({ range }: { range: Range }) {   // Lists the attention cohorts in a fixed order, then one row per failed-session reason, hiding rows with 0. Called by the dashboard page, after the totals
+const EXTRA = [
+  ["failure_then_success", "Connected after a failed attempt"],
+  ["success_then_failure", "Failed attempt after connecting"],
+  ["reconnected_10", "10 or more client reconnects"],
+  ["no_end_event", "Missing end event"],
+] as const;
+
+export default async function Attention({ range }: { range: Range }) {
   const [counts, reasons, clients] = await Promise.all([getSessionCounts(range), getSessionReasons(range), getClientCounts(range)]);
-  const rows = [
-    ...ROWS.map((key) => ({ key, title: COHORTS[key].title, sessions: counts[key], sheet: { list: key } as Sheet })),
-    ...reasons.map((row) => ({ key: `reason-${row.reason}`, title: <>Failed sessions: {reasonLabel(row.reason)}</>, sessions: row.sessions, sheet: { list: "session_reason", arg: row.reason } as Sheet })),
-  ].filter((row) => Number(row.sessions) > 0);
+  const base = counts.with_telemetry;
+  const signal = ([key, label]: (typeof MAIN | typeof EXTRA)[number]) => (
+    <DiagnosticRow key={key} range={range} sheet={{ list: key }} label={label} count={counts[key]} base={base} />
+  );
 
   return (
-    <section>
-      <h2>Session investigation</h2>
-      <p className="hint">Sessions with telemetry; a session can be in several rows.</p>
-      {rows.length === 0 ? (
-        <p className="hint">No matching sessions in this period.</p>
-      ) : (
-        <>
-          <div className="group-label">Sessions</div>
-          <div className="list">
-            {rows.map((row) => (
-              <Link key={row.key} href={link(range, row.sheet)} scroll={false} className="list-row">
-                <span className="row-main">{row.title}</span>
-                <span className="row-end">{formatNumber(row.sessions)} <span className="muted">{percent(row.sessions, counts.with_telemetry)}%</span></span>
-                <span className="chevron">›</span>
-              </Link>
+    <div className="diagnostics-grid">
+      <section className="diagnostics-panel" aria-labelledby="signals-title">
+        <h3 id="signals-title">Session patterns</h3>
+        <p className="hint">Share of sessions with telemetry. Patterns can overlap.</p>
+        <div className="diagnostic-list">{MAIN.map(signal)}</div>
+        <details className="disclosure nested-disclosure">
+          <summary>More session patterns</summary>
+          <div className="diagnostic-list">{EXTRA.map(signal)}</div>
+          {Number(clients.clients_alone) > 0 && (
+            <DiagnosticRow range={range} sheet={{ list: "clients_alone" }} label="No client connected in the session" count={clients.clients_alone} note="Client connections" />
+          )}
+        </details>
+      </section>
+      <section className="diagnostics-panel" aria-labelledby="failed-sessions-title">
+        <h3 id="failed-sessions-title">Failed sessions</h3>
+        <p className="hint">Session outcomes grouped by the recorded reason.</p>
+        {reasons.length === 0 ? <p className="hint">No failed sessions recorded.</p> : (
+          <div className="diagnostic-list">
+            {reasons.map((row) => (
+              <DiagnosticRow key={row.reason} range={range} sheet={{ list: "session_reason", arg: row.reason }} label={reasonLabel(row.reason)} count={row.sessions} />
             ))}
           </div>
-        </>
-      )}
-      {Number(clients.clients_alone) > 0 && (
-        <p className="diagnostic-link">
-          <Link href={link(range, { list: "clients_alone" })} scroll={false}>
-            {formatNumber(clients.clients_alone)} failed connections in sessions where no client connected
-          </Link>
-        </p>
-      )}
-    </section>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function DiagnosticRow({ range, sheet, label, count, base, note }: { range: Range; sheet: Sheet; label: string; count: string; base?: string; note?: string }) {
+  return (
+    <Link href={link(range, sheet)} scroll={false} className="list-row">
+      <span className="row-main">{label}</span>
+      <span className="row-end"><strong>{formatNumber(count)}</strong>{note && <small>{note}</small>}{base && Number(base) > 0 && <small>{percent(count, base)}%</small>}</span>
+      <span className="chevron" aria-hidden="true">›</span>
+    </Link>
   );
 }

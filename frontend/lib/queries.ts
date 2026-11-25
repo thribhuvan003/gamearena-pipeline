@@ -297,6 +297,7 @@ export async function getUntiedErrors(range: Range): Promise<UntiedErrorRow[]> {
   return query<UntiedErrorRow>(`
     SELECT ${ERROR_NAME} AS error, count(*) AS events, count(DISTINCT e.session_id) AS sessions
     FROM session_telemetry_events e
+    JOIN gamearena_source.host_sessions h ON h.id = e.session_id
     WHERE e.level = 'error' AND e.connection_id IS NULL AND ${IN_RANGE("e.recorded_at")}
     GROUP BY 1
     ORDER BY events DESC`, [range.from, range.to]);
