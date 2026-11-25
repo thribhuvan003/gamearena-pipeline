@@ -1,13 +1,12 @@
-// SessionView.tsx: one session: its facts, each client connection with device and outcome, and the event timeline. Shown on the session page and in the reason sheet's client step.
+// SessionView.tsx: one session: its facts, each client connection with device and outcome, and the event timeline. Shown on the session page and in the sheet's session step.
 
-import { notFound } from "next/navigation";
-import SessionTimeline from "@/components/SessionTimeline";
-import { formatNumber, formatTime, reasonLabel } from "@/lib/format";
+import SessionTimeline, { type PageHref } from "@/components/SessionTimeline";
+import { formatNumber, formatTime, redact, tagText } from "@/lib/format";
 import { getClientConnections, getSessionDetail, type SessionDetail } from "@/lib/queries";
 
-export default async function SessionView({ id, highlight }: { id: string; highlight?: string }) {   // Reads the session and its client connections and shows them, then the timeline. Called by the session page and by ReasonSheet's client step; highlight = the client connection to mark
+export default async function SessionView({ id, highlight, eventPage, pageHref }: { id: string; highlight?: string; eventPage: number; pageHref: PageHref }) {   // Reads the session and its client connections and shows them, then the timeline. Called by the session page and by the sheet's session step; highlight = the client connection to mark, eventPage and pageHref = the timeline's event page and its links
   const [session, connections] = await Promise.all([getSessionDetail(id), getClientConnections(id)]);
-  if (!session) notFound();
+  if (!session) return <p className="hint">No app session or events with this ID.</p>;
 
   return (
     <>
@@ -16,7 +15,7 @@ export default async function SessionView({ id, highlight }: { id: string; highl
         <dt>Outcome (pipeline)</dt><dd>{outcome(session)}</dd>
         <dt>Started (app)</dt><dd>{session.started_at ? formatTime(session.started_at) : "-"}</dd>
         <dt>Ended (app)</dt><dd>{endText(session)}</dd>
-        <dt>End reason (app)</dt><dd>{session.end_reason ? <span className="mono">{session.end_reason}</span> : "-"}</dd>
+        <dt>End reason (app)</dt><dd>{session.end_reason ? <span className="mono">{redact(session.end_reason)}</span> : "-"}</dd>
         <dt>First event recorded</dt><dd>{session.first_event_at ? formatTime(session.first_event_at) : "-"}</dd>
         <dt>Events recorded</dt><dd>{formatNumber(session.events)}</dd>
       </dl>
@@ -44,13 +43,9 @@ export default async function SessionView({ id, highlight }: { id: string; highl
         )}
       </section>
 
-      <SessionTimeline sessionId={id} total={session.events} />
+      <SessionTimeline sessionId={id} detail={session} eventPage={eventPage} pageHref={pageHref} />
     </>
   );
-}
-
-function tagText(tag: string, reason: string | null): string {   // "failed (setup_error)", or just the tag when there is no reason. Called for the session outcome and each connection's outcome
-  return reason ? `${tag} (${reasonLabel(reason)})` : tag;
 }
 
 function outcome(session: SessionDetail): string {   // The pipeline's tag in words, or why there is none. Called by SessionView for the Outcome row of the facts

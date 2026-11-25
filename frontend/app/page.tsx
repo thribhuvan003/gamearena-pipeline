@@ -1,13 +1,17 @@
-// page.tsx: the dashboard at http://localhost:3000: header with the date filter, the numbers, the reasons, the errors, the daily error chart, and the reason sheet when one is open.
+// page.tsx: the dashboard at http://localhost:3000: header with the date filter and ID search, the numbers, what needs attention, the reasons, the errors, the daily error chart, and the side sheet when one is open.
 
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import Attention from "@/components/Attention";
 import DateFilter from "@/components/DateFilter";
 import ErrorTable from "@/components/ErrorTable";
 import ErrorTrend from "@/components/ErrorTrend";
-import ReasonSheet from "@/components/ReasonSheet";
 import ReasonsTable from "@/components/ReasonsTable";
+import SearchBox from "@/components/SearchBox";
+import Sheet from "@/components/Sheet";
 import SummaryCards from "@/components/SummaryCards";
-import type { Range } from "@/lib/queries";
+import { linkString, readSheet, searchPrefix } from "@/lib/links";
+import { searchIds, type Range } from "@/lib/queries";
 
 export default function Home({ searchParams }: PageProps<"/">) {          // Lays out the page. Next.js calls it on every visit to /
   return (
@@ -19,23 +23,27 @@ export default function Home({ searchParams }: PageProps<"/">) {          // Lay
   );
 }
 
-async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">) {   // Reads the dates (?from=&to=), the opened reason (?reason=) and the opened client (?client=) from the URL and shows every section, with the sheet last. Called by Home inside <Suspense> (shows "Loading…" until ready), because the URL is only known when someone visits
+async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">) {   // Reads the dates (?from=&to=) and the sheet state (list, session, search) from the URL, opens a search's only match straight away, and shows every section, with the sheet last. Called by Home inside <Suspense> (shows "Loading…" until ready), because the URL is only known when someone visits
   const params = await searchParams;
   const range: Range = { from: readDate(params.from), to: readDate(params.to) };
-  const reason = typeof params.reason === "string" ? params.reason : undefined;
-  const client = typeof params.client === "string" ? params.client : undefined;
+  const sheet = readSheet(params);
+  const prefix = sheet.session ? null : searchPrefix(sheet.q);
+  const found = prefix ? await searchIds(prefix) : [];
+  if (found.length === 1) redirect(linkString(range, { session: found[0].session_id, client: found[0].kind === "client" ? found[0].id : undefined }));
 
   return (
     <>
       <div className="page-head">
         <h1>GameArena</h1>
         <DateFilter range={range} />
+        <SearchBox range={range} q={sheet.q} />
       </div>
       <SummaryCards range={range} />
-      <ReasonsTable reason={reason} range={range} />
+      <Attention range={range} />
+      <ReasonsTable range={range} sheet={sheet} />
       <ErrorTable range={range} />
       <ErrorTrend range={range} />
-      {reason && <Suspense fallback={<div className="sheet"><p className="hint">Loading…</p></div>}><ReasonSheet reason={reason} client={client} range={range} /></Suspense>}
+      {(sheet.list || sheet.session || sheet.q) && <Suspense fallback={<><div className="sheet-backdrop" /><div className="sheet"><p className="hint">Loading…</p></div></>}><Sheet range={range} sheet={sheet} /></Suspense>}
     </>
   );
 }

@@ -1,26 +1,45 @@
-// SessionTimeline.tsx: one session's errors and warnings first, then every event in time order, with private bits hidden.
+// SessionTimeline.tsx: one session's errors (every one), its warnings (one row per event name), then all its events page by page, with private bits hidden.
 
+import Pager from "./Pager";
 import { formatClock, formatNumber, isMuted, redact } from "@/lib/format";
-import { getTimeline, type TimelineRow } from "@/lib/queries";
+import { ERROR_LIMIT, EVENT_PAGE_SIZE, getErrorEvents, getEventPage, getWarningSummary, type SessionDetail, type TimelineRow } from "@/lib/queries";
 
-export default async function SessionTimeline({ sessionId, total }: { sessionId: string; total: string }) {   // Reads the session's events and shows the errors and warnings, then all events behind "Show all". Called by SessionView, under the client connections; total is the event count it already has
-  const rows = await getTimeline(sessionId);
-  const problems = rows.filter((row) => row.level === "error" || row.level === "warn");
+// The link to one event page of this session; the sheet and the session page each build their own.
+export type PageHref = (epage: number) => { pathname: string; query: Record<string, string> };
+
+export default async function SessionTimeline({ sessionId, detail, eventPage, pageHref }: { sessionId: string; detail: SessionDetail; eventPage: number; pageHref: PageHref }) {   // Reads the session's errors, its warnings per event name and one page of all its events, and shows all three. Called by SessionView, under the client connections; detail has the real counts
+  const [errors, warnings, events] = await Promise.all([getErrorEvents(sessionId), getWarningSummary(sessionId), getEventPage(sessionId, eventPage)]);
+  const total = Number(detail.events);
 
   return (
     <section>
-      <h3>Errors and warnings ({formatNumber(String(problems.length))})</h3>
+      <h3>Errors ({formatNumber(detail.error_events)})</h3>
       <p className="hint">
-        UTC, oldest first. Addresses, links, IDs and tokens are hidden.{Number(total) > rows.length && ` Showing the first ${rows.length} of ${formatNumber(total)}.`}
+        UTC, oldest first. Addresses, links, IDs and tokens are hidden.{Number(detail.error_events) > ERROR_LIMIT && ` The first ${formatNumber(String(ERROR_LIMIT))} of ${formatNumber(detail.error_events)} are shown.`}
       </p>
-      {rows.length === 0 ? (
+      {total === 0 ? (
         <p className="hint">No events recorded for this session.</p>
       ) : (
         <>
-          {problems.length > 0 && <div className="list">{problems.map(eventRow)}</div>}
-          <details className="more">
-            <summary>Show all {formatNumber(total)} events</summary>
-            <div className="list">{rows.map(eventRow)}</div>
+          {errors.length > 0 && <div className="list">{errors.map(eventRow)}</div>}
+          <h3>Warnings ({formatNumber(detail.warn_events)})</h3>
+          {warnings.length > 0 && (
+            <div className="list">
+              {warnings.map((row) => (
+                <div key={row.event} className={`list-row level-warn${isMuted(row.event) ? " muted" : ""}`}>
+                  <div className="row-main">
+                    <div><span className="mono">{row.event}</span>{row.warning && <> <span className="badge badge-warning">warning</span></>}</div>
+                    <div className="row-meta">first {formatClock(row.first_at)} · last {formatClock(row.last_at)}{row.warning && " · logged as level error"}</div>
+                  </div>
+                  <span className="row-end">{formatNumber(row.events)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <details className="more" open={eventPage > 0}>
+            <summary>All events ({formatNumber(detail.events)})</summary>
+            {events.length > 0 && <div className="list">{events.map(eventRow)}</div>}
+            <Pager page={eventPage} size={EVENT_PAGE_SIZE} shown={events.length} total={total} href={pageHref} />
           </details>
         </>
       )}

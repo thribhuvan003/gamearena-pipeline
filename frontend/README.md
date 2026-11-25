@@ -1,34 +1,37 @@
 # GameArena dashboard
 
-A small read-only dashboard over the pipeline's results (the pipeline is in `../backend`). It runs on your own machine only, because the pages show real session IDs.
+A small read-only dashboard over the pipeline's results (the pipeline is in `../backend`) and the app's own session records. It runs on your own machine only, because the pages show real session IDs.
 
 ## Problem statement
-**What data we have:** the pipeline's three tables in CockroachDB:
-- `session_tags`: one row per ended session (connected, failed or no_attempt), with a failure reason and start time.
-- `connection_tags`: one row per client connection (connected, not_connected or unknown), with its session.
-- `pipeline_runs`: the run history (not shown here).
+**What data we have:**
+- the pipeline's tables in CockroachDB: `session_tags` (one row per ended session with telemetry: connected, failed or no_attempt, with a reason), `connection_tags` (one row per client connection with telemetry: connected, not_connected or unknown, with a reason) and `pipeline_runs` (not shown)
+- the raw events in `session_telemetry_events`
+- the app's records in `gamearena_source`, restored from the 11 Nov 2026 backup: every app session (`host_sessions`, 18,982) and client connection (`session_client_connections`)
 
-The raw events are in `session_telemetry_events`.
+**What we want to see:** overall usage, then the scale of the problems, then the exact sessions or client connections behind each number, then the evidence in one session.
 
-**What we want to see:** the numbers first, then the sessions behind them.
+**Out of scope for now:** FPS, streamed hours and other quality numbers; auth and an API (needed before it is shared); changing the pipeline's rules.
 
-**Out of scope for now:** grouping errors into categories, hours streamed, deployment, changing the pipeline or the database.
-
-**Rules:** the dashboard only reads (`SELECT`), uses the same SQL as the pipeline's `backend/sql/report.sql`, and every number must match `just report`.
+**Rules:**
+- The dashboard only reads (`SELECT`).
+- Every clickable number is a cohort in `lib/queries.ts`. One SQL condition is used for both its count and its list, so a number always opens exactly the records it counts.
+- Units are never mixed: usage and coverage count app sessions, connection problems count client connections, and errors that name no client count affected sessions.
+- Names are shown as the data has them. The one exception is `no_video`, shown as "no info".
 
 ## What the page shows
 | Section | Shows |
 |---|---|
-| Date filter | pick From and To (UTC days, both included) and press Show; every section below uses that period. Empty = all dates |
-| Sessions | total, connected, failed, no_attempt, % connected (report 1) |
-| Client connections | total, connected, not_connected, unknown, % connected (report 2) |
-| Why client connections didn't connect | not_connected client connections per reason (`connection_tags`); `no_video` is shown as "no info" (tried, no failure event, no failed video state). Reasons that exist only per session (setup_error, someone_never_joined) are one line underneath. Click a reason and it opens in place: the errors its clients recorded (error + code, phase, stage, clients; "No error recorded"; warnings last), then the latest 500 clients with session, client number, device and browser. Click a client and its session opens in place |
-| Errors recorded, per client connection | every event the app logged as an error, grouped by error + code (`code` or `errorCode` from the payload): times recorded, client connections hit, how many didn't connect and how many connected anyway, ordered by the share that didn't connect. ice.candidate.error is always last, marked as a warning. Errors that name no client (most setup failures) are listed underneath, per session. Wider than `just errors`, which covers only failed sessions' setup failures |
-| Errors in client connections that didn't connect, per day | a bar chart (Recharts): per day, how many client connections that didn't connect recorded each error + code, one colour per error, the warning last in grey. The key on the left shows what the app sent with each error: its message, phases, stages and error text (private bits hidden), with counts |
-| Session (opened in place, or `/session/<id>`) | the app's start, end and end reason; the pipeline's outcome (or "Not classified"); each client's device, OS and browser (guessed from the user agent), access type and outcome, the opened client highlighted; and the first 1,000 events in time order with who sent them, code, phase, stage and message (addresses, links, IDs and tokens hidden) |
+| Header | date filter (UTC days, both included; the app's session days, 1 Jun – 17 Oct), and a search for a session or client connection ID (the whole ID or its first 8+ characters; one match opens it) |
+| Sessions | every app session, with and without telemetry events, by the app's start time |
+| Client connections | client connections with telemetry: connected, not_connected and unknown |
+| What needs attention | sessions with more than one `pipeline.connect.attempt`, a `pipeline.connect.failure`, a failure then a later success, a success then a later failure, `client_reconnected` (and 10 or more), events but no `session_ended`; and failed sessions per reason. A session can be in several rows |
+| Why client connections didn't connect | not_connected client connections per reason, and those in sessions where no client connected |
+| Errors recorded, per client connection | each error + code: times recorded; tagged client connections hit (click to list them), how many didn't connect and connected anyway, % didn't connect = didn't connect ÷ (didn't connect + connected); untagged clients apart. ice.candidate.error is last, marked as a warning. Errors that name no client are listed underneath with their affected sessions (click to list them) |
+| Errors per day | a bar chart (Recharts): not_connected client connections per day for the 5 errors that hit the most in the period, the rest as Other, the warning last. The key shows what the app sent with each error (message, phases, stages, error text; private bits hidden) |
+| Side sheet | opens in place on every click: the list behind a number (50 per page; for a client reason, first how far its clients got and the errors they recorded), a search result, or one session. A session shows the app's start, end and end reason, the pipeline's outcome, each client's device, OS and browser (read from the user agent), every error, the warnings one row per event name with counts, and all events 100 per page. Escape closes it; Tab stays inside it |
 
 ## Run it
-Needs Node.js 20+, the `cockroachdb` Docker container running, and the pipeline run at least once (`just run`). The session page also reads the `gamearena_source` database: the app's sessions and client connections, restored from the 11 Nov 2026 backup. From the project folder:
+Needs Node.js 20+, the `cockroachdb` Docker container running (with `gamearena_source` restored), and the pipeline run at least once (`just run`). From the project folder:
 ```
 just dashboard
 ```
@@ -43,10 +46,11 @@ It uses the pipeline's settings and defaults (`DB_HOST` 127.0.0.1, `DB_PORT` 262
 | `app/page.tsx` | the dashboard page |
 | `app/session/[id]/page.tsx` | one session's page, for a direct link |
 | `app/layout.tsx`, `app/globals.css` | the HTML frame, title and the only stylesheet |
-| `components/*.tsx` | one file per section: date filter, summary cards, reasons, reason detail, session view, error table, error chart, session timeline (`ErrorChart.tsx` is the only one that runs in the browser) |
-| `lib/queries.ts` | the data: the database connection and every SQL the dashboard runs |
+| `components/*.tsx` | one file per section, plus the side sheet (`Sheet`, `SheetFrame`), `SessionView`, `SessionTimeline` and `Pager`. `ErrorChart.tsx` and `SheetFrame.tsx` are the only ones that run in the browser |
+| `lib/queries.ts` | the data: the database connection, the cohorts and every SQL the dashboard runs |
+| `lib/links.ts` | the page's URL state and the one function that builds every link |
 | `lib/format.ts` | number and time formatting, and hiding private bits in messages |
 | `proxy.ts` | refuses any request not addressed to localhost |
 
 ## Check it
-With no dates picked, `just report` matches the page: report 1 = Sessions cards, report 2 = Client connections cards; report 3 (failed sessions per reason) matches the session-only line under the reasons table for those reasons.
+With no dates picked: Client connections = `just report` report 2. Sessions tagged connected, failed and no_attempt (in the side sheet's lists) = report 1, counted by the app's start time instead of the first event, so a range can differ at its edges.

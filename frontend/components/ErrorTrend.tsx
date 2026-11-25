@@ -1,64 +1,84 @@
-// ErrorTrend.tsx: per day, the client connections that didn't connect with each error, as a chart with a key of what the app recorded for each error.
+// ErrorTrend.tsx: per day, the client connections that didn't connect with each of the top 5 errors and Other, as a chart with a key of what the app recorded for each error.
 
 import { Fragment } from "react";
 import ErrorChart from "./ErrorChart";
 import { formatNumber, redact } from "@/lib/format";
-import { getErrorKey, getErrorsPerDay, type ErrorKeyRow, type Range } from "@/lib/queries";
+import { getErrorKey, getErrorSeries, type ErrorKeyRow, type ErrorSeriesRow, type Range } from "@/lib/queries";
 
-const COLOURS = ["#0a84ff", "#ff9f0a", "#30d158", "#bf5af2", "#ff375f", "#64d2ff", "#ffd60a"];
+const COLOURS = ["#0a84ff", "#ff9f0a", "#30d158", "#bf5af2", "#ff375f"];
+const OTHER = "Other";
+const OTHER_COLOUR = "#aeaeb2";
 const WARNING_COLOUR = "#8e8e93";
 const FIELDS: { field: ErrorKeyRow["field"]; label: string }[] = [
   { field: "message", label: "App message" }, { field: "phase", label: "Phase" }, { field: "stage", label: "Stage" }, { field: "text", label: "App's error text" },
 ];
 
-export default async function ErrorTrend({ range }: { range: Range }) {   // Turns the per-day rows into one row per day with a count per error, picks a colour per error (warnings last, grey), and shows the chart and its key. Called by the dashboard page, after the errors table
-  const [rows, key] = await Promise.all([getErrorsPerDay(range), getErrorKey(range)]);
+function rank(row: ErrorSeriesRow): number {   // 0 for a named error, 1 for Other, 2 for a warning, so the key and the stack keep that order. Called by ErrorTrend when it sorts the series
+  return row.warning ? 2 : row.series === OTHER ? 1 : 0;
+}
+
+export default async function ErrorTrend({ range }: { range: Range }) {   // Splits getErrorSeries into range totals (day null) and one row per day, orders the series (top 5 by total, then Other, then warnings) with their colours, and shows the chart and its key. Called by the dashboard page, after the errors table
+  const [rows, key] = await Promise.all([getErrorSeries(range), getErrorKey(range)]);
 
   const days = new Map<string, Record<string, number | string>>();
-  const warnings = new Set<string>();
   for (const row of rows) {
+    if (row.day === null) continue;
     const day = days.get(row.day) ?? { day: row.day };
-    day[row.error] = Number(row.clients);
+    day[row.series] = Number(row.clients);
     days.set(row.day, day);
-    if (row.warning) warnings.add(row.error);
   }
-  const totals = new Map(key.filter((row) => row.field === "clients").map((row) => [row.error, Number(row.events)]));
-  const errors = [...totals.keys()].sort((a, b) => Number(warnings.has(a)) - Number(warnings.has(b)) || totals.get(b)! - totals.get(a)!);
-  const series = errors.map((name, i) => ({ name, colour: warnings.has(name) ? WARNING_COLOUR : COLOURS[i % COLOURS.length] }));
+  const totals = rows.filter((row) => row.day === null).sort((a, b) => rank(a) - rank(b) || Number(b.clients) - Number(a.clients));
+  const series = totals.map((row, i) => ({ name: row.series, colour: row.warning ? WARNING_COLOUR : row.series === OTHER ? OTHER_COLOUR : COLOURS[i] }));
+  const named = new Set(totals.filter((row) => row.series !== OTHER).map((row) => row.series));
+  const folded = key.filter((row) => row.field === "clients" && !named.has(row.error));
 
   return (
     <section>
       <h2>Errors in client connections that didn&apos;t connect, per day</h2>
-      <p className="hint">Clients that didn&apos;t connect, per error recorded each day (UTC). What the codes mean is not in the data.</p>
+      <p className="hint">The 5 errors that hit the most not_connected clients in this period, per day (UTC), the rest as Other; a client with two errors counts in both.</p>
       {rows.length === 0 ? (
         <p className="hint">No errors in client connections that didn&apos;t connect in this period.</p>
       ) : (
         <>
           <ErrorChart days={[...days.values()]} series={series} />
           <div className="list">
-            {series.map(({ name, colour }) => (
-              <div key={name} className={warnings.has(name) ? "list-row muted" : "list-row"}>
-                <span className="swatch" style={{ background: colour }} />
+            {totals.map((row, i) => (
+              <div key={row.series} className={row.warning ? "list-row muted" : "list-row"}>
+                <span className="swatch" style={{ background: series[i].colour }} />
                 <div className="row-main">
-                  <span className="mono">{name}</span>
-                  {warnings.has(name) && <> <span className="badge badge-warning">warning</span></>}
+                  {row.series === OTHER ? OTHER : <span className="mono">{row.series}</span>}
+                  {row.warning && <> <span className="badge badge-warning">warning</span></>}
                   <details className="more">
                     <summary>Details</summary>
                     <dl className="kv">
-                      {FIELDS.map(({ field, label }) => {
-                        const values = key.filter((row) => row.error === name && row.field === field);
-                        if (values.length === 0) return null;
-                        return (
-                          <Fragment key={field}>
-                            <dt>{label}</dt>
-                            <dd>{values.map((row) => `${redact(row.value) ?? "none"} (${formatNumber(row.events)})`).join(", ")}</dd>
-                          </Fragment>
-                        );
-                      })}
+                      {row.series === OTHER ? (
+                        <>
+                          <dt>Errors</dt>
+                          <dd>
+                            {folded.map((error, j) => (
+                              <Fragment key={error.error}>
+                                {j > 0 && ", "}
+                                <span className="mono">{error.error}</span> ({formatNumber(error.events)})
+                              </Fragment>
+                            ))}
+                          </dd>
+                        </>
+                      ) : (
+                        FIELDS.map(({ field, label }) => {
+                          const values = key.filter((value) => value.error === row.series && value.field === field);
+                          if (values.length === 0) return null;
+                          return (
+                            <Fragment key={field}>
+                              <dt>{label}</dt>
+                              <dd>{values.map((value) => `${redact(value.value) ?? "none"} (${formatNumber(value.events)})`).join(", ")}</dd>
+                            </Fragment>
+                          );
+                        })
+                      )}
                     </dl>
                   </details>
                 </div>
-                <span className="row-end">{formatNumber(String(totals.get(name)))}</span>
+                <span className="row-end">{formatNumber(row.clients)}</span>
               </div>
             ))}
           </div>

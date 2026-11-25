@@ -1,44 +1,42 @@
-// ReasonsTable.tsx: client connections that didn't connect, per reason, as a list; clicking a reason opens its sheet on the same page.
+// ReasonsTable.tsx: client connections that didn't connect, per reason, then those in sessions where no client connected; each row opens its client connections in the sheet.
 
 import Link from "next/link";
-import { formatNumber, rangeQuery, reasonLabel } from "@/lib/format";
-import { getConnectionReasons, getFailureReasons, type Range } from "@/lib/queries";
+import { formatNumber, reasonLabel } from "@/lib/format";
+import { link, type Sheet } from "@/lib/links";
+import { getClientCounts, getConnectionReasons, type Range } from "@/lib/queries";
 
-export default async function ReasonsTable({ reason, range }: { reason?: string; range: Range }) {   // Lists the client reasons for the range, the open one selected, then the reasons that exist only per session. Called by the dashboard page
-  const [rows, sessionReasons] = await Promise.all([getConnectionReasons(range), getFailureReasons(range)]);
-  const clientReasons = new Set(rows.map((row) => row.reason));
-  const sessionOnly = sessionReasons.filter((row) => !clientReasons.has(row.reason));
+export default async function ReasonsTable({ range, sheet }: { range: Range; sheet: Sheet }) {   // Lists the client reasons for the range, the open one selected, then the clients_alone row. Called by the dashboard page
+  const [rows, counts] = await Promise.all([getConnectionReasons(range), getClientCounts(range)]);
 
   return (
     <section>
       <h2>Why client connections didn&apos;t connect</h2>
       <p className="hint">no info = tried, but no failure event or failed video state was recorded.</p>
-      {rows.length === 0 && <p className="hint">No client connections that didn&apos;t connect in this period.</p>}
-      {(rows.length > 0 || sessionOnly.length > 0) && (
+      {rows.length === 0 ? (
+        <p className="hint">No client connections that didn&apos;t connect in this period.</p>
+      ) : (
         <div className="list">
           {rows.map((row) => (
             <Link
               key={row.reason}
-              href={{ pathname: "/", query: { ...rangeQuery(range), reason: row.reason } }}
+              href={link(range, { list: "client_reason", arg: row.reason })}
               scroll={false}
-              className={row.reason === reason ? "list-row selected" : "list-row"}
+              className={sheet.list === "client_reason" && sheet.arg === row.reason ? "list-row selected" : "list-row"}
             >
               <span className="row-main mono">{reasonLabel(row.reason)}</span>
               <span className="row-end">{formatNumber(row.clients)} <span className="muted">{row.percent}%</span></span>
               <span className="chevron">›</span>
             </Link>
           ))}
-          {sessionOnly.length > 0 && (
-            <div className="list-row muted">
-              <span className="row-main">
-                Only per session:{" "}
-                {sessionOnly.map((row, i) => (
-                  <span key={row.reason}>{i > 0 && ", "}<span className="mono">{reasonLabel(row.reason)}</span> {formatNumber(row.failed_sessions)}</span>
-                ))}{" "}
-                failed sessions
-              </span>
-            </div>
-          )}
+          <Link
+            href={link(range, { list: "clients_alone" })}
+            scroll={false}
+            className={sheet.list === "clients_alone" ? "list-row selected" : "list-row"}
+          >
+            <span className="row-main"><span className="mono">not_connected</span> in sessions where no client connected</span>
+            <span className="row-end">{formatNumber(counts.clients_alone)}</span>
+            <span className="chevron">›</span>
+          </Link>
         </div>
       )}
     </section>

@@ -12,18 +12,22 @@ export function formatClock(value: Date): string {         // A timestamp -> "20
   return value.toISOString().slice(0, 23).replace("T", " ");
 }
 
-export function shortId(id: string): string {             // A UUID's first 8 characters, for lists; the full ID stays in a title or the facts. Called by the reason sheet and session view
+export function shortId(id: string): string {             // A UUID's first 8 characters, for lists; the full ID stays in a title or the facts. Called by the sheet
   return id.slice(0, 8);
+}
+
+export function percent(part: string, whole: string): string {   // part as a share of whole, to one decimal ("0" when whole is 0). Called by the cards and the attention list, for the muted share next to a count
+  return Number(whole) === 0 ? "0" : (Math.round((1000 * Number(part)) / Number(whole)) / 10).toString();
+}
+
+export function tagText(tag: string, reason: string | null): string {   // "failed (setup_error)", or just the tag when there is no reason. Called by the sheet's rows and the session view
+  return reason ? `${tag} (${reasonLabel(reason)})` : tag;
 }
 
 export function formatSeconds(value: string | null): string {   // "33" -> "33 s", "172" -> "2 min 52 s", null -> "-". Called by the client list
   if (value === null) return "-";
   const seconds = Number(value);
   return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
-}
-
-export function rangeQuery(range: { from: string | null; to: string | null }): { from?: string; to?: string } {   // The date range as URL query values, leaving out empty sides. Called by every link that must keep the picked dates
-  return { ...(range.from ? { from: range.from } : {}), ...(range.to ? { to: range.to } : {}) };
 }
 
 // Events shown muted in a timeline: ice.candidate.error (most clients that hit it still connect) and ws_error (in 6,136 of 6,546 sessions, connected ones too).
