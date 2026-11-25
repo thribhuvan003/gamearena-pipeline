@@ -1,4 +1,4 @@
-// ErrorTable.tsx: the error-level events, most harmful first (by sessions that did not connect).
+// ErrorTable.tsx: the events the app logged as errors, ordered by how many sessions that didn't connect had them.
 
 import { formatNumber } from "@/lib/format";
 import { getErrorFrequency, type Range } from "@/lib/queries";
@@ -10,7 +10,7 @@ export default async function ErrorTable({ range }: { range: Range }) {   // Lis
     <section>
       <h2>Errors recorded</h2>
       <p className="hint">
-        Every error-level event, named as the app sent it, most harmful first. An error in a session that connected anyway did not stop the player.
+        Every event the app logged as an error, named as the app sent it, ordered by sessions that didn&apos;t connect. An error in a session that connected anyway did not stop the whole session from connecting. Sessions not yet tagged count in neither of the last two columns.
       </p>
       {rows.length === 0 ? (
         <p className="hint">No errors in this period.</p>

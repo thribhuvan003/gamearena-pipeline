@@ -98,6 +98,23 @@ tr.selected {
   background: #eaf1fd;
 }
 
+.facts {
+  width: auto;
+  margin: 8px 0 0;
+}
+
+.facts th {
+  width: 260px;
+}
+
+tr.level-warn {
+  background: #fff8e6;
+}
+
+tr.level-error {
+  background: #fdecec;
+}
+
 .filter {
   display: flex;
   flex-wrap: wrap;

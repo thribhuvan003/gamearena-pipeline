@@ -13,7 +13,7 @@ export default function Home({ searchParams }: PageProps<"/">) {          // Lay
   return (
     <main>
       <h1>GameArena</h1>
-      <p className="hint">Results of the GameArena pipeline, read live from the database on every page load.</p>
+      <p className="hint">Live numbers from GameArena sessions, read from the database on every page load.</p>
       <Suspense fallback={<p className="hint">Loading…</p>}>
         <Dashboard searchParams={searchParams} />
       </Suspense>
@@ -21,9 +21,9 @@ export default function Home({ searchParams }: PageProps<"/">) {          // Lay
   );
 }
 
-async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">) {   // Reads the date range (?from=&to=) and the clicked reason (?reason=) from the URL, and shows every section for that range. Called by Home inside <Suspense>, because the URL is only known when someone visits
+async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">) {   // Reads the dates (?from=&to=) and the clicked reason (?reason=) from the URL and shows every section. Called by Home inside <Suspense> (shows "Loading…" until ready), because the URL is only known when someone visits
   const params = await searchParams;
-  const range: Range = { from: day(params.from), to: day(params.to) };
+  const range: Range = { from: readDate(params.from), to: readDate(params.to) };
   const reason = typeof params.reason === "string" ? params.reason : undefined;
 
   return (
@@ -38,6 +38,8 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
   );
 }
 
-function day(value: string | string[] | undefined): string | null {   // Keeps a URL value only if it is a real date like 2026-10-01, else null (no limit). Called by Dashboard for ?from= and ?to=
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : null;
+function readDate(value: string | string[] | undefined): string | null {   // Keeps a URL value only if it is a real calendar day like 2026-10-01 (2026-02-31 is rejected), else null = no limit. Called by Dashboard for ?from= and ?to=
+  if (typeof value !== "string") return null;
+  const parsed = new Date(value);   // an impossible day rolls over to another day or is invalid, so it won't read back the same
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? value : null;
 }

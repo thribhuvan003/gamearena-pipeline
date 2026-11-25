@@ -1,4 +1,4 @@
-// ReasonsTable.tsx: section 2, failed sessions per reason. Each reason links to its sessions.
+// ReasonsTable.tsx: failed sessions per reason. Each reason links to its sessions.
 
 import Link from "next/link";
 import { formatNumber } from "@/lib/format";
@@ -11,6 +11,7 @@ export default async function ReasonsTable({ selected, range }: { selected?: str
   return (
     <section>
       <h2>Why sessions failed</h2>
+      <p className="hint">Reasons come from the pipeline&apos;s rules (backend/pipeline/tags.py), mainly the phase of the last recorded failure.</p>
       {rows.length === 0 ? (
         <p className="hint">No failed sessions in this period.</p>
       ) : (

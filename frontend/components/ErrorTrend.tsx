@@ -1,4 +1,4 @@
-// ErrorTrend.tsx: section 4, per day, how many sessions that did not connect had each error. Reads the counts on the server and hands them to the chart.
+// ErrorTrend.tsx: per day, how many sessions that didn't connect had each error. Reads the counts on the server and hands them to the chart.
 
 import ErrorChart from "./ErrorChart";
 import { getErrorsPerDay, type Range } from "@/lib/queries";
@@ -19,8 +19,8 @@ export default async function ErrorTrend({ range }: { range: Range }) {   // Tur
   return (
     <section>
       <h2>Errors in sessions that didn&apos;t connect, per day</h2>
-      <p className="hint">Each bar is one day (UTC): how many sessions that never connected recorded each error that day. A rising bar means more players are being stopped by that error.</p>
-      {rows.length === 0 ? <p className="hint">No failed sessions with errors in this period.</p> : <ErrorChart days={[...days.values()]} events={events} />}
+      <p className="hint">Each bar is one day (UTC): how many sessions that didn&apos;t connect recorded each error that day. A session with two different errors is counted in both, so a bar can be taller than the number of sessions.</p>
+      {rows.length === 0 ? <p className="hint">No errors in sessions that didn&apos;t connect in this period.</p> : <ErrorChart days={[...days.values()]} events={events} />}
     </section>
   );
 }

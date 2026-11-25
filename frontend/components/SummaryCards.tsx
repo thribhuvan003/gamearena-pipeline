@@ -1,4 +1,4 @@
-// SummaryCards.tsx: section 1, the totals for sessions and for client connections, one card per number.
+// SummaryCards.tsx: the totals for sessions and for client connections, one card per number.
 
 import { formatNumber } from "@/lib/format";
 import { getConnectionSummary, getSessionSummary, type Range } from "@/lib/queries";
