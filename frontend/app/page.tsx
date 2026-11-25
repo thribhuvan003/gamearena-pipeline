@@ -1,8 +1,8 @@
-// page.tsx: the dashboard at http://localhost:3000: header with the date filter and ID search, the numbers, what needs attention, the reasons, the errors, the daily error chart, and the side sheet when one is open.
-
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import Attention from "@/components/Attention";
+import ConnectionTrend from "@/components/ConnectionTrend";
 import DateFilter from "@/components/DateFilter";
 import ErrorTable from "@/components/ErrorTable";
 import ErrorTrend from "@/components/ErrorTrend";
@@ -10,7 +10,7 @@ import ReasonsTable from "@/components/ReasonsTable";
 import SearchBox from "@/components/SearchBox";
 import Sheet from "@/components/Sheet";
 import SummaryCards from "@/components/SummaryCards";
-import { linkString, readSheet, searchPrefix } from "@/lib/links";
+import { link, linkString, readSheet, searchPrefix } from "@/lib/links";
 import { searchIds, type Range } from "@/lib/queries";
 
 export default function Home({ searchParams }: PageProps<"/">) {          // Lays out the page. Next.js calls it on every visit to /
@@ -23,9 +23,14 @@ export default function Home({ searchParams }: PageProps<"/">) {          // Lay
   );
 }
 
-async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">) {   // Reads the dates (?from=&to=) and the sheet state (list, session, search) from the URL, opens a search's only match straight away, and shows every section, with the sheet last. Called by Home inside <Suspense> (shows "Loading…" until ready), because the URL is only known when someone visits
+async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">) {   // Reads the dates (?from=&to=) and the sheet state (list, session, search) from the URL, opens a search's only match straight away, and renders the selected view with the sheet last. Called by Home inside <Suspense> (shows "Loading…" until ready), because the URL is only known when someone visits
   const params = await searchParams;
-  const range: Range = { from: readDate(params.from), to: readDate(params.to) };
+  const range: Range = {
+    from: readDate(params.from),
+    to: readDate(params.to),
+    view: params.view === "diagnostics" ? "diagnostics" : undefined,
+  };
+  const diagnostics = range.view === "diagnostics";
   const sheet = readSheet(params);
   const prefix = sheet.session ? null : searchPrefix(sheet.q);
   const found = prefix ? await searchIds(prefix) : [];
@@ -33,16 +38,34 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
 
   return (
     <>
-      <div className="page-head">
-        <h1>GameArena</h1>
-        <DateFilter range={range} />
-        <SearchBox range={range} q={sheet.q} />
-      </div>
-      <SummaryCards range={range} />
-      <Attention range={range} />
-      <ReasonsTable range={range} sheet={sheet} />
-      <ErrorTable range={range} />
-      <ErrorTrend range={range} />
+      <header className="dashboard-header">
+        <div className="page-head">
+          <h1>GameArena</h1>
+          <nav className="dashboard-nav" aria-label="Dashboard views">
+            <Link href={link({ ...range, view: undefined })} aria-current={!diagnostics ? "page" : undefined}>Overview</Link>
+            <Link href={link({ ...range, view: "diagnostics" })} aria-current={diagnostics ? "page" : undefined}>Diagnostics</Link>
+          </nav>
+        </div>
+        <div className="dashboard-tools">
+          <DateFilter range={range} />
+          <SearchBox range={range} q={sheet.q} />
+        </div>
+      </header>
+      {diagnostics ? (
+        <>
+          <Attention range={range} />
+          <ErrorTable range={range} />
+          <ErrorTrend range={range} />
+        </>
+      ) : (
+        <>
+          <SummaryCards range={range} />
+          <div className="overview-grid">
+            <ReasonsTable range={range} sheet={sheet} />
+            <ConnectionTrend range={range} />
+          </div>
+        </>
+      )}
       {(sheet.list || sheet.session || sheet.q) && <Suspense fallback={<><div className="sheet-backdrop" /><div className="sheet"><p className="hint">Loading…</p></div></>}><Sheet range={range} sheet={sheet} /></Suspense>}
     </>
   );

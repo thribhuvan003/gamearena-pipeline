@@ -1,43 +1,45 @@
-// SummaryCards.tsx: the session totals, then the client connection totals, as big numbers that each open their records.
-
 import Link from "next/link";
 import { formatNumber, percent } from "@/lib/format";
 import { link } from "@/lib/links";
 import { getClientCounts, getSessionCounts, type CohortKey, type Range } from "@/lib/queries";
 
-export default async function SummaryCards({ range }: { range: Range }) {   // Reads both cohort counts for the range and shows the session row, then the client connection row. Called by the dashboard page, first section
+export default async function SummaryCards({ range }: { range: Range }) {
   const [sessions, clients] = await Promise.all([getSessionCounts(range), getClientCounts(range)]);
+  const clientShare = (value: string) => Number(clients.clients) > 0
+    ? `${percent(value, clients.clients)}% of measured connections`
+    : undefined;
 
   return (
-    <>
-      <section>
-        <h2>Sessions</h2>
-        <p className="hint">Every app session, by its start time in the app.</p>
-        <div className="stats">
-          <Stat range={range} list="app_sessions" label="App sessions" value={sessions.app_sessions} />
-          <Stat range={range} list="with_telemetry" label="With telemetry" value={sessions.with_telemetry} sub={`${percent(sessions.with_telemetry, sessions.app_sessions)}% of app sessions`} />
-          <Stat range={range} list="no_telemetry" label="No telemetry events" value={sessions.no_telemetry} />
+    <section aria-labelledby="health-title">
+      <h2 id="health-title">Connection health</h2>
+      <p className="hint">An app session can have several client connections.</p>
+      <div className="stats health-stats">
+        <Stat range={range} list="app_sessions" label="App sessions" value={sessions.app_sessions} sub="All sessions in this period" />
+        <Stat range={range} list="clients" label="Measured connections" value={clients.clients} sub="Client connections with telemetry" />
+        <Stat range={range} list="clients_connected" label="Connected" value={clients.clients_connected} sub={clientShare(clients.clients_connected)} />
+        <Stat range={range} list="clients_not_connected" label="Didn’t connect" value={clients.clients_not_connected} sub={clientShare(clients.clients_not_connected)} />
+      </div>
+      <div className="coverage">
+        <div>
+          <strong>Session data coverage</strong>
+          <span>
+            <Link href={link(range, { list: "with_telemetry" })} scroll={false}>{formatNumber(sessions.with_telemetry)} with telemetry</Link>
+            {" · "}
+            <Link href={link(range, { list: "no_telemetry" })} scroll={false}>{formatNumber(sessions.no_telemetry)} without telemetry</Link>
+          </span>
         </div>
-      </section>
-
-      <section>
-        <h2>Client connections</h2>
-        <p className="hint">Client connections with telemetry; one session can have several.</p>
-        <div className="stats">
-          <Stat range={range} list="clients" label="Client connections" value={clients.clients} />
-          <Stat range={range} list="clients_connected" label="Connected" value={clients.clients_connected} sub={`${percent(clients.clients_connected, clients.clients)}%`} />
-          <Stat range={range} list="clients_not_connected" label="Not connected" value={clients.clients_not_connected} sub={`${percent(clients.clients_not_connected, clients.clients)}%`} />
-          <Stat range={range} list="clients_unknown" label="Unknown" value={clients.clients_unknown} />
-        </div>
-      </section>
-    </>
+        {Number(clients.clients_unknown) > 0 && (
+          <Link href={link(range, { list: "clients_unknown" })} scroll={false}>{formatNumber(clients.clients_unknown)} connections with unknown outcomes</Link>
+        )}
+      </div>
+    </section>
   );
 }
 
-function Stat({ range, list, label, value, sub }: { range: Range; list: CohortKey; label: string; value: string; sub?: string }) {   // One tile that opens its cohort's list in the sheet: label, big number and an optional sub-line. Called by SummaryCards above for each total
+function Stat({ range, list, label, value, sub }: { range: Range; list: CohortKey; label: string; value: string; sub?: string }) {
   return (
-    <Link href={link(range, { list })} scroll={false} className="stat">
-      <div className="stat-label">{label}</div>
+    <Link href={link(range, { list })} scroll={false} className="stat" data-outcome={list}>
+      <div className="stat-label">{label}<span aria-hidden="true">›</span></div>
       <div className="stat-value">{formatNumber(value)}</div>
       {sub && <div className="stat-sub">{sub}</div>}
     </Link>

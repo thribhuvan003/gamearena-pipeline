@@ -39,7 +39,7 @@ function hintStep(title: string, hint: string): Step {   // A step with only a h
 async function sessionStep(range: Range, sheet: SheetState): Promise<Step> {   // One session, with back to the list or the search it was opened from. Called by Sheet when ?session= is set
   const id = sheet.session;
   if (!isUuid(id)) return hintStep("Session", "Not a session ID.");
-  const back = sheet.list ? link(range, { list: sheet.list, arg: sheet.arg, page: sheet.page }) : sheet.q ? link(range, { q: sheet.q }) : undefined;
+  const back = sheet.list ? link(range, { list: sheet.list, arg: sheet.arg, filter: sheet.filter, page: sheet.page }) : sheet.q ? link(range, { q: sheet.q }) : undefined;
   return {
     label: `Session ${shortId(id)}`,
     title: <>Session <span className="mono">{shortId(id)}</span></>,
@@ -59,37 +59,57 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   const cohort = COHORTS[key];
   const arg = sheet.arg ?? null;
   const page = sheet.page ?? 0;
+  const prefix = searchPrefix(sheet.filter) ?? undefined;
   const shownArg = arg === null ? null : key === "session_reason" || key === "client_reason" ? reasonLabel(arg) : arg;
   const [total, rows, steps, errors] = await Promise.all([
-    getCohortCount(key, arg, range),
+    getCohortCount(key, arg, range, prefix),
     cohort.unit === "sessions"
-      ? getSessionPage(key, arg, range, page).then((list) => list.map((row) => sessionRow(row, range, sheet)))
-      : getClientPage(key, arg, range, page).then((list) => list.map((row) => clientRow(row, range, sheet))),
-    key === "client_reason" ? getReasonSteps(arg!, range) : null,
-    key === "client_reason" ? getReasonErrors(arg!, range) : null,
+      ? getSessionPage(key, arg, range, page, prefix).then((list) => list.map((row) => sessionRow(row, range, sheet)))
+      : getClientPage(key, arg, range, page, prefix).then((list) => list.map((row) => clientRow(row, range, sheet))),
+    key === "client_reason" && !prefix ? getReasonSteps(arg!, range) : null,
+    key === "client_reason" && !prefix ? getReasonErrors(arg!, range) : null,
   ]);
   const unit = cohort.unit === "sessions" ? "sessions" : "client connections";
 
+  const title = shownArg === null ? cohort.title : `${cohort.title} · ${shownArg}`;
+
   return {
-    label: shownArg === null ? cohort.title : `${cohort.title}: ${shownArg}`,
-    title: <>{cohort.title}{shownArg !== null && <>: <span className="mono">{shownArg}</span></>}</>,
+    label: title,
+    title,
     body: (
       <>
         <div className="sheet-section">
           <div className="stat-value">{formatNumber(total)}</div>
-          <div className="stat-sub">{unit}</div>
-          {steps && (
-            <p className="row-meta">
-              Reached <span className="mono">ice.gathering.complete</span> {formatNumber(steps.gathered)} of {formatNumber(steps.clients)} · <span className="mono">media.first_decode</span> {formatNumber(steps.decoded)} of {formatNumber(steps.clients)}
-            </p>
+          <div className="stat-sub">{prefix ? "Matching " : ""}{unit}</div>
+          {arg === "no_video" && (key === "session_reason" || key === "client_reason") && (
+            <p className="row-meta">An attempt was recorded, but the logs don’t establish a cause.</p>
           )}
         </div>
-        {errors && <ReasonErrors errors={errors} />}
         <div className="sheet-section">
-          <h3>{cohort.unit === "sessions" ? "Sessions" : "Client connections"}</h3>
-          {rows.length > 0 && <div className="list">{rows}</div>}
-          <Pager page={page} size={PAGE_SIZE} shown={rows.length} total={Number(total)} href={(to) => link(range, { list: key, arg: sheet.arg, page: to })} />
+          <form className="search sheet-list-filter" action="/" method="get">
+            {Object.entries(link(range, { list: key, arg: sheet.arg }).query).map(([name, value]) => (
+              <input key={name} type="hidden" name={name} value={value} />
+            ))}
+            <input
+              name="filter" type="search" minLength={8} maxLength={36} pattern="(?:[0-9A-Fa-f]|-){8,36}"
+              key={prefix} defaultValue={prefix} aria-label="Filter this list by ID" placeholder="Filter by ID (8+ characters)"
+            />
+            <button type="submit">Filter</button>
+            {prefix && <Link href={link(range, { list: key, arg: sheet.arg })} scroll={false}>Clear</Link>}
+          </form>
+          {rows.length > 0 ? <div className="list">{rows}</div> : <p className="hint">No {unit} match this list.</p>}
+          <Pager page={page} size={PAGE_SIZE} shown={rows.length} total={Number(total)} href={(to) => link(range, { list: key, arg: sheet.arg, filter: prefix, page: to })} />
         </div>
+        {errors && steps && (
+          <details className="sheet-section">
+            <summary>Connection evidence</summary>
+            <p className="row-meta">
+              Network discovery completed for {formatNumber(steps.gathered)} of {formatNumber(steps.clients)} connections.
+              First video frame decoded for {formatNumber(steps.decoded)}.
+            </p>
+            <ReasonErrors errors={errors} />
+          </details>
+        )}
       </>
     ),
   };
@@ -131,11 +151,11 @@ function errorRow(row: ReasonErrorRow, i: number) {   // One error of the reason
 
 function sessionRow(row: SessionListRow, range: Range, sheet: SheetState) {   // One session of a list: short ID, app start, tag or "no telemetry events", events and client connections; opens the session. Called by listStep
   return (
-    <Link key={row.session_id} href={link(range, { list: sheet.list, arg: sheet.arg, page: sheet.page, session: row.session_id })} scroll={false} className="list-row">
+    <Link key={row.session_id} href={link(range, { list: sheet.list, arg: sheet.arg, filter: sheet.filter, page: sheet.page, session: row.session_id })} scroll={false} className="list-row">
       <div className="row-main">
         <div><span className="mono" title={row.session_id}>{shortId(row.session_id)}</span></div>
         <div className="row-meta">
-          {formatTime(row.started_at)} · {row.events === null ? "no telemetry events" : <>{row.tag ? <span className="mono">{tagText(row.tag, row.reason)}</span> : "not classified"} · {formatNumber(row.events)} events</>} · {formatNumber(row.clients)} client connections
+          {formatTime(row.started_at)} · {row.events === null ? "no telemetry events" : <>{row.tag ? <span>{tagText(row.tag, row.reason)}</span> : "not classified"} · {formatNumber(row.events)} events</>} · {formatNumber(row.clients)} client connections
         </div>
       </div>
       <span className="chevron">›</span>
@@ -145,11 +165,11 @@ function sessionRow(row: SessionListRow, range: Range, sheet: SheetState) {   //
 
 function clientRow(row: ClientListRow, range: Range, sheet: SheetState) {   // One client connection of a list: its session, client number, start, tag, the app's connected_at → disconnected_at and whether another client connected; opens the session with it marked. Called by listStep
   return (
-    <Link key={row.connection_id} href={link(range, { list: sheet.list, arg: sheet.arg, page: sheet.page, session: row.session_id, client: row.connection_id })} scroll={false} className="list-row">
+    <Link key={row.connection_id} href={link(range, { list: sheet.list, arg: sheet.arg, filter: sheet.filter, page: sheet.page, session: row.session_id, client: row.connection_id })} scroll={false} className="list-row">
       <div className="row-main">
-        <div><span className="mono" title={row.session_id}>{shortId(row.session_id)}</span> {row.client_number ? `Client ${row.client_number}` : "-"}</div>
+        <div><span className="mono" title={row.session_id}>{shortId(row.session_id)}</span> {row.client_number ? `Client ${row.client_number}` : ""}</div>
         <div className="row-meta">
-          {formatTime(row.started_at)} · <span className="mono">{tagText(row.tag, row.reason)}</span> · <span className="mono">connected_at → disconnected_at</span> {formatSeconds(row.seconds)} · {row.other_connected ? "another client connected" : "no other client connected"}
+          {formatTime(row.started_at)} · <span>{tagText(row.tag, row.reason)}</span>{row.seconds !== null && ` · ${formatSeconds(row.seconds)} between app timestamps`} · {row.other_connected ? "another client connected" : "no other client connected"}
         </div>
       </div>
       <span className="chevron">›</span>

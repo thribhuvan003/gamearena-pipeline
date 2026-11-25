@@ -20,10 +20,11 @@ async function query<Row extends QueryResultRow>(sql: string, params: unknown[] 
 }
 
 // A date range picked on the page: "YYYY-MM-DD" days in UTC, both included; null = no limit on that side.
-export type Range = { from: string | null; to: string | null };
+export type Range = { from: string | null; to: string | null; view?: "diagnostics" };
 
 // Counts come back from CockroachDB as text, so they are typed as strings and formatted on screen.
 // Distinct counts with a condition use count(DISTINCT CASE WHEN ... END), never count(DISTINCT ...) FILTER: CockroachDB 26.3.4 returned 451 instead of 6,136 for the FILTER form next to another count(DISTINCT) of the same column.
+export type DailyConnectionRow = { day: string; not_connected: string };
 export type ClientReasonRow = { reason: string; clients: string; percent: string };
 export type SessionReasonRow = { reason: string; sessions: string };
 export type ReasonErrorRow = { error: string | null; warning: boolean; clients: string; phase: string | null; stage: string | null; top_percent: string | null };
@@ -98,24 +99,24 @@ export const COHORTS = {
   app_sessions: { unit: "sessions", title: "App sessions", arg: false, where: S },
   with_telemetry: { unit: "sessions", title: "App sessions with telemetry events", arg: false, where: `${S} AND s.events IS NOT NULL` },
   no_telemetry: { unit: "sessions", title: "App sessions with no telemetry events", arg: false, where: `${S} AND s.events IS NULL` },
-  no_end_event: { unit: "sessions", title: "Sessions with events but no session_ended", arg: false, where: `${S} AND s.events IS NOT NULL AND NOT s.has_end` },
-  several_attempts: { unit: "sessions", title: "Sessions with more than one pipeline.connect.attempt", arg: false, where: `${S} AND s.attempts > 1` },
-  failure: { unit: "sessions", title: "Sessions with a pipeline.connect.failure", arg: false, where: `${S} AND s.first_failure IS NOT NULL` },
-  failure_then_success: { unit: "sessions", title: "Sessions with a pipeline.connect.failure, then a later pipeline.connect.success", arg: false, where: `${S} AND s.first_failure < s.last_success` },
-  success_then_failure: { unit: "sessions", title: "Sessions with a pipeline.connect.success, then a later pipeline.connect.failure", arg: false, where: `${S} AND s.last_failure > s.first_success` },
-  reconnected: { unit: "sessions", title: "Sessions with client_reconnected", arg: false, where: `${S} AND s.reconnects > 0` },
-  reconnected_10: { unit: "sessions", title: "Sessions with 10 or more client_reconnected", arg: false, where: `${S} AND s.reconnects >= 10` },
+  no_end_event: { unit: "sessions", title: "Sessions missing an end event", arg: false, where: `${S} AND s.events IS NOT NULL AND NOT s.has_end` },
+  several_attempts: { unit: "sessions", title: "Sessions with multiple connection attempts", arg: false, where: `${S} AND s.attempts > 1` },
+  failure: { unit: "sessions", title: "Sessions with a recorded connection failure", arg: false, where: `${S} AND s.first_failure IS NOT NULL` },
+  failure_then_success: { unit: "sessions", title: "Sessions that connected after a failed attempt", arg: false, where: `${S} AND s.first_failure < s.last_success` },
+  success_then_failure: { unit: "sessions", title: "Sessions with a failed attempt after connecting", arg: false, where: `${S} AND s.last_failure > s.first_success` },
+  reconnected: { unit: "sessions", title: "Sessions with a client reconnect", arg: false, where: `${S} AND s.reconnects > 0` },
+  reconnected_10: { unit: "sessions", title: "Sessions with 10 or more client reconnects", arg: false, where: `${S} AND s.reconnects >= 10` },
   tag_connected: { unit: "sessions", title: "Sessions tagged connected", arg: false, where: `${S} AND s.tag = 'connected'` },
   tag_failed: { unit: "sessions", title: "Sessions tagged failed", arg: false, where: `${S} AND s.tag = 'failed'` },
   tag_no_attempt: { unit: "sessions", title: "Sessions tagged no_attempt", arg: false, where: `${S} AND s.tag = 'no_attempt'` },
-  session_reason: { unit: "sessions", title: "Failed sessions with reason", arg: true, where: `${S} AND s.tag = 'failed' AND s.reason = $3` },
+  session_reason: { unit: "sessions", title: "App sessions classified as failed", arg: true, where: `${S} AND s.tag = 'failed' AND s.reason = $3` },
   untied_error: { unit: "sessions", title: "Sessions with an error that names no client", arg: true, where: ERROR_ON("e.session_id = s.session_id", false) },
   clients: { unit: "clients", title: "Client connections with telemetry", arg: false, where: S },
-  clients_connected: { unit: "clients", title: "Client connections tagged connected", arg: false, where: `${S} AND s.tag = 'connected'` },
-  clients_not_connected: { unit: "clients", title: "Client connections tagged not_connected", arg: false, where: `${S} AND s.tag = 'not_connected'` },
-  clients_alone: { unit: "clients", title: "not_connected client connections in sessions where no client connected", arg: false, where: `${S} AND s.tag = 'not_connected' AND NOT EXISTS (SELECT 1 FROM connection_tags o WHERE o.session_id = s.session_id AND o.tag = 'connected')` },
-  clients_unknown: { unit: "clients", title: "Client connections tagged unknown", arg: false, where: `${S} AND s.tag = 'unknown'` },
-  client_reason: { unit: "clients", title: "not_connected client connections with reason", arg: true, where: `${S} AND s.tag = 'not_connected' AND s.reason = $3` },
+  clients_connected: { unit: "clients", title: "Client connections that connected", arg: false, where: `${S} AND s.tag = 'connected'` },
+  clients_not_connected: { unit: "clients", title: "Client connections that didn’t connect", arg: false, where: `${S} AND s.tag = 'not_connected'` },
+  clients_alone: { unit: "clients", title: "Failed connections in sessions where no client connected", arg: false, where: `${S} AND s.tag = 'not_connected' AND NOT EXISTS (SELECT 1 FROM connection_tags o WHERE o.session_id = s.session_id AND o.tag = 'connected')` },
+  clients_unknown: { unit: "clients", title: "Client connections with unknown outcomes", arg: false, where: `${S} AND s.tag = 'unknown'` },
+  client_reason: { unit: "clients", title: "Client connections that didn’t connect", arg: true, where: `${S} AND s.tag = 'not_connected' AND s.reason = $3` },
   client_error: { unit: "clients", title: "Client connections that recorded", arg: true, where: ERROR_ON("e.connection_id = s.connection_id", true) },
 } satisfies Record<string, Cohort>;
 export type CohortKey = keyof typeof COHORTS;
@@ -147,37 +148,45 @@ export const getClientCounts = cache(async (range: Range): Promise<ClientCounts>
 
 export const PAGE_SIZE = 50;
 
-function cohortParams(key: CohortKey, arg: string | null, range: Range): unknown[] {   // $1, $2 = the range, $3 = the argument when the cohort has one. Called by the cohort count and page queries
-  return COHORTS[key].arg ? [range.from, range.to, arg] : [range.from, range.to];
+function cohortFilter(key: CohortKey, arg: string | null, range: Range, prefix?: string) {
+  const cohort = COHORTS[key];
+  const params = cohort.arg ? [range.from, range.to, arg] : [range.from, range.to];
+  let where = cohort.where;
+  if (prefix) {
+    params.push(prefix + "%");
+    const columns = cohort.unit === "sessions" ? ["session_id"] : ["connection_id", "session_id"];
+    where += ` AND (${columns.map((column) => `s.${column}::STRING LIKE $${params.length}`).join(" OR ")})`;
+  }
+  return { params, where };
 }
 
-export async function getCohortCount(key: CohortKey, arg: string | null, range: Range): Promise<string> {   // How many records a cohort holds. Called by the sheet's list step for its title and pages
-  // Count with the cohort's condition.
+export async function getCohortCount(key: CohortKey, arg: string | null, range: Range, prefix?: string): Promise<string> {   // How many records a cohort holds. Called by the sheet's list step for its title and pages
+  const { params, where } = cohortFilter(key, arg, range, prefix);
   const rows = await query<{ n: string }>(`
-    SELECT count(*) AS n FROM ${COHORTS[key].unit === "sessions" ? SESSIONS : CLIENTS} WHERE ${COHORTS[key].where}`, cohortParams(key, arg, range));
+    SELECT count(*) AS n FROM ${COHORTS[key].unit === "sessions" ? SESSIONS : CLIENTS} WHERE ${where}`, params);
   return rows[0].n;
 }
 
-export async function getSessionPage(key: CohortKey, arg: string | null, range: Range, page: number): Promise<SessionListRow[]> {   // One page (50) of a session cohort, latest first: app start and end, events, tag and client count. Called by the sheet's list step
+export async function getSessionPage(key: CohortKey, arg: string | null, range: Range, page: number, prefix?: string): Promise<SessionListRow[]> {   // One page (50) of a session cohort, latest first: app start and end, events, tag and client count. Called by the sheet's list step
   // The cohort's sessions, latest app start first; clients = the app's client connection records for the session.
-  const params = cohortParams(key, arg, range);
+  const { params, where } = cohortFilter(key, arg, range, prefix);
   return query<SessionListRow>(`
     SELECT s.session_id, s.started_at, s.ended_at, s.events, s.tag, s.reason,
            (SELECT count(*) FROM gamearena_source.session_client_connections c WHERE c.session_id = s.session_id) AS clients
     FROM ${SESSIONS}
-    WHERE ${COHORTS[key].where}
+    WHERE ${where}
     ORDER BY s.started_at DESC, s.session_id
     LIMIT ${PAGE_SIZE} OFFSET $${params.length + 1}`, [...params, page * PAGE_SIZE]);
 }
 
-export async function getClientPage(key: CohortKey, arg: string | null, range: Range, page: number): Promise<ClientListRow[]> {   // One page (50) of a client cohort, latest first: session, tag, client number, the app record's seconds and whether another client in the session connected. Called by the sheet's list step
+export async function getClientPage(key: CohortKey, arg: string | null, range: Range, page: number, prefix?: string): Promise<ClientListRow[]> {   // One page (50) of a client cohort, latest first: session, tag, client number, the app record's seconds and whether another client in the session connected. Called by the sheet's list step
   // The page of client connections first, then each one's client number and app timestamps from the app's records of its session.
-  const params = cohortParams(key, arg, range);
+  const { params, where } = cohortFilter(key, arg, range, prefix);
   return query<ClientListRow>(`
     WITH p AS (
       SELECT s.connection_id, s.session_id, s.started_at, s.tag, s.reason
       FROM ${CLIENTS}
-      WHERE ${COHORTS[key].where}
+      WHERE ${where}
       ORDER BY s.started_at DESC, s.connection_id
       LIMIT ${PAGE_SIZE} OFFSET $${params.length + 1}),
     c AS (
@@ -220,6 +229,16 @@ export async function getConnectionReasons(range: Range): Promise<ClientReasonRo
     ORDER BY clients DESC`, [range.from, range.to]);
 }
 
+export async function getDailyConnections(range: Range): Promise<DailyConnectionRow[]> {
+  return query<DailyConnectionRow>(`
+    SELECT (s.started_at AT TIME ZONE 'UTC')::DATE::STRING AS day,
+           count(*) FILTER (WHERE ${COHORTS.clients_not_connected.where}) AS not_connected
+    FROM ${CLIENTS}
+    WHERE ${COHORTS.clients.where}
+    GROUP BY 1
+    ORDER BY 1`, [range.from, range.to]);
+}
+
 export async function getReasonErrors(reason: string, range: Range): Promise<ReasonErrorRow[]> {   // What is inside one reason: the errors recorded on its client connections, by error + code, with the most common phase and stage. Called by the sheet's client_reason list
   // Error events of this reason's clients; per error + code: clients hit, and the most common phase + stage with its share of the times recorded. Then one row (error NULL) for the clients with no error at all. Warnings last.
   return query<ReasonErrorRow>(`
@@ -230,13 +249,15 @@ export async function getReasonErrors(reason: string, range: Range): Promise<Rea
       WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")} AND e.level = 'error'),
     per AS (SELECT error, bool_or(warning) AS warning, count(DISTINCT connection_id) AS clients, count(*) AS events FROM ev GROUP BY error),
     top AS (SELECT DISTINCT ON (error) error, phase, stage, count(*) AS n FROM ev GROUP BY error, phase, stage ORDER BY error, n DESC, phase, stage)
-    SELECT p.error, p.warning, p.clients, top.phase, top.stage, round(100.0 * top.n / p.events)::STRING AS top_percent
-    FROM per p JOIN top ON top.error = p.error
-    UNION ALL
-    SELECT NULL::STRING, false, count(*), NULL::STRING, NULL::STRING, NULL::STRING
-    FROM connection_tags t
-    WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")}
-      AND NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.connection_id = t.connection_id AND e.level = 'error')
+    SELECT * FROM (
+      SELECT p.error, p.warning, p.clients, top.phase, top.stage, round(100.0 * top.n / p.events)::STRING AS top_percent
+      FROM per p JOIN top ON top.error = p.error
+      UNION ALL
+      SELECT NULL::STRING, false, count(*), NULL::STRING, NULL::STRING, NULL::STRING
+      FROM connection_tags t
+      WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")}
+        AND NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.connection_id = t.connection_id AND e.level = 'error')
+    ) evidence
     ORDER BY warning, error IS NULL, clients DESC, error`, [range.from, range.to, reason]);
 }
 

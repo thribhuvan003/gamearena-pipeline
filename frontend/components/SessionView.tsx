@@ -1,7 +1,7 @@
 // SessionView.tsx: one session: its facts, each client connection with device and outcome, and the event timeline. Shown on the session page and in the sheet's session step.
 
 import SessionTimeline, { type PageHref } from "@/components/SessionTimeline";
-import { formatNumber, formatTime, redact, tagText } from "@/lib/format";
+import { formatTime, redact, tagText } from "@/lib/format";
 import { getClientConnections, getSessionDetail, type SessionDetail } from "@/lib/queries";
 
 export default async function SessionView({ id, highlight, eventPage, pageHref }: { id: string; highlight?: string; eventPage: number; pageHref: PageHref }) {   // Reads the session and its client connections and shows them, then the timeline. Called by the session page and by the sheet's session step; highlight = the client connection to mark, eventPage and pageHref = the timeline's event page and its links
@@ -12,31 +12,28 @@ export default async function SessionView({ id, highlight, eventPage, pageHref }
     <>
       <dl className="kv">
         <dt>Session ID</dt><dd className="id">{id}</dd>
-        <dt>Outcome (pipeline)</dt><dd>{outcome(session)}</dd>
-        <dt>Started (app)</dt><dd>{session.started_at ? formatTime(session.started_at) : "-"}</dd>
-        <dt>Ended (app)</dt><dd>{endText(session)}</dd>
-        <dt>End reason (app)</dt><dd>{session.end_reason ? <span className="mono">{redact(session.end_reason)}</span> : "-"}</dd>
-        <dt>First event recorded</dt><dd>{session.first_event_at ? formatTime(session.first_event_at) : "-"}</dd>
-        <dt>Events recorded</dt><dd>{formatNumber(session.events)}</dd>
+        <dt>Session outcome</dt><dd>{outcome(session)}</dd>
+        <dt>App start</dt><dd>{session.started_at ? formatTime(session.started_at) : "-"}</dd>
+        <dt>App end</dt><dd>{endText(session)}</dd>
+        <dt>App end reason</dt><dd>{session.end_reason ? <span className="mono">{redact(session.end_reason)}</span> : "-"}</dd>
       </dl>
       {!session.in_app && <p className="hint">Not in the app backup: start, end and devices unknown.</p>}
 
       <section>
         <h3>Client connections ({connections.length})</h3>
-        <p className="hint">Device, OS and browser are read from the user agent.</p>
         {connections.length === 0 ? (
           <p className="hint">{session.in_app ? "No client connections recorded." : "Not in the app data, so connections are not listed."}</p>
         ) : (
           <div className="list">
             {connections.map((row, i) => (
-              <div key={row.connection_id} className={row.connection_id === highlight ? "list-row selected" : "list-row"}>
+              <div key={row.connection_id} className={row.connection_id === highlight ? "list-row client-detail-row selected" : "list-row client-detail-row"}>
                 <div className="row-main">
                   <div>Client {i + 1} · {row.device} · {row.os} · {row.browser}</div>
                   <div className="row-meta">
-                    Access type <span className="mono">{row.auth_type}</span> · {formatTime(row.connected_at)} → {row.disconnected_at ? formatTime(row.disconnected_at) : "-"}
+                    {row.auth_type} access · App timestamps {formatTime(row.connected_at)}{row.disconnected_at && ` → ${formatTime(row.disconnected_at)}`}
                   </div>
                 </div>
-                <span className="row-end">{row.tag ? <span className="mono">{tagText(row.tag, row.reason)}</span> : "Not classified"}</span>
+                <span className="row-end">{row.tag ? tagText(row.tag, row.reason) : "Not classified"}</span>
               </div>
             ))}
           </div>

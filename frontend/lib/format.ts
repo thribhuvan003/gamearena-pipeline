@@ -20,8 +20,24 @@ export function percent(part: string, whole: string): string {   // part as a sh
   return Number(whole) === 0 ? "0" : (Math.round((1000 * Number(part)) / Number(whole)) / 10).toString();
 }
 
-export function tagText(tag: string, reason: string | null): string {   // "failed (setup_error)", or just the tag when there is no reason. Called by the sheet's rows and the session view
-  return reason ? `${tag} (${reasonLabel(reason)})` : tag;
+const TAG_LABELS: Record<string, string> = {
+  connected: "Connected",
+  not_connected: "Didn’t connect",
+  failed: "Failed",
+  no_attempt: "No attempt recorded",
+  unknown: "Outcome unknown",
+};
+
+export function tagText(tag: string, reason: string | null): string {
+  const label = TAG_LABELS[tag] ?? reasonLabel(tag);
+  return reason ? `${label} · ${reasonLabel(reason)}` : label;
+}
+
+const DAY_FORMAT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const FULL_DAY_FORMAT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
+export function dayLabel(day: string, year = true): string {
+  return (year ? FULL_DAY_FORMAT : DAY_FORMAT).format(new Date(day + "T00:00:00Z"));
 }
 
 export function formatSeconds(value: string | null): string {   // "33" -> "33 s", "172" -> "2 min 52 s", null -> "-". Called by the client list
@@ -37,8 +53,16 @@ export function isMuted(event: string): boolean {          // True for an event 
   return MUTED_EVENTS.has(event);
 }
 
-export function reasonLabel(reason: string): string {      // The pipeline's reason as shown on screen: no_video -> "no info" (tried, no success, and no failure event or failed video state recorded), others unchanged. Called wherever a reason is shown
-  return reason === "no_video" ? "no info" : reason;
+const REASON_LABELS: Record<string, string> = {
+  no_video: "Reason unknown",
+  setup_error: "Setup failed",
+  video_connection_failed: "Video connection failed",
+  someone_never_joined: "A client never joined",
+  error_while_connecting: "Error while connecting",
+};
+
+export function reasonLabel(reason: string): string {
+  return REASON_LABELS[reason] ?? reason.replaceAll("_", " ");
 }
 
 // Private bits that can appear inside the app's free-text messages: addresses, links, IDs and long tokens.

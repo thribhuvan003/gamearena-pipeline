@@ -11,7 +11,7 @@ export default async function ErrorTable({ range }: { range: Range }) {   // Sho
   return (
     <section>
       <h2>Errors recorded, per client connection</h2>
-      <p className="hint">Tagged client connections that recorded each error; % = didn&apos;t connect ÷ (didn&apos;t connect + connected).</p>
+      <p className="hint">The failure share uses connections with a known outcome. A recorded error can occur on a connection that succeeded.</p>
       {rows.length === 0 ? (
         <p className="hint">No errors tied to a client connection in this period.</p>
       ) : (
@@ -23,7 +23,7 @@ export default async function ErrorTable({ range }: { range: Range }) {   // Sho
                 <th className="num">Clients</th>
                 <th className="num">Didn&apos;t connect</th>
                 <th className="num">Connected anyway</th>
-                <th className="num">% didn&apos;t connect</th>
+                <th className="num">Failure share</th>
                 <th className="num">Not tagged</th>
               </tr>
             </thead>
@@ -40,7 +40,7 @@ export default async function ErrorTable({ range }: { range: Range }) {   // Sho
                   </td>
                   <td className="num">{formatNumber(row.not_connected_clients)}</td>
                   <td className="num">{formatNumber(row.connected_clients)}</td>
-                  <td className="num">{row.not_connected_percent ?? "-"}</td>
+                  <td className="num">{row.not_connected_percent === null ? "—" : `${row.not_connected_percent}%`}</td>
                   <td className="num">{formatNumber(row.not_tagged_clients)}</td>
                 </tr>
               ))}

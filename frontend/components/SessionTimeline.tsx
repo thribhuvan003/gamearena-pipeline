@@ -12,29 +12,35 @@ export default async function SessionTimeline({ sessionId, detail, eventPage, pa
   const total = Number(detail.events);
 
   return (
-    <section>
-      <h3>Errors ({formatNumber(detail.error_events)})</h3>
-      <p className="hint">
-        UTC, oldest first. Addresses, links, IDs and tokens are hidden.{Number(detail.error_events) > ERROR_LIMIT && ` The first ${formatNumber(String(ERROR_LIMIT))} of ${formatNumber(detail.error_events)} are shown.`}
-      </p>
+    <section aria-labelledby="events-heading">
+      <h3 id="events-heading">Recorded evidence</h3>
+      <p className="hint">{formatNumber(detail.events)} events · {formatNumber(detail.error_events)} errors · {formatNumber(detail.warn_events)} warnings</p>
       {total === 0 ? (
         <p className="hint">No events recorded for this session.</p>
       ) : (
         <>
-          {errors.length > 0 && <div className="list">{errors.map(eventRow)}</div>}
-          <h3>Warnings ({formatNumber(detail.warn_events)})</h3>
+          {errors.length > 0 && (
+            <details className="more">
+              <summary>Error events ({formatNumber(detail.error_events)})</summary>
+              <p className="hint">Oldest first (UTC).{Number(detail.error_events) > ERROR_LIMIT && ` First ${formatNumber(String(ERROR_LIMIT))} shown.`}</p>
+              <div className="list">{errors.map(eventRow)}</div>
+            </details>
+          )}
           {warnings.length > 0 && (
-            <div className="list">
-              {warnings.map((row) => (
-                <div key={row.event} className={`list-row level-warn${isMuted(row.event) ? " muted" : ""}`}>
-                  <div className="row-main">
-                    <div><span className="mono">{row.event}</span>{row.warning && <> <span className="badge badge-warning">warning</span></>}</div>
-                    <div className="row-meta">first {formatClock(row.first_at)} · last {formatClock(row.last_at)}{row.warning && " · logged as level error"}</div>
+            <details className="more">
+              <summary>Warnings ({formatNumber(detail.warn_events)})</summary>
+              <div className="list">
+                {warnings.map((row) => (
+                  <div key={row.event} className={`list-row level-warn${isMuted(row.event) ? " muted" : ""}`}>
+                    <div className="row-main">
+                      <div><span className="mono">{row.event}</span>{row.warning && <> <span className="badge badge-warning">warning</span></>}</div>
+                      <div className="row-meta">first {formatClock(row.first_at)} · last {formatClock(row.last_at)}{row.warning && " · logged as level error"}</div>
+                    </div>
+                    <span className="row-end">{formatNumber(row.events)}</span>
                   </div>
-                  <span className="row-end">{formatNumber(row.events)}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </details>
           )}
           <details className="more" open={eventPage > 0}>
             <summary>All events ({formatNumber(detail.events)})</summary>

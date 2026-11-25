@@ -34,8 +34,8 @@ export default async function ErrorTrend({ range }: { range: Range }) {   // Spl
 
   return (
     <section>
-      <h2>Errors in client connections that didn&apos;t connect, per day</h2>
-      <p className="hint">The 5 errors that hit the most not_connected clients in this period, per day (UTC), the rest as Other; a client with two errors counts in both.</p>
+      <h2>Daily error breakdown</h2>
+      <p className="hint">The five most common errors among connections that didn’t connect, by event day (UTC). A connection can appear in several series.</p>
       {rows.length === 0 ? (
         <p className="hint">No errors in client connections that didn&apos;t connect in this period.</p>
       ) : (
