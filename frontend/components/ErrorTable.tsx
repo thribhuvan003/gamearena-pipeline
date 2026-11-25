@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { eventLabel, formatNumber } from "@/lib/format";
 import { link } from "@/lib/links";
-import { getErrorFrequency, getUntiedErrors, type ErrorRow, type Range, type UntiedErrorRow } from "@/lib/queries";
+import { getErrorFrequency, getUntiedErrors, type ErrorRow, type Range, type SessionErrorRow } from "@/lib/queries";
 
 export default async function ErrorTable({ range }: { range: Range }) {
   const [rows, untied] = await Promise.all([getErrorFrequency(range), getUntiedErrors(range)]);
@@ -69,7 +69,7 @@ function ClientError({ row, range }: { row: ErrorRow; range: Range }) {
   );
 }
 
-function SessionError({ row, range }: { row: UntiedErrorRow; range: Range }) {
+function SessionError({ row, range }: { row: SessionErrorRow; range: Range }) {
   return (
     <details className="disclosure">
       <summary>{eventLabel(row.error)} <span className="disclosure-value">{formatNumber(row.sessions)}</span></summary>

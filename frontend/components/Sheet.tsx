@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import Pager from "./Pager";
 import SessionView from "./SessionView";
 import SheetFrame from "./SheetFrame";
-import { eventLabel, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
+import { eventLabel, formatNumber, formatSeconds, formatTime, overviewErrorLabel, reasonLabel, shortId, tagText } from "@/lib/format";
 import { isUuid, link, linkString, searchPrefix, type Sheet as SheetState } from "@/lib/links";
 import {
   COHORTS, getClientPage, getCohortCount, getReasonErrors, getReasonSteps, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
@@ -71,7 +71,9 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   ]);
   const unit = cohort.unit === "sessions" ? "sessions" : "client connections";
 
-  const title = key === "client_error" || key === "untied_error"
+  const title = key === "recorded_error" && arg
+    ? overviewErrorLabel(arg)
+    : key === "client_error" || key === "untied_error"
     ? shownArg ?? cohort.title
     : shownArg === null ? cohort.title : `${cohort.title} · ${shownArg}`;
 
@@ -83,6 +85,7 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
         <div className="sheet-section">
           <div className="stat-value">{formatNumber(total)}</div>
           <div className="stat-sub">{prefix ? "Matching " : ""}{unit}</div>
+          {key === "recorded_error" && <p className="row-meta">App sessions where this error was logged during the selected dates.</p>}
           {arg === "no_video" && (key === "session_reason" || key === "client_reason") && (
             <p className="row-meta">The logs don’t establish a cause.</p>
           )}

@@ -30,7 +30,7 @@ export type SessionReasonRow = { reason: string; sessions: string };
 export type ReasonErrorRow = { error: string | null; warning: boolean; clients: string; phase: string | null; stage: string | null; top_percent: string | null };
 export type ReasonSteps = { clients: string; gathered: string; decoded: string };
 export type ErrorRow = { error: string; warning: boolean; events: string; clients: string; not_tagged_clients: string; not_connected_clients: string; connected_clients: string; not_connected_percent: string | null };
-export type UntiedErrorRow = { error: string; events: string; sessions: string };
+export type SessionErrorRow = { error: string; events: string; sessions: string };
 export type ErrorSeriesRow = { day: string | null; series: string; warning: boolean; clients: string };
 export type ErrorKeyRow = { error: string; field: "clients" | "message" | "phase" | "stage" | "text"; value: string | null; events: string };
 export type SessionListRow = { session_id: string; started_at: Date; ended_at: Date | null; events: string | null; tag: string | null; reason: string | null; clients: string };
@@ -64,6 +64,7 @@ const EVENT = `coalesce(e.payload->>'event', e.event_type::STRING)`;
 const ERROR_NAME = `${EVENT} || coalesce(' ' || coalesce(e.payload->>'code', e.payload->>'errorCode'), '')`;
 // ice.candidate.error is logged as an error, but most clients that hit it still connect, so the dashboard shows it as a warning, always last.
 const WARNING = `(${EVENT} = 'ice.candidate.error')`;
+const RECORDED_ERROR = `e.level = 'error' AND NOT ${WARNING} AND ${IN_RANGE("e.recorded_at")}`;
 
 // One row per app session (gamearena_source.host_sessions, the whole population) with its telemetry facts (events NULL = no telemetry) and the pipeline's tag. No date filter here; the cohorts add it on the app's started_at.
 const SESSIONS = `(
@@ -110,6 +111,10 @@ export const COHORTS = {
   tag_failed: { unit: "sessions", title: "Sessions tagged failed", arg: false, where: `${S} AND s.tag = 'failed'` },
   tag_no_attempt: { unit: "sessions", title: "Sessions tagged no_attempt", arg: false, where: `${S} AND s.tag = 'no_attempt'` },
   session_reason: { unit: "sessions", title: "App sessions classified as failed", arg: true, where: `${S} AND s.tag = 'failed' AND s.reason = $3` },
+  recorded_error: {
+    unit: "sessions", title: "Affected sessions", arg: true,
+    where: `EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = s.session_id AND ${RECORDED_ERROR} AND ${ERROR_NAME} = $3)`,
+  },
   untied_error: { unit: "sessions", title: "Sessions with an error that names no client", arg: true, where: ERROR_ON("e.session_id = s.session_id", false) },
   clients: { unit: "clients", title: "Client connections with telemetry", arg: false, where: S },
   clients_connected: { unit: "clients", title: "Client connections that connected", arg: false, where: `${S} AND s.tag = 'connected'` },
@@ -273,6 +278,18 @@ export async function getReasonSteps(reason: string, range: Range): Promise<Reas
   return rows[0];
 }
 
+// Aggregate errors by app session, including host events and client-linked events.
+export async function getTopSessionErrors(range: Range): Promise<SessionErrorRow[]> {
+  return query<SessionErrorRow>(`
+    SELECT ${ERROR_NAME} AS error, count(*) AS events, count(DISTINCT e.session_id) AS sessions
+    FROM session_telemetry_events e
+    JOIN gamearena_source.host_sessions h ON h.id = e.session_id
+    WHERE ${RECORDED_ERROR}
+    GROUP BY 1
+    ORDER BY sessions DESC, events DESC, error
+    LIMIT 3`, [range.from, range.to]);
+}
+
 export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {          // Each error + code in the range, counted per tagged client connection it hit, worst share first, warnings last. Called by ErrorTable (the error table Sravya asked for)
   // Error events that name a client: times recorded; tagged clients hit (the client_error cohort), untagged clients apart; of the tagged, how many didn't connect and connected anyway. % = didn't connect / (didn't connect + connected).
   return query<ErrorRow>(`
@@ -292,9 +309,9 @@ export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {    
     ORDER BY warning, not_connected_percent DESC NULLS LAST, not_connected_clients DESC`, [range.from, range.to]);
 }
 
-export async function getUntiedErrors(range: Range): Promise<UntiedErrorRow[]> {     // Errors in the range that name no client connection (mostly setup failures before any player connected), with the sessions they happened in (the untied_error cohort). Called by ErrorTable
+export async function getUntiedErrors(range: Range): Promise<SessionErrorRow[]> {     // Errors in the range that name no client connection (mostly setup failures before any player connected), with the sessions they happened in (the untied_error cohort). Called by ErrorTable
   // Events the app logged as errors with no connection_id: times recorded and sessions they happened in, per error + code.
-  return query<UntiedErrorRow>(`
+  return query<SessionErrorRow>(`
     SELECT ${ERROR_NAME} AS error, count(*) AS events, count(DISTINCT e.session_id) AS sessions
     FROM session_telemetry_events e
     JOIN gamearena_source.host_sessions h ON h.id = e.session_id
