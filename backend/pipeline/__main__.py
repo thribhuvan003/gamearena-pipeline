@@ -106,7 +106,7 @@ def tag_new_sessions(conn, run_id, limit):                   # Per batch: read, 
 
         for connection in connections.values():
             connection["tag"] = tags.tag_connection(connection)
-            connection["reason"] = tags.connection_reason(connection, connection["tag"])
+            connection["reason"] = tags.failure_reason(connection, connection["tag"])
 
         store.save_tags(conn, sessions, run_id)
         store.save_connection_tags(conn, connections, run_id)

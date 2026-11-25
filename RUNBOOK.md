@@ -19,7 +19,8 @@ One session can contain multiple client connections. The counts must not be adde
 | Folder | Part | What is in it |
 |---|---|---|
 | `backend/pipeline/` | backend | the Python pipeline: reads telemetry, tags sessions and connections, saves them |
-| `backend/sql/` | backend | the SQL behind `just setup`, `check`, `report`, `trends`, `errors`, `tables`, `explore` |
+| `backend/sql/` | backend | the SQL behind `just setup`, `check`, `report`, `trends`, `errors`, `profile`, `tables`, `explore` |
+| `backend/tests/` | backend | small made-up cases for the tagging rules (`just test`) |
 | `frontend/` | frontend | the dashboard (Next.js): reads the saved tables and shows them in the browser |
 
 `justfile`, `RUNBOOK.md` and `COMMANDS.md` at the top cover both parts.
@@ -63,6 +64,8 @@ All SQL recipes target the local Docker database `gamearena_analytics`. The Pyth
 | `just report` | Show the four main analytics summaries |
 | `just trends` | Show daily session and connection outcomes |
 | `just errors` | Show recorded errors for failed sessions that have explicit error events |
+| `just profile` | Show how complete the data is and what each result rests on: session and connection coverage, success vs first video frame, error fields, reasons vs evidence, reconnects (counts only; needs `gamearena_source`) |
+| `just test` | Check the tagging rules on small made-up sessions (no database needed) |
 | `just tables` | Show up to ten records from each derived table |
 | `just explore` | Show source tables, columns, event names and fields |
 | `just sql` | Open the local SQL shell; exit with `\q` |

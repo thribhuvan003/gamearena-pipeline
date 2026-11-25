@@ -13,28 +13,6 @@ def tag_session(session):                                    # connected, failed
     return "no_attempt"
 
 
-def failure_reason(session, tag):                            # Why a failed session failed (first match wins), else None
-    if tag != "failed":
-        return None
-
-    phase = last_failure_phase(session)
-    if phase == "pre-connect":
-        return "setup_error"
-    if phase == "connecting":
-        return "error_while_connecting"
-    if phase is not None:
-        return "error_other"
-
-    if video_failed(session):
-        return "video_connection_failed"
-
-    event_names = session["event_names"]
-    if "host_connected" not in event_names or "client_connected" not in event_names:
-        return "someone_never_joined"
-
-    return "no_video"
-
-
 def tag_connection(connection):                              # connected, not_connected or unknown
     if "pipeline.connect.success" in connection["event_names"]:
         return "connected"
@@ -45,11 +23,11 @@ def tag_connection(connection):                              # connected, not_co
     return "not_connected"
 
 
-def connection_reason(connection, tag):                      # Why a not_connected connection had no success (first match wins), else None
-    if tag != "not_connected":
+def failure_reason(item, tag):                               # Why a failed session or a not_connected connection didn't connect (first match wins), else None. someone_never_joined is checked for sessions only
+    if tag not in ("failed", "not_connected"):
         return None
 
-    phase = last_failure_phase(connection)
+    phase = last_failure_phase(item)
     if phase == "pre-connect":
         return "setup_error"
     if phase == "connecting":
@@ -57,8 +35,12 @@ def connection_reason(connection, tag):                      # Why a not_connect
     if phase is not None:
         return "error_other"
 
-    if video_failed(connection):
+    if video_failed(item):
         return "video_connection_failed"
+
+    event_names = item["event_names"]
+    if tag == "failed" and ("host_connected" not in event_names or "client_connected" not in event_names):
+        return "someone_never_joined"
 
     return "no_video"
 

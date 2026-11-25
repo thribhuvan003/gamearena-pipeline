@@ -42,6 +42,14 @@ trends:
 errors:
     {{db}} < backend/sql/errors.sql
 
+# How complete the data is and what each result rests on (counts only; needs gamearena_source)
+profile:
+    {{db}} < backend/sql/profile.sql
+
+# Check the tagging rules on small made-up sessions (no database needed)
+test:
+    cd backend && {{python}} -m unittest discover -s tests
+
 # Preview ten rows from each generated table
 tables:
     {{db}} < backend/sql/tables.sql

@@ -45,6 +45,6 @@ def show_status(conn):                                       # Prints tag totals
 
     print("Last runs:")
     for started_at, status, sessions_tagged, took, error in conn.execute(LAST_RUNS_SQL).fetchall():
-        seconds = f"{took.total_seconds():.1f} s" if took is not None else "still running"
+        seconds = f"{took.total_seconds():.1f} s" if took is not None else "? s (no finish time recorded)"
         line = f"  {started_at:%Y-%m-%d %H:%M}  {status:<7} {sessions_tagged:,} sessions in {seconds}"
         print(line + (f"  ({error})" if error else ""))

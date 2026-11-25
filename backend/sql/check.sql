@@ -57,7 +57,7 @@ SELECT count(*) AS ended_sessions,
 FROM expected x
 LEFT JOIN session_tags t USING (session_id);
 
--- Check 2, client connections: the same rules as tags.py tag_connection / connection_reason, compared with connection_tags; sessions_wrong = a connection saved under the wrong session.
+-- Check 2, client connections: the same rules as tags.py tag_connection / failure_reason, compared with connection_tags; sessions_wrong = a connection saved under the wrong session.
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
     FROM session_telemetry_events
