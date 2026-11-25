@@ -6,7 +6,16 @@ import { dayLabel } from "@/lib/format";
 const DAY = 86_400_000;
 const date = (value: number) => new Date(value).toISOString().slice(0, 10);
 
-export default function ConnectionChart({ days }: { days: { day: number; count: number }[] }) {
+type ChartProps = {
+  days: { day: number; count: number }[];
+  height?: number;
+  seriesLabel?: string;
+  colour?: string;
+};
+
+export default function ConnectionChart({
+  days, height = 184, seriesLabel = "Didn’t connect", colour = "var(--accent)",
+}: ChartProps) {
   const first = days[0].day;
   const last = days[days.length - 1].day;
   const dayCount = (last - first) / DAY;
@@ -16,7 +25,7 @@ export default function ConnectionChart({ days }: { days: { day: number; count: 
 
   return (
     <div className="connection-chart">
-      <ResponsiveContainer width="100%" height={184}>
+      <ResponsiveContainer width="100%" height={height}>
         <BarChart data={days} margin={{ top: 6, right: 10, bottom: 0, left: 0 }}>
           <CartesianGrid stroke="var(--separator)" vertical={false} />
           <XAxis
@@ -32,7 +41,7 @@ export default function ConnectionChart({ days }: { days: { day: number; count: 
             contentStyle={{ background: "var(--surface)", borderColor: "var(--separator)", borderRadius: 8 }}
             cursor={{ fill: "var(--accent-bg)" }}
           />
-          <Bar dataKey="count" name="Didn’t connect" fill="var(--accent)" maxBarSize={Math.max(1, Math.min(22, Math.floor(255 / (dayCount + 1))))} radius={[2, 2, 0, 0]} isAnimationActive={false} />
+          <Bar dataKey="count" name={seriesLabel} fill={colour} maxBarSize={Math.max(1, Math.min(22, Math.floor(255 / (dayCount + 1))))} radius={[2, 2, 0, 0]} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -944,3 +944,109 @@ details.more > summary::-webkit-details-marker {
     font-size: var(--fs-small);
   }
 }
+
+.issue-trend-grid {
+  display: grid;
+  grid-template-columns: minmax(230px, 2fr) minmax(0, 3fr);
+  gap: var(--s5);
+  margin-top: var(--s4);
+}
+
+.issue-list-heading,
+.issue-choice,
+.issue-signatures li,
+.issue-daily-values li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s2) var(--s3);
+}
+
+.issue-list-heading {
+  color: var(--text-2);
+  font-size: var(--fs-small);
+}
+
+.issue-choice {
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  font: inherit;
+  text-align: start;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--separator);
+  cursor: pointer;
+}
+
+.issue-choice span,
+.issue-signatures code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.issue-choice strong,
+.issue-signatures span,
+.issue-daily-values span {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.issue-choice:hover,
+.issue-choice[aria-pressed="true"] {
+  background: var(--accent-bg);
+}
+
+.issue-choice[aria-pressed="true"] {
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.issue-warning-group {
+  margin-top: var(--s3);
+}
+
+.issue-warning-group h4 {
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  margin-inline: var(--s3);
+}
+
+.issue-trend-panel {
+  min-width: 0;
+  padding: var(--s3) var(--s4) 0;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.issue-trend-panel > .disclosure {
+  border-top: 1px solid var(--separator);
+}
+
+.issue-signatures, .issue-daily-values {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--fs-small);
+}
+
+.issue-daily-values {
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.issue-count-note {
+  margin-top: var(--s3);
+}
+
+@media (max-width: 680px) {
+  .issue-trend-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s3);
+  }
+
+  .issue-trend-panel {
+    padding-inline: var(--s2);
+  }
+}
