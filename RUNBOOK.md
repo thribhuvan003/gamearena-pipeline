@@ -141,4 +141,4 @@ Saved batches survive Ctrl+C. This implementation is intended to run as one pipe
 
 ## Deployment boundary
 
-On Linux servers, run `python3 -m pipeline run` from `backend/` using secured database settings and a supervised process. The local Docker `just` SQL commands are developer tooling, **not** a production deployment configuration. The dashboard in `frontend/` is local-only; serving it to other people needs access controls, which is separate future work.
+On Linux servers, run `python3 -m pipeline run` from `backend/` using secured database settings and a supervised process. The local Docker `just` SQL commands are developer tooling, **not** a production deployment configuration. The dashboard's Auth0 access controls are implemented; configure the tenant, approved users, HTTPS domain, and secured database connection before serving it to other people. See [frontend/README.md](frontend/README.md).

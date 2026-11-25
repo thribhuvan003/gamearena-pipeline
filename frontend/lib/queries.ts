@@ -3,6 +3,7 @@
 import { connection } from "next/server";
 import { Pool, type QueryResultRow } from "pg";
 import { cache } from "react";
+import { requireDashboardAccess } from "./access";
 
 // One connection pool, with the same settings and defaults as the pipeline.
 const pool = new Pool({
@@ -15,6 +16,7 @@ const pool = new Pool({
 
 async function query<Row extends QueryResultRow>(sql: string, params: unknown[] = []): Promise<Row[]> {   // Runs one SELECT with $1, $2 parameters and returns its rows. Called by every function below; connection() tells Next.js not to cache, so the numbers are always live
   await connection();
+  await requireDashboardAccess();
   const result = await pool.query<Row>(sql, params);
   return result.rows;
 }

@@ -1,6 +1,6 @@
 # GameArena dashboard
 
-A small read-only dashboard over the pipeline's results (the pipeline is in `../backend`) and the app's own session records. It runs on your own machine only, because the pages show real session IDs.
+A small read-only dashboard over the pipeline's results (the pipeline is in `../backend`) and the app's own session records. Local development stays on your own machine; Auth0 sign-in protects it when configured for sharing.
 
 ## Problem statement
 **What data we have:**
@@ -10,7 +10,7 @@ A small read-only dashboard over the pipeline's results (the pipeline is in `../
 
 **What we want to see:** overall usage, then the scale of the problems, then the exact sessions or client connections behind each number, then the evidence in one session.
 
-**Out of scope for now:** FPS, streamed hours and other quality numbers; auth and an API (needed before it is shared); changing the pipeline's rules.
+**Out of scope for now:** FPS, streamed hours and other quality numbers; changing the pipeline's rules.
 
 **Rules:**
 - The dashboard only reads (`SELECT`).
@@ -36,9 +36,26 @@ Needs Node.js 20+, the `cockroachdb` Docker container running (with `gamearena_s
 just dashboard
 ```
 That installs the packages and starts it. Without just, run `npm install` then `npm run dev` in this `frontend` folder (or `npm run build` then `npm start` for the faster built version).
-Then open http://localhost:3000 (or http://127.0.0.1:3000). It only listens on this machine, not the network, and `proxy.ts` refuses requests addressed to any other host name. Ctrl+C stops it.
+Then open http://localhost:3000 (or http://127.0.0.1:3000). Development defaults to a localhost-only preview without login. `npm start` and other production builds require Auth0 configuration and HTTPS. Ctrl+C stops it.
 
 It uses the pipeline's settings and defaults (`DB_HOST` 127.0.0.1, `DB_PORT` 26257, `DB_NAME` gamearena_analytics, `DB_USER` root, `DB_PASSWORD` not set). To change them, put them in a `.env.local` file here.
+
+## Auth0 sign-in
+Create a **Regular Web Application** in Auth0. In its settings, add `http://localhost:3000/auth/callback` to Allowed Callback URLs and `http://localhost:3000` to Allowed Logout URLs. Use the corresponding HTTPS URLs for the eventual deployment. Choose and enable the identity connection the team will use; only users on the app's allowlist can see data.
+
+For local sign-in, add this to `frontend/.env.local`, then restart `npm run dev`:
+```
+AUTH_MODE=auth0
+APP_BASE_URL=http://localhost:3000
+AUTH0_DOMAIN=your-tenant.auth0.com
+AUTH0_CLIENT_ID=your-client-id
+AUTH0_CLIENT_SECRET=your-client-secret
+AUTH0_SECRET=64-hex-characters
+AUTH0_ALLOWED_EMAILS=tribhuvan@example.com,kc@example.com,sravya@example.com
+```
+Generate `AUTH0_SECRET` with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Replace the example addresses with the team's real verified sign-in emails. `.env.local` is gitignored; do not commit secrets. Use `http://localhost:3000` consistently during the local Auth0 test.
+
+The Auth0 SDK handles `/auth/login`, `/auth/callback`, and `/auth/logout`. The proxy checks the host, session, verified email, and allowlist before serving pages; database reads independently check access. Other SDK routes, including `/auth/profile` and `/auth/access-token`, are not exposed. Production refuses requests if Auth0 settings, an allowlist, or a matching HTTPS `APP_BASE_URL` is missing. Configure the deployment's database connection and network access separately before sharing the site.
 
 ## Files
 | File | What it does |
@@ -50,7 +67,8 @@ It uses the pipeline's settings and defaults (`DB_HOST` 127.0.0.1, `DB_PORT` 262
 | `lib/queries.ts` | the data: the database connection, the cohorts and every SQL the dashboard runs |
 | `lib/links.ts` | the page's URL state and the one function that builds every link |
 | `lib/format.ts` | number and time formatting, and hiding private bits in messages |
-| `proxy.ts` | refuses any request not addressed to localhost |
+| `lib/access-policy.ts`, `lib/access.ts`, `lib/auth0.ts` | local preview rule, Auth0 session and email allowlist, and server-side access check before database reads |
+| `proxy.ts` | localhost-only preview in development; Auth0 route handling and access enforcement when sign-in is enabled |
 
 ## Check it
 With no dates picked: Client connections = `just report` report 2. Sessions tagged connected, failed and no_attempt (in the side sheet's lists) = report 1, counted by the app's start time instead of the first event, so a range can differ at its edges.

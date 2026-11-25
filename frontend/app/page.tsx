@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { connection } from "next/server";
 import Attention from "@/components/Attention";
 import ConnectionTrend from "@/components/ConnectionTrend";
 import DateFilter from "@/components/DateFilter";
@@ -11,6 +12,8 @@ import SearchBox from "@/components/SearchBox";
 import Sheet from "@/components/Sheet";
 import SummaryCards from "@/components/SummaryCards";
 import TopErrors from "@/components/TopErrors";
+import { requireDashboardAccess } from "@/lib/access";
+import { localPreview } from "@/lib/access-policy";
 import { link, linkString, readSheet, searchPrefix } from "@/lib/links";
 import { searchIds, type Range } from "@/lib/queries";
 
@@ -25,6 +28,8 @@ export default function Home({ searchParams }: PageProps<"/">) {          // Lay
 }
 
 async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">) {   // Reads the dates (?from=&to=) and the sheet state (list, session, search) from the URL, opens a search's only match straight away, and renders the selected view with the sheet last. Called by Home inside <Suspense> (shows "Loading…" until ready), because the URL is only known when someone visits
+  await connection();
+  await requireDashboardAccess();
   const params = await searchParams;
   const range: Range = {
     from: readDate(params.from),
@@ -45,6 +50,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
           <nav className="dashboard-nav" aria-label="Dashboard views">
             <Link href={link({ ...range, view: undefined })} aria-current={!diagnostics ? "page" : undefined}>Overview</Link>
             <Link href={link({ ...range, view: "diagnostics" })} aria-current={diagnostics ? "page" : undefined}>Diagnostics</Link>
+            {!localPreview() && <a href="/auth/logout">Sign out</a>}
           </nav>
         </div>
         <div className="dashboard-tools">

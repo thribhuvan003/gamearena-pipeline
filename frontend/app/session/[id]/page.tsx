@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { connection } from "next/server";
 import SessionView from "@/components/SessionView";
+import { requireDashboardAccess } from "@/lib/access";
+import { localPreview } from "@/lib/access-policy";
 import { shortId } from "@/lib/format";
 import { isUuid, readSheet } from "@/lib/links";
 
@@ -19,6 +22,8 @@ export default function SessionPage({ params, searchParams }: PageProps<"/sessio
 }
 
 async function SessionPageBody({ params, searchParams }: PageProps<"/session/[id]">) {   // Checks the ID, reads the event page (?epage=) and shows the session. Called by SessionPage inside <Suspense> (shows "Loading…" until ready), because the ID is only known when someone visits
+  await connection();
+  await requireDashboardAccess();
   const { id } = await params;
   if (!isUuid(id)) notFound();
   const eventPage = readSheet(await searchParams).epage ?? 0;
@@ -27,6 +32,7 @@ async function SessionPageBody({ params, searchParams }: PageProps<"/session/[id
     <>
       <div className="page-head">
         <h1>Session {shortId(id)}</h1>
+        {!localPreview() && <a href="/auth/logout">Sign out</a>}
       </div>
       <SessionView
         id={id}
