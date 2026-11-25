@@ -8,7 +8,7 @@ export default function SearchBox({ range, q }: { range: Range; q?: string }) { 
       {range.view && <input type="hidden" name="view" value={range.view} />}
       {range.from && <input type="hidden" name="from" value={range.from} />}
       {range.to && <input type="hidden" name="to" value={range.to} />}
-      <input name="q" type="search" placeholder="Session or client connection ID" defaultValue={q} minLength={8} maxLength={36} aria-label="Session or client connection ID" />
+      <input name="q" type="search" placeholder="Session or connection ID" defaultValue={q} minLength={8} maxLength={36} aria-label="Session or client connection ID" />
       <button type="submit">Find</button>
     </form>
   );

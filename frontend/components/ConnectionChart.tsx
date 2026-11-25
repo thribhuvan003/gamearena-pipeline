@@ -11,7 +11,7 @@ export default function ConnectionChart({ days }: { days: { day: number; count: 
   const last = days[days.length - 1].day;
   const dayCount = (last - first) / DAY;
   const step = Math.max(1, Math.ceil(dayCount / 4));
-  const ticks = Array.from({ length: Math.floor(dayCount / step) + 1 }, (_, i) => first + i * step);
+  const ticks = Array.from({ length: Math.floor(dayCount / step) + 1 }, (_, i) => first + i * step * DAY);
   const max = Math.max(1, ...days.map(({ count }) => count));
 
   return (
@@ -21,7 +21,7 @@ export default function ConnectionChart({ days }: { days: { day: number; count: 
           <CartesianGrid stroke="var(--separator)" vertical={false} />
           <XAxis
             dataKey="day" type="number" domain={[first - DAY / 2, last + DAY / 2]}
-            ticks={ticks} tickFormatter={(value) => dayLabel(date(value), false)}
+            ticks={ticks} interval={0} tickFormatter={(value) => dayLabel(date(value), false)}
             tick={{ fill: "var(--text-2)", fontSize: 11 }} tickLine={false} axisLine={false}
           />
           <YAxis width={34} domain={[0, max]} allowDecimals={false} tickCount={4}
