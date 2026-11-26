@@ -37,7 +37,7 @@ export default function ErrorChart({ series }: { series: IssueSeries[] }) {
 
   return (
     <>
-      <p className="hint">Issues recorded on client connections that didn’t connect. Choose an issue to see when it was recorded.</p>
+      <p className="hint">Error events on client IDs with no recorded success, grouped by event day (UTC). Choose an event to see its daily count.</p>
       <div className="issue-trend-grid">
         <div>
           <div className="issue-list-heading"><strong>Issue</strong><span>Connections</span></div>
@@ -52,11 +52,11 @@ export default function ErrorChart({ series }: { series: IssueSeries[] }) {
         <div className="issue-trend-panel">
           <div aria-live="polite">
             <h4>{issue.title}</h4>
-            <p className="hint">Connections per day (UTC)</p>
+            <p className="hint">Client IDs with this event per day (UTC)</p>
           </div>
           <ConnectionChart
             days={issue.points}
-            seriesLabel="Connections"
+            seriesLabel="Client IDs"
             height={220}
             colour={issue.warning ? "var(--warn)" : "var(--accent)"}
           />

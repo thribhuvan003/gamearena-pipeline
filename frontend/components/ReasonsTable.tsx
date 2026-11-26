@@ -8,10 +8,10 @@ export default async function ReasonsTable({ range, sheet }: { range: Range; she
 
   return (
     <section className="overview-panel" aria-labelledby="reasons-title">
-      <h2 id="reasons-title">Why connections didn’t connect</h2>
-      <p className="hint">Share of measured connections that didn’t connect.</p>
+      <h2 id="reasons-title">No success recorded: pipeline categories</h2>
+      <p className="hint">The pipeline assigns one category per client connection without a success event, using logged failure phase, video state, or missing evidence. These are clues, not confirmed root causes.</p>
       {rows.length === 0 ? (
-        <p className="hint">No failed connections in this period.</p>
+        <p className="hint">No connections without a recorded success in this period.</p>
       ) : (
         <ul className="list reason-list">
           {rows.map((row) => (

@@ -85,7 +85,8 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
         <div className="sheet-section">
           <div className="stat-value">{formatNumber(total)}</div>
           <div className="stat-sub">{prefix ? "Matching " : ""}{unit}</div>
-          {key === "recorded_error" && <p className="row-meta">App sessions where this error was logged during the selected dates.</p>}
+          {key === "recorded_error" && <p className="row-meta">App sessions where this event was logged during the selected dates. The session may also have a recorded success; the code is an app-reported value.</p>}
+          {key === "client_error" && <p className="row-meta">Client IDs with this error event. They may also have a recorded success.</p>}
           {arg === "no_video" && (key === "session_reason" || key === "client_reason") && (
             <p className="row-meta">The logs don’t establish a cause.</p>
           )}
@@ -174,7 +175,7 @@ function clientRow(row: ClientListRow, range: Range, sheet: SheetState) {   // O
       <div className="row-main">
         <div><span className="mono" title={row.session_id}>{shortId(row.session_id)}</span> {row.client_number ? `Client ${row.client_number}` : ""}</div>
         <div className="row-meta">
-          {formatTime(row.started_at)} · <span>{tagText(row.tag, row.reason)}</span>{row.seconds !== null && ` · ${formatSeconds(row.seconds)} between app timestamps`} · {row.other_connected ? "another client connected" : "no other client connected"}
+          {formatTime(row.started_at)} · <span>{tagText(row.tag, row.reason)}</span>{row.seconds !== null && ` · ${formatSeconds(row.seconds)} between app timestamps`}{row.other_connected && " · another client ID has a success event"}
         </div>
       </div>
       <span className="chevron">›</span>

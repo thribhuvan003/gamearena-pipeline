@@ -14,7 +14,7 @@ type ChartProps = {
 };
 
 export default function ConnectionChart({
-  days, height = 184, seriesLabel = "Didn’t connect", colour = "var(--accent)",
+  days, height = 184, seriesLabel = "No success recorded", colour = "var(--accent)",
 }: ChartProps) {
   const first = days[0].day;
   const last = days[days.length - 1].day;

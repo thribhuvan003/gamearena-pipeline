@@ -21,6 +21,7 @@ export default async function SessionView({ id, highlight, eventPage, pageHref }
           <h3 id="session-clients">Client connections</h3>
           <span className="section-count">{formatNumber(String(connections.length))}</span>
         </div>
+        <p className="hint">Each client ID has its own outcome. “No success recorded” means its events contain no success event; it does not prove the player never joined.</p>
         {connections.length === 0 ? (
           <p className="hint">{session.in_app ? "No client connections recorded." : "Client records are unavailable in the app backup."}</p>
         ) : (

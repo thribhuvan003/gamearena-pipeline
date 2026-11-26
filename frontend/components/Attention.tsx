@@ -1,46 +1,33 @@
 import Link from "next/link";
-import { formatNumber, percent, reasonLabel } from "@/lib/format";
+import { formatNumber, reasonLabel } from "@/lib/format";
 import { link, type Sheet } from "@/lib/links";
-import { getClientCounts, getSessionCounts, getSessionReasons, type Range } from "@/lib/queries";
+import { getSessionCounts, getSessionReasons, type Range } from "@/lib/queries";
 
 const MAIN = [
-  ["several_attempts", "Multiple connection attempts"],
-  ["failure", "Recorded connection failure"],
-  ["reconnected", "Client reconnected"],
+  ["several_attempts", "2+ attempt events"],
+  ["failure", "Failure event logged"],
+  ["reconnected", "Reconnect event logged"],
 ] as const;
 
 const EXTRA = [
-  ["failure_then_success", "Connected after a failed attempt"],
-  ["success_then_failure", "Failed attempt after connecting"],
-  ["reconnected_10", "10 or more client reconnects"],
-  ["no_end_event", "Missing end event"],
+  ["failure_then_success", "Failure event before success event"],
+  ["success_then_failure", "Failure event after success event"],
+  ["reconnected_10", "10+ reconnect events"],
+  ["no_end_event", "No session end event"],
 ] as const;
 
 export default async function Attention({ range }: { range: Range }) {
-  const [counts, reasons, clients] = await Promise.all([getSessionCounts(range), getSessionReasons(range), getClientCounts(range)]);
-  const base = counts.with_telemetry;
+  const [counts, reasons] = await Promise.all([getSessionCounts(range), getSessionReasons(range)]);
   const signal = ([key, label]: (typeof MAIN | typeof EXTRA)[number]) => (
-    <DiagnosticRow key={key} range={range} sheet={{ list: key }} label={label} count={counts[key]} base={base} />
+    <DiagnosticRow key={key} range={range} sheet={{ list: key }} label={label} count={counts[key]} />
   );
 
   return (
     <div className="diagnostics-grid">
-      <section className="diagnostics-panel" aria-labelledby="signals-title">
-        <h3 id="signals-title">Session patterns</h3>
-        <p className="hint">Share of sessions with telemetry. Patterns can overlap.</p>
-        <div className="diagnostic-list">{MAIN.map(signal)}</div>
-        <details className="disclosure nested-disclosure">
-          <summary>More session patterns</summary>
-          <div className="diagnostic-list">{EXTRA.map(signal)}</div>
-          {Number(clients.clients_alone) > 0 && (
-            <DiagnosticRow range={range} sheet={{ list: "clients_alone" }} label="No client connected in the session" count={clients.clients_alone} note="Client connections" />
-          )}
-        </details>
-      </section>
       <section className="diagnostics-panel" aria-labelledby="failed-sessions-title">
-        <h3 id="failed-sessions-title">Failed sessions</h3>
-        <p className="hint">Session outcomes grouped by the recorded reason.</p>
-        {reasons.length === 0 ? <p className="hint">No failed sessions recorded.</p> : (
+        <h3 id="failed-sessions-title">Sessions without recorded success</h3>
+        <p className="hint">{formatNumber(counts.tag_failed)} ended app sessions had an attempt event but no success event. Counted by app start; one category per session, inferred from its logs.</p>
+        {reasons.length === 0 ? <p className="hint">No sessions in this outcome.</p> : (
           <div className="diagnostic-list">
             {reasons.map((row) => (
               <DiagnosticRow key={row.reason} range={range} sheet={{ list: "session_reason", arg: row.reason }} label={reasonLabel(row.reason)} count={row.sessions} />
@@ -48,15 +35,24 @@ export default async function Attention({ range }: { range: Range }) {
           </div>
         )}
       </section>
+      <section className="diagnostics-panel" aria-labelledby="signals-title">
+        <h3 id="signals-title">Events seen during sessions</h3>
+        <p className="hint">App sessions by start day. Rows overlap and can include successful sessions; events may belong to different clients.</p>
+        <div className="diagnostic-list">{MAIN.map(signal)}</div>
+        <details className="disclosure nested-disclosure">
+          <summary>More event patterns</summary>
+          <div className="diagnostic-list">{EXTRA.map(signal)}</div>
+        </details>
+      </section>
     </div>
   );
 }
 
-function DiagnosticRow({ range, sheet, label, count, base, note }: { range: Range; sheet: Sheet; label: string; count: string; base?: string; note?: string }) {
+function DiagnosticRow({ range, sheet, label, count }: { range: Range; sheet: Sheet; label: string; count: string }) {
   return (
     <Link href={link(range, sheet)} scroll={false} className="list-row">
       <span className="row-main">{label}</span>
-      <span className="row-end"><strong>{formatNumber(count)}</strong>{note && <small>{note}</small>}{base && Number(base) > 0 && <small>{percent(count, base)}%</small>}</span>
+      <span className="row-end"><strong>{formatNumber(count)}</strong></span>
       <span className="chevron" aria-hidden="true">›</span>
     </Link>
   );

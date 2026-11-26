@@ -9,9 +9,9 @@ export default async function TopErrors({ range }: { range: Range }) {
   return (
     <section className="top-errors" aria-labelledby="top-errors-title">
       <div className="section-line">
-        <h2 id="top-errors-title">Common errors</h2>
-        <Link href={{ ...link({ ...range, view: "diagnostics" }), hash: "logged-errors-title" }}>See all errors</Link>
+        <h2 id="top-errors-title">Logged error events</h2>
       </div>
+      <p className="hint">Distinct app sessions containing each error by event day (UTC), including sessions with a success. Events can repeat; Code 500 is an app-reported value, not a confirmed cause.</p>
       {errors.length === 0 ? <p className="hint">No errors recorded in app sessions during these dates.</p> : (
         <div className="list overview-errors">
           <div className="overview-error-row overview-error-labels" aria-hidden="true">

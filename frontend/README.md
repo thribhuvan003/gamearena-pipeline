@@ -15,19 +15,24 @@ A small read-only dashboard over the pipeline's results (the pipeline is in `../
 **Rules:**
 - The dashboard only reads (`SELECT`).
 - Every clickable number is a cohort in `lib/queries.ts`. One SQL condition is used for both its count and its list, so a number always opens exactly the records it counts.
-- Units are never mixed: usage and coverage count app sessions, connection problems count client connections, and errors that name no client count affected sessions.
-- Names are shown as the data has them. The one exception is `no_video`, shown as "no info".
+- An app session may contain several client connection IDs. A client ID is tagged `connected` if it has a `pipeline.connect.success` event, `not_connected` if it has app events but no success event, and `unknown` if it has no app events. These tags describe recorded evidence, not proof of a physical connection outcome.
+- Ended sessions with telemetry are tagged `connected` if any success event exists, `failed` if an attempt but no success exists, or `no_attempt` otherwise. A session tag and its clients' tags use different units.
+- Error event counts may repeat and may include sessions or clients with a recorded success. The app supplies event codes such as 500; the code alone does not identify an HTTP status or root cause.
+- `pipeline.connect.failure` is an explicit failed-attempt event; `pipeline.connection.dropped` is an app-reported drop event. Either may appear for a client whose tag says success recorded. `ice.connection.state` and `webrtc.connection.state` name state events; inspect the underlying state and timeline before assigning a cause.
+- Pipeline reasons use the last `pipeline.connect.failure` phase first (`pre-connect` → setup, `connecting` → connecting error), then a failed WebRTC state, then missing join events for sessions, then unknown. The inferred reason is not an independently confirmed root cause.
+- Date filters use app session start for session counts and patterns, first client event for client outcomes and the daily outcome chart, and event timestamp for error lists and error trends. Each is a UTC day.
 
 ## What the page shows
 | Section | Shows |
 |---|---|
 | Header | date filter (UTC days, both included; the app's session days, 1 Jun – 17 Oct), and a search for a session or client connection ID (the whole ID or its first 8+ characters; one match opens it) |
 | Sessions | every app session, with and without telemetry events, by the app's start time |
-| Client connections | client connections with telemetry: connected, not_connected and unknown |
-| What needs attention | sessions with more than one `pipeline.connect.attempt`, a `pipeline.connect.failure`, a failure then a later success, a success then a later failure, `client_reconnected` (and 10 or more), events but no `session_ended`; and failed sessions per reason. A session can be in several rows |
-| Why client connections didn't connect | not_connected client connections per reason, and those in sessions where no client connected |
-| Errors recorded, per client connection | each error + code: times recorded; tagged client connections hit (click to list them), how many didn't connect and connected anyway, % didn't connect = didn't connect ÷ (didn't connect + connected); untagged clients apart. ice.candidate.error is last, marked as a warning. Errors that name no client remain in the underlying session timeline but are not shown as a separate diagnostics column |
-| Errors per day | a bar chart (Recharts): not_connected client connections per day for the 5 errors that hit the most in the period, the rest as Other, the warning last. The key shows what the app sent with each error (message, phases, stages, error text; private bits hidden) |
+| Client connections | client IDs with telemetry: success recorded, no success recorded and no outcome evidence |
+| Sessions without recorded success | ended sessions with an attempt event and no success event, grouped by the pipeline's inferred category. One session has one category; these are clues, not confirmed root causes |
+| Events seen during sessions | sessions with more than one `pipeline.connect.attempt`, a `pipeline.connect.failure`, failure and success events in time order, `client_reconnected` (and 10 or more), or events but no `session_ended`. These rows overlap, and the events may belong to different clients |
+| No success recorded: pipeline categories | `not_connected` client IDs per pipeline reason. A missing success event is not the same as an explicit failure event |
+| Client error events | each error + code: times recorded; tagged client IDs with the event (click to list them); IDs with no success and with success; untagged IDs apart. `ice.candidate.error` is marked as a warning. Events naming no client remain in the session timeline |
+| Errors per day | a bar chart (Recharts): `not_connected` client IDs with each error by the event's UTC day, top 5 errors, Other and warnings. One ID can appear on several days. The key shows app-supplied message, phase, stage and error text with private bits hidden |
 | Side sheet | opens in place on every click: the list behind a number (50 per page; for a client reason, first how far its clients got and the errors they recorded), a search result, or one session. A session shows the app's start, end and end reason, the pipeline's outcome, each client's device, OS and browser (read from the user agent), every error, the warnings one row per event name with counts, and all events 100 per page. Escape closes it; Tab stays inside it |
 
 ## Run it

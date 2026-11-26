@@ -21,11 +21,11 @@ export function percent(part: string, whole: string): string {   // part as a sh
 }
 
 const TAG_LABELS: Record<string, string> = {
-  connected: "Connected",
-  not_connected: "Didn’t connect",
-  failed: "Failed",
+  connected: "Success recorded",
+  not_connected: "No success recorded",
+  failed: "No success recorded",
   no_attempt: "No attempt recorded",
-  unknown: "Outcome unknown",
+  unknown: "No outcome evidence",
 };
 
 export function tagText(tag: string, reason: string | null): string {

@@ -63,7 +63,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
           <div className="diagnostics-content">
             <div className="view-heading">
               <h2>Diagnostics</h2>
-              <p className="hint">Session patterns and recorded errors for the selected dates.</p>
+              <p className="hint">A session can contain several client connections. Outcomes use recorded success events; patterns count events within sessions; errors are individual logs that may repeat.</p>
             </div>
             <Attention range={range} />
             <ErrorTable range={range} />

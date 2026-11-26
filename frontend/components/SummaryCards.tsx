@@ -10,6 +10,7 @@ export default async function SummaryCards({ range }: { range: Range }) {
     <div className="metric-groups">
       <section aria-labelledby="sessions-title">
         <h2 id="sessions-title">App sessions</h2>
+        <p className="hint">Counted by app session start. One session can have several client connections.</p>
         <div className="metric-strip session-metrics">
           <Metric range={range} list="app_sessions" label="Total" value={sessions.app_sessions} />
           <Metric range={range} list="with_telemetry" label="With event logs" value={sessions.with_telemetry} />
@@ -19,13 +20,14 @@ export default async function SummaryCards({ range }: { range: Range }) {
       <section aria-labelledby="connections-title">
         <div className="section-line metric-heading">
           <h2 id="connections-title">Client connections</h2>
-          <span>From event logs</span>
+          <span>One outcome per connection ID</span>
         </div>
+        <p className="hint">Counted by first event. A success means a success event was logged for that ID. No success recorded does not prove a player never connected.</p>
         <div className="metric-strip client-metrics">
           <Metric range={range} list="clients" label="Total tracked" value={clients.clients} />
-          <Metric range={range} list="clients_connected" label="Connected" value={clients.clients_connected} />
-          <Metric range={range} list="clients_not_connected" label="Didn’t connect" value={clients.clients_not_connected} />
-          <Metric range={range} list="clients_unknown" label="Outcome unknown" value={clients.clients_unknown} />
+          <Metric range={range} list="clients_connected" label="Success recorded" value={clients.clients_connected} />
+          <Metric range={range} list="clients_not_connected" label="No success recorded" value={clients.clients_not_connected} />
+          <Metric range={range} list="clients_unknown" label="No outcome evidence" value={clients.clients_unknown} />
         </div>
       </section>
     </div>

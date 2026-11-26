@@ -10,9 +10,9 @@ export default async function ErrorTable({ range }: { range: Range }) {
 
   return (
     <section className="diagnostics-panel diagnostics-errors" aria-labelledby="logged-errors-title">
-      <h3 id="logged-errors-title">Recorded errors</h3>
+      <h3 id="logged-errors-title">Client error events</h3>
       <div className="diagnostics-error-list">
-        <p className="hint">Number of client connections that recorded each error.</p>
+        <p className="hint">Distinct client IDs with each error by event day (UTC). IDs can later succeed or have several errors. Code 500 is app-reported, not a proven cause or HTTP status.</p>
         {errors.length === 0 && <p className="hint">No client errors recorded.</p>}
         <div className="diagnostic-list">
           {errors.slice(0, 5).map((row) => <ClientError key={row.error} row={row} range={range} />)}
@@ -38,21 +38,31 @@ function ClientError({ row, range }: { row: ErrorRow; range: Range }) {
   const unknown = Number(row.clients) - Number(row.connected_clients) - Number(row.not_connected_clients);
   const stats = [
     ["Times recorded", formatNumber(row.events)],
-    ["Didn’t connect", formatNumber(row.not_connected_clients)],
-    ["Connected", formatNumber(row.connected_clients)],
+    ["No success recorded", formatNumber(row.not_connected_clients)],
+    ["Success recorded", formatNumber(row.connected_clients)],
     ["Unknown outcome", formatNumber(String(unknown))],
     ["Connections without telemetry tags", formatNumber(row.not_tagged_clients)],
-    ["Share that didn’t connect", row.not_connected_percent === null ? "Unavailable" : `${row.not_connected_percent}%`],
+    ["Share with no success recorded", row.not_connected_percent === null ? "Unavailable" : `${row.not_connected_percent}%`],
   ];
   return (
     <details className="disclosure">
       <summary>{eventLabel(row.error)} <span className="disclosure-value">{formatNumber(row.clients)}</span></summary>
       <div className="disclosure-body">
+        {eventExplanation(row.error) && <p className="hint">{eventExplanation(row.error)}</p>}
         <dl className="compact-facts">{stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-        <p className="hint">The share uses connections with a known outcome.</p>
+        <p className="hint">The share excludes unknown and untagged connections. “Times recorded” counts events, so it may exceed the connection count.</p>
         <p className="id">{row.error}</p>
         {Number(row.clients) > 0 && <Link href={link(range, { list: "client_error", arg: row.error })} scroll={false}>View connections ›</Link>}
       </div>
     </details>
   );
+}
+
+function eventExplanation(signature: string): string | null {
+  const event = signature.split(" ", 1)[0];
+  if (event === "pipeline.connection.dropped") return "The app logged a drop event. This event alone does not prove a success was previously logged for this client ID.";
+  if (event === "pipeline.connect.failure") return "The app logged a failed attempt. The same client or session may later have a success event.";
+  if (event === "ice.connection.state") return "A network negotiation state was logged at error level. Open a connection to see its recorded state and timeline.";
+  if (event === "webrtc.connection.state") return "A WebRTC state was logged at error level. Open a connection to see its recorded state and timeline.";
+  return null;
 }
