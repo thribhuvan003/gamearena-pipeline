@@ -1,4 +1,4 @@
--- setup.sql (just setup): creates our 5 tables if they don't exist yet; safe to run again.
+-- setup.sql (just setup): creates our 5 tables if they don't exist yet and sets the allowed reasons; safe to run again.
 -- The raw telemetry (session_telemetry_events) is never changed; everything here is worked out from it by the pipeline.
 
 -- session_tags: one row per tagged session: its tag, its reason (if it failed), when it started, and which run tagged it.
@@ -10,9 +10,10 @@ CREATE TABLE IF NOT EXISTS session_tags (
     tag STRING NOT NULL CHECK (tag IN ('connected', 'failed', 'no_attempt')),
     -- Only for failed, first match wins: the phase of the last pipeline.connect.failure (pre-connect -> setup_error,
     -- connecting -> error_while_connecting, any other -> error_other), else webrtc.connection.state went to failed
-    -- (video_connection_failed), else host_connected or client_connected never arrived (someone_never_joined), else no_video.
-    reason STRING NULL CHECK (reason IN ('setup_error', 'error_while_connecting', 'error_other',
-                                         'video_connection_failed', 'someone_never_joined', 'no_video')),
+    -- (video_connection_failed), else ice.connection.state went to failed (network_connection_failed), else media.decode.error
+    -- (video_decode_error), else pipeline.connection.dropped (connection_dropped), else host_connected or client_connected
+    -- never arrived (someone_never_joined), else no_video. The allowed values are set at the end of this file.
+    reason STRING NULL,
     -- The session's first event; NULL is allowed but the pipeline always fills it.
     started_at TIMESTAMPTZ NULL,
     -- The pipeline_runs row that wrote this tag; no foreign key, so the run history can be cleared on its own.
@@ -28,8 +29,7 @@ CREATE TABLE IF NOT EXISTS connection_tags (
     -- connected = logged pipeline.connect.success; unknown = only system events, the app itself sent nothing; otherwise not_connected.
     tag STRING NOT NULL CHECK (tag IN ('connected', 'not_connected', 'unknown')),
     -- Only for not_connected, with the session rules minus someone_never_joined (that one needs the whole session, not one client).
-    reason STRING NULL CHECK (reason IN ('setup_error', 'error_while_connecting', 'error_other',
-                                         'video_connection_failed', 'no_video')),
+    reason STRING NULL,
     -- The connection's first event; the dashboard's daily client charts use this day (UTC).
     started_at TIMESTAMPTZ NOT NULL,
     -- The run that wrote this tag, as in session_tags.
@@ -97,3 +97,13 @@ CREATE TABLE IF NOT EXISTS error_events (
     INDEX (session_id),
     INDEX (connection_id)
 );
+
+-- The reasons each tag table allows, set here (dropped and added again) so a new reason also reaches tables created earlier.
+ALTER TABLE session_tags DROP CONSTRAINT IF EXISTS check_reason;
+ALTER TABLE session_tags ADD CONSTRAINT check_reason CHECK (reason IN (
+    'setup_error', 'error_while_connecting', 'error_other', 'video_connection_failed', 'network_connection_failed',
+    'video_decode_error', 'connection_dropped', 'someone_never_joined', 'no_video'));
+ALTER TABLE connection_tags DROP CONSTRAINT IF EXISTS check_reason;
+ALTER TABLE connection_tags ADD CONSTRAINT check_reason CHECK (reason IN (
+    'setup_error', 'error_while_connecting', 'error_other', 'video_connection_failed', 'network_connection_failed',
+    'video_decode_error', 'connection_dropped', 'no_video'));

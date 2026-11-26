@@ -16,6 +16,9 @@ sessions AS (
                ELSE 'no_attempt'
            END AS tag,
            bool_or(e.payload->>'event' = 'webrtc.connection.state' AND e.payload->>'state' = 'failed') AS video_failed,
+           bool_or(e.payload->>'event' = 'ice.connection.state' AND e.payload->>'state' = 'failed') AS network_failed,
+           bool_or(e.payload->>'event' = 'media.decode.error') AS decode_error,
+           bool_or(e.payload->>'event' = 'pipeline.connection.dropped') AS dropped,
            bool_or(e.event_type = 'host_connected') AS host_joined,
            bool_or(e.event_type = 'client_connected') AS client_joined
     FROM ended s
@@ -41,6 +44,9 @@ expected AS (
                WHEN l.phase = 'connecting' THEN 'error_while_connecting'
                WHEN l.phase IS NOT NULL THEN 'error_other'
                WHEN x.video_failed THEN 'video_connection_failed'
+               WHEN x.network_failed THEN 'network_connection_failed'
+               WHEN x.decode_error THEN 'video_decode_error'
+               WHEN x.dropped THEN 'connection_dropped'
                WHEN NOT (x.host_joined AND x.client_joined) THEN 'someone_never_joined'
                ELSE 'no_video'
            END AS reason
@@ -73,7 +79,10 @@ connections AS (
                WHEN count(*) FILTER (WHERE e.source <> 'system') = 0 THEN 'unknown'
                ELSE 'not_connected'
            END AS tag,
-           bool_or(e.payload->>'event' = 'webrtc.connection.state' AND e.payload->>'state' = 'failed') AS video_failed
+           bool_or(e.payload->>'event' = 'webrtc.connection.state' AND e.payload->>'state' = 'failed') AS video_failed,
+           bool_or(e.payload->>'event' = 'ice.connection.state' AND e.payload->>'state' = 'failed') AS network_failed,
+           bool_or(e.payload->>'event' = 'media.decode.error') AS decode_error,
+           bool_or(e.payload->>'event' = 'pipeline.connection.dropped') AS dropped
     FROM ended s
     JOIN session_telemetry_events e ON e.session_id = s.session_id
     WHERE e.connection_role = 'client'
@@ -102,6 +111,9 @@ expected AS (
                WHEN l.phase = 'connecting' THEN 'error_while_connecting'
                WHEN l.phase IS NOT NULL THEN 'error_other'
                WHEN c.video_failed THEN 'video_connection_failed'
+               WHEN c.network_failed THEN 'network_connection_failed'
+               WHEN c.decode_error THEN 'video_decode_error'
+               WHEN c.dropped THEN 'connection_dropped'
                ELSE 'no_video'
            END AS reason
     FROM connections c

@@ -11,7 +11,7 @@ export default async function ClientReasons({ range, sheet }: { range: Range; sh
   return (
     <section className="overview-panel" aria-labelledby="reasons-title">
       <h2 id="reasons-title">Why clients didn't connect</h2>
-      <p className="hint">One category per client that didn't connect, from its logged failure phase or video state. A clue, not a proven cause.</p>
+      <p className="hint">One category per client that didn't connect, from the first logged signal: failure phase, failed video or network state, decode error or drop. A clue, not a proven cause.</p>
       {rows.length === 0 ? (
         <p className="hint">No clients that didn't connect in this period.</p>
       ) : (

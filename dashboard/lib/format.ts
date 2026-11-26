@@ -49,6 +49,9 @@ const REASON_LABELS: Record<string, string> = {
   no_video: "Reason unknown",
   setup_error: "Setup failed",
   video_connection_failed: "Video connection failed",
+  network_connection_failed: "Network connection failed",
+  video_decode_error: "Video decoding error",
+  connection_dropped: "Connection dropped",
   someone_never_joined: "Host or client join missing",
   error_while_connecting: "Error while connecting",
   error_other: "Other connection error",
@@ -60,6 +63,9 @@ const REASON_EXPLAINED: Record<string, string> = {
   error_while_connecting: "Its last pipeline.connect.failure was in phase connecting.",
   error_other: "Its last pipeline.connect.failure was in another phase.",
   video_connection_failed: "No connect failure logged, but webrtc.connection.state went to failed.",
+  network_connection_failed: "No connect failure or failed video state, but ice.connection.state went to failed.",
+  video_decode_error: "None of the above, but media.decode.error was logged.",
+  connection_dropped: "None of the above, but pipeline.connection.dropped was logged.",
   someone_never_joined: "No failure logged, and host_connected or client_connected never arrived.",
 };
 
@@ -75,8 +81,8 @@ export function tagText(tag: string, reason: string | null): string {   // A tag
 export function reasonExplanation(reason: string, unit: "sessions" | "clients"): string | null {   // A category's one-line meaning
   if (reason === "no_video") {
     return unit === "sessions"
-      ? "Host and client joined and it tried, but no failure or failed video state was logged."
-      : "It tried, but no failure or failed video state was logged.";
+      ? "Host and client joined and it tried, but no connect failure, failed video or network state, decode error or drop was logged."
+      : "It tried, but no connect failure, failed video or network state, decode error or drop was logged.";
   }
   return REASON_EXPLAINED[reason] ?? null;
 }

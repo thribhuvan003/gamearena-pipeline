@@ -35,10 +35,16 @@ def failure_reason(item, tag):                               # Why a failed sess
     if phase is not None:
         return "error_other"
 
-    if video_failed(item):
+    if state_failed(item, "webrtc.connection.state"):
         return "video_connection_failed"
+    if state_failed(item, "ice.connection.state"):
+        return "network_connection_failed"
 
     event_names = item["event_names"]
+    if "media.decode.error" in event_names:
+        return "video_decode_error"
+    if "pipeline.connection.dropped" in event_names:
+        return "connection_dropped"
     if tag == "failed" and ("host_connected" not in event_names or "client_connected" not in event_names):
         return "someone_never_joined"
 
@@ -53,8 +59,8 @@ def last_failure_phase(session):                             # Phase of the last
     return phase
 
 
-def video_failed(session):                                   # True if webrtc.connection.state ever went to failed
-    for name, state in zip(session["event_names"], session["states"]):
-        if name == "webrtc.connection.state" and state == "failed":
+def state_failed(item, event):                               # True if this state event (webrtc or ice connection state) ever went to failed
+    for name, state in zip(item["event_names"], item["states"]):
+        if name == event and state == "failed":
             return True
     return False

@@ -40,6 +40,25 @@ class SessionRules(unittest.TestCase):   # Session tag and reason, the same orde
         self.check(events("host_connected", "client_connected", "pipeline.connect.attempt",
                           ("webrtc.connection.state", "connecting", "failed")), "failed", "video_connection_failed")
 
+    def test_failed_network_state(self):
+        self.check(events("host_connected", "client_connected", "pipeline.connect.attempt",
+                          ("ice.connection.state", "connecting", "failed")), "failed", "network_connection_failed")
+
+    def test_network_state_not_failed_is_ignored(self):
+        self.check(events("host_connected", "client_connected", "pipeline.connect.attempt",
+                          ("ice.connection.state", "connecting", "disconnected")), "failed", "no_video")
+
+    def test_video_decode_error(self):
+        self.check(events("host_connected", "client_connected", "pipeline.connect.attempt", "media.decode.error"), "failed", "video_decode_error")
+
+    def test_connection_dropped(self):
+        self.check(events("host_connected", "client_connected", "pipeline.connect.attempt", "pipeline.connection.dropped"), "failed", "connection_dropped")
+
+    def test_video_state_comes_before_network_state(self):
+        self.check(events("host_connected", "client_connected", "pipeline.connect.attempt",
+                          ("ice.connection.state", "connecting", "failed"),
+                          ("webrtc.connection.state", "connecting", "failed")), "failed", "video_connection_failed")
+
     def test_host_never_joined(self):
         self.check(events("client_connected", "pipeline.connect.attempt"), "failed", "someone_never_joined")
 
@@ -60,6 +79,10 @@ class ConnectionRules(unittest.TestCase):   # Client connection tag and reason
         connection = events("client_connected", "ws.connect")
         self.assertEqual(tags.tag_connection(connection), "not_connected")
         self.assertEqual(tags.failure_reason(connection, "not_connected"), "no_video")
+
+    def test_connection_with_failed_network_state(self):
+        connection = events("client_connected", ("ice.connection.state", "connecting", "failed"))
+        self.assertEqual(tags.failure_reason(connection, "not_connected"), "network_connection_failed")
 
     def test_missing_host_is_not_someone_never_joined_for_a_connection(self):
         connection = events("pipeline.connect.attempt")
