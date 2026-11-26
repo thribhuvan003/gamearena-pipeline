@@ -1,4 +1,4 @@
-# __main__.py: the start of the program; functions in the order they run: main -> run_command -> run_one_round -> tag_new_sessions, or main -> status_command.
+# __main__.py: the start of the program; functions in the order they run: main -> run_command -> run_one_round -> tag_new_sessions (then the facts refresh), or main -> status_command, or main -> facts_command.
 
 import argparse
 import time
@@ -13,7 +13,7 @@ from pipeline import store
 from pipeline import tags
 
 
-def main():                                                  # Reads the command (run or status). Called when you type python -m pipeline
+def main():                                                  # Reads the command (run, status or facts). Called when you type python -m pipeline
     parser = argparse.ArgumentParser(prog="python -m pipeline", description="Tag GameArena sessions and their client connections.")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -23,6 +23,9 @@ def main():                                                  # Reads the command
 
     commands.add_parser("status", help="show totals and the last runs; changes nothing")
 
+    facts_parser = commands.add_parser("facts", help="refresh session_facts and error_events for sessions with new events")
+    facts_parser.add_argument("--all", action="store_true", help="recount every session (a full rebuild)")
+
     args = parser.parse_args()
 
     if args.command == "run" and args.limit is not None and args.limit < 1:
@@ -30,6 +33,8 @@ def main():                                                  # Reads the command
 
     if args.command == "run":
         run_command(args)
+    elif args.command == "facts":
+        facts_command(args)
     else:
         status_command()
 
@@ -70,6 +75,8 @@ def run_one_round(conn, limit):                              # Runs one round an
 
     try:
         total = tag_new_sessions(conn, run_id, limit)
+        refreshed = store.refresh_facts(conn)
+        print(f"Refreshed facts for {refreshed} sessions with new events")
     except BaseException as error:
         conn.rollback()
         store.finish_run(conn, run_id, "failed", f"{type(error).__name__}: {error}")
@@ -114,6 +121,12 @@ def tag_new_sessions(conn, run_id, limit):                   # Per batch: read, 
 
         total += len(sessions)
         print(f"Saved {len(sessions)} sessions and {len(connections)} client connections (total {total} sessions)")
+
+
+def facts_command(args):                                     # Refreshes session_facts and error_events once (every session with --all). Called by main for python -m pipeline facts
+    with db.connect() as conn:
+        refreshed = store.refresh_facts(conn, everything=args.all)
+    print(f"Refreshed facts for {refreshed} sessions")
 
 
 def status_command():                                        # Prints the processing status

@@ -116,3 +116,33 @@ SELECT count(*) AS client_connections,
        count(*) FILTER (WHERE t.started_at <> x.started_at) AS dates_wrong
 FROM expected x
 LEFT JOIN connection_tags t USING (connection_id);
+
+-- Check 3, facts: session_facts and error_events counted again from the raw events in plain SQL. Every *_wrong must be 0; sessions_missing is 0 after a refresh (just facts).
+WITH raw AS (
+    SELECT session_id,
+           count(*) AS events,
+           bool_or(event_type = 'session_ended') AS has_end,
+           count(*) FILTER (WHERE coalesce(payload->>'event', event_type::STRING) = 'pipeline.connect.attempt') AS attempts,
+           count(*) FILTER (WHERE event_type = 'client_reconnected') AS reconnects,
+           min(recorded_at) FILTER (WHERE coalesce(payload->>'event', event_type::STRING) = 'pipeline.connect.failure') AS first_failure,
+           max(recorded_at) FILTER (WHERE coalesce(payload->>'event', event_type::STRING) = 'pipeline.connect.failure') AS last_failure,
+           min(recorded_at) FILTER (WHERE coalesce(payload->>'event', event_type::STRING) = 'pipeline.connect.success') AS first_success,
+           max(recorded_at) FILTER (WHERE coalesce(payload->>'event', event_type::STRING) = 'pipeline.connect.success') AS last_success,
+           max(recorded_at) AS last_event_at,
+           count(*) FILTER (WHERE level = 'error') AS errors
+    FROM session_telemetry_events
+    GROUP BY session_id
+),
+copied AS (
+    SELECT session_id, count(*) AS errors FROM error_events GROUP BY session_id
+)
+SELECT count(*) AS sessions_with_events,
+       count(*) FILTER (WHERE f.session_id IS NULL) AS sessions_missing,
+       count(*) FILTER (WHERE f.events <> r.events OR f.has_end <> r.has_end OR f.attempts <> r.attempts OR f.reconnects <> r.reconnects) AS counts_wrong,
+       count(*) FILTER (WHERE f.first_failure IS DISTINCT FROM r.first_failure OR f.last_failure IS DISTINCT FROM r.last_failure
+                           OR f.first_success IS DISTINCT FROM r.first_success OR f.last_success IS DISTINCT FROM r.last_success
+                           OR f.last_event_at <> r.last_event_at) AS times_wrong,
+       count(*) FILTER (WHERE coalesce(c.errors, 0) <> r.errors) AS errors_wrong
+FROM raw r
+LEFT JOIN session_facts f USING (session_id)
+LEFT JOIN copied c USING (session_id);

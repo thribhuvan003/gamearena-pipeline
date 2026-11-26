@@ -4,13 +4,17 @@
 
 The pipeline reads GameArena telemetry and classifies ended sessions and their client connections. It stores the results for investigation and analytics. It does not modify source telemetry.
 
-**Three stored tables** (not three competing reports):
+**Five stored tables** (not competing reports):
 
 | Table | One row represents | Why it exists |
 |---|---|---|
 | `session_tags` | One ended session | Overall session outcome and reason |
 | `connection_tags` | One client connection | Individual connection outcome, linked to its session |
 | `pipeline_runs` | One processing round | When the pipeline ran and whether it succeeded |
+| `session_facts` | One session with events | Its counts (events, attempts, reconnects), first/last failure and success, end event, newest event; so the dashboard never re-reads every raw event |
+| `error_events` | One error-level event | A copy of the error events only (about 6% of all events) with the fields the dashboard shows |
+
+Every round, after tagging, the pipeline refreshes `session_facts` and `error_events` for every session with events newer than the newest it already has (with a 10-minute overlap), so late events and sessions that have not ended yet are covered. `just facts all` recounts every session.
 
 One session can contain multiple client connections. The counts must not be added together.
 
@@ -31,7 +35,7 @@ These `just` recipes work in Linux/WSL shells and in native Windows terminals. O
 
 1. Install Python 3, a virtual environment, `just` (version 1.23+), and Docker CLI access. On Ubuntu 24.04 or later: `sudo apt update && sudo apt install python3-venv python3-pip just`. For native Windows, install Python and `just` (`winget install --id Casey.Just`).
 2. In WSL, enable Docker Desktop WSL integration. On Linux or native Windows, start the local container. Verify that `docker ps` lists `cockroachdb`.
-3. Import the telemetry backup first. `just setup` creates only the three *derived* tables; it does not import source telemetry.
+3. Import the telemetry backup first. `just setup` creates only the five *derived* tables; it does not import source telemetry.
 4. From the repository root, on Linux/WSL run:
 
 ```bash
@@ -60,7 +64,9 @@ All SQL recipes target the local Docker database `gamearena_analytics`. The Pyth
 | `just run` | Process every pending ended session in batches |
 | `just live` | Check for new ended sessions every `WAIT_SECONDS` until Ctrl+C |
 | `just status` | Show tags, pending sessions, and recent processing rounds |
-| `just check` | Compare stored tags against raw events |
+| `just facts` | Refresh `session_facts` and `error_events` for sessions with new events (`just run` already does this) |
+| `just facts all` | Recount `session_facts` and `error_events` for every session (first fill or rebuild) |
+| `just check` | Compare stored tags and facts against raw events |
 | `just report` | Show the four main analytics summaries |
 | `just trends` | Show daily session and connection outcomes |
 | `just errors` | Show recorded errors for failed sessions that have explicit error events |

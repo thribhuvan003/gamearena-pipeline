@@ -10,7 +10,7 @@ db := "docker exec -i cockroachdb ./cockroach sql --insecure -d gamearena_analyt
 default:
     @just --list
 
-# Create the three generated tables if missing
+# Create the five generated tables if missing
 setup:
     {{db}} < backend/sql/setup.sql
 
@@ -21,6 +21,10 @@ run n="":
 # Run continuously until Ctrl+C
 live:
     cd backend && {{python}} -m pipeline run
+
+# Refresh session_facts and error_events (just facts all = recount every session)
+facts mode="":
+    cd backend && {{python}} -m pipeline facts {{ if mode == "all" { "--all" } else { "" } }}
 
 # Show processing status
 status:
