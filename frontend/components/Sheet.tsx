@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import Pager from "./Pager";
 import SessionView from "./SessionView";
 import SheetFrame from "./SheetFrame";
-import { eventLabel, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
+import { cohortExplanation, eventLabel, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
 import { isUuid, link, linkString, searchPrefix, type Sheet as SheetState } from "@/lib/links";
 import {
   COHORTS, getClientPage, getCohortCount, getReasonErrors, getReasonSteps, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
@@ -83,11 +83,7 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
         <div className="sheet-section">
           <div className="stat-value">{formatNumber(total)}</div>
           <div className="stat-sub">{prefix ? "Matching " : ""}{unit}</div>
-          {key === "untied_error" && <p className="row-meta">App sessions where this error was logged before any client connected. The session may still connect later.</p>}
-          {key === "client_error" && <p className="row-meta">Client IDs with this error event. Some of them may still have connected.</p>}
-          {arg === "no_video" && (key === "session_reason" || key === "client_reason") && (
-            <p className="row-meta">The logs don’t establish a cause.</p>
-          )}
+          {cohortExplanation(key, arg) && <p className="row-meta">{cohortExplanation(key, arg)}</p>}
         </div>
         <div className="sheet-section">
           <form className="search sheet-list-filter" action="/" method="get">

@@ -1,28 +1,28 @@
 // Attention.tsx: the sessions that didn't connect, by pipeline category, and the session-level event patterns; every row has a one-line meaning taken from its rule and opens exactly its sessions.
 
 import Link from "next/link";
-import { formatNumber, reasonExplanation, reasonLabel } from "@/lib/format";
+import { cohortExplanation, formatNumber, reasonLabel } from "@/lib/format";
 import { link, type Sheet } from "@/lib/links";
 import { getSessionCounts, getSessionReasons, type Range } from "@/lib/queries";
 
-// Each pattern: its cohort, its name, and what puts a session in it (the cohort's condition in plain words).
+// Each pattern: its cohort and its name; its one-line meaning comes from cohortExplanation.
 const MAIN = [
-  ["several_attempts", "2+ attempt events", "pipeline.connect.attempt was logged more than once in the session."],
-  ["failure", "Failure event logged", "At least one pipeline.connect.failure was logged."],
-  ["reconnected", "Reconnect event logged", "At least one client_reconnected was logged."],
+  ["several_attempts", "2+ attempt events"],
+  ["failure", "Failure event logged"],
+  ["reconnected", "Reconnect event logged"],
 ] as const;
 
 const EXTRA = [
-  ["failure_then_success", "Failure, then connected", "A pipeline.connect.failure came before its last pipeline.connect.success."],
-  ["success_then_failure", "Connected, then a failure", "A pipeline.connect.failure came after its first pipeline.connect.success."],
-  ["reconnected_10", "10+ reconnect events", "client_reconnected was logged 10 or more times."],
-  ["no_end_event", "No session end event", "It has events, but session_ended was never logged."],
+  ["failure_then_success", "Failure, then connected"],
+  ["success_then_failure", "Connected, then a failure"],
+  ["reconnected_10", "10+ reconnect events"],
+  ["no_end_event", "No session end event"],
 ] as const;
 
 export default async function Attention({ range }: { range: Range }) {   // Shows the two panels for the range, hiding nothing; each row links to its cohort. Called by the dashboard's diagnostics view
   const [counts, reasons] = await Promise.all([getSessionCounts(range), getSessionReasons(range)]);
-  const signal = ([key, label, detail]: (typeof MAIN | typeof EXTRA)[number]) => (
-    <DiagnosticRow key={key} range={range} sheet={{ list: key }} label={label} detail={detail} count={counts[key]} />
+  const signal = ([key, label]: (typeof MAIN | typeof EXTRA)[number]) => (
+    <DiagnosticRow key={key} range={range} sheet={{ list: key }} label={label} detail={cohortExplanation(key, null)} count={counts[key]} />
   );
 
   return (
@@ -33,7 +33,7 @@ export default async function Attention({ range }: { range: Range }) {   // Show
         {reasons.length === 0 ? <p className="hint">No sessions in this outcome.</p> : (
           <div className="diagnostic-list">
             {reasons.map((row) => (
-              <DiagnosticRow key={row.reason} range={range} sheet={{ list: "session_reason", arg: row.reason }} label={reasonLabel(row.reason)} detail={reasonExplanation(row.reason, "sessions")} count={row.sessions} />
+              <DiagnosticRow key={row.reason} range={range} sheet={{ list: "session_reason", arg: row.reason }} label={reasonLabel(row.reason)} detail={cohortExplanation("session_reason", row.reason)} count={row.sessions} />
             ))}
           </div>
         )}

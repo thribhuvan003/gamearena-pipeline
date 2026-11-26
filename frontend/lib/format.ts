@@ -80,6 +80,36 @@ export function reasonExplanation(reason: string, unit: "sessions" | "clients"):
   return REASON_EXPLAINED[reason] ?? null;
 }
 
+// One line per list (cohort): what puts a session or client in it, in the words of its SQL condition or pipeline rule.
+const COHORT_EXPLAINED: Record<string, string> = {
+  app_sessions: "Every session in the app's own records, by its start time.",
+  with_telemetry: "App sessions that logged at least one event.",
+  no_telemetry: "App sessions that never logged an event.",
+  no_end_event: "It has events, but session_ended was never logged.",
+  several_attempts: "pipeline.connect.attempt was logged more than once in the session.",
+  failure: "At least one pipeline.connect.failure was logged.",
+  failure_then_success: "A pipeline.connect.failure came before its last pipeline.connect.success.",
+  success_then_failure: "A pipeline.connect.failure came after its first pipeline.connect.success.",
+  reconnected: "At least one client_reconnected was logged.",
+  reconnected_10: "client_reconnected was logged 10 or more times.",
+  tag_connected: "Ended sessions that logged pipeline.connect.success.",
+  tag_failed: "Ended sessions that logged pipeline.connect.attempt but never pipeline.connect.success.",
+  tag_no_attempt: "Ended sessions that never logged pipeline.connect.attempt.",
+  clients: "Client connections that logged events, one row per connection ID.",
+  clients_connected: "The app logged pipeline.connect.success for this client.",
+  clients_not_connected: "The app logged events for this client, but never pipeline.connect.success.",
+  clients_alone: "Clients that didn't connect, in sessions where no client connected.",
+  clients_unknown: "Only server events exist for this client; the app logged nothing, so the outcome is unknown.",
+  untied_error: "Sessions that logged this error with no client ID, before any client connected. They may still connect later.",
+  client_error: "Clients that logged this error at least once. Some of them may still have connected.",
+};
+
+export function cohortExplanation(key: string, arg: string | null): string | null {   // The one-line logic of a list, shown under its row and at the top of its sheet. Called by Attention and the sheet's list step
+  if (key === "session_reason" && arg) return reasonExplanation(arg, "sessions");
+  if (key === "client_reason" && arg) return reasonExplanation(arg, "clients");
+  return COHORT_EXPLAINED[key] ?? null;
+}
+
 export function reasonLabel(reason: string): string {
   return REASON_LABELS[reason] ?? reason.replaceAll("_", " ");
 }

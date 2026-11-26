@@ -13,13 +13,13 @@ export default async function TopErrors({ range }: { range: Range }) {   // List
       <div className="section-line">
         <h2 id="top-errors-title">Errors before any client connected</h2>
       </div>
-      <p className="hint">Logged with no client ID, counted per app session (UTC event days). In brackets: what the app’s payload recorded most often.</p>
+      <p className="hint">Logged with no client ID. Sessions = app sessions that logged it; times logged = how often it was logged in total (a session can log it more than once). In brackets: the payload’s most common values.</p>
       {errors.length === 0 ? <p className="hint">No errors before a client connected in this period.</p> : (
         <div className="list overview-errors">
           <div className="overview-error-row overview-error-labels" aria-hidden="true">
             <span>Error</span>
             <span>Sessions</span>
-            <span>Times</span>
+            <span>Times logged</span>
             <span />
           </div>
           {errors.map((row) => <ErrorRow key={row.error} row={row} range={range} />)}
