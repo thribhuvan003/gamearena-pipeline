@@ -79,7 +79,7 @@ In development, omitting `AUTH_MODE=better-auth` retains the prior localhost-onl
 | `lib/links.ts` | the page's URL state and the one function that builds every link |
 | `lib/format.ts` | number and time formatting, and hiding private bits in messages |
 | `lib/access-policy.ts`, `lib/access.ts`, `lib/auth.ts` | local preview rule, Better Auth session and email allowlist, and server-side access check before database reads |
-| `proxy.ts` | localhost-only preview in development; Auth0 route handling and access enforcement when sign-in is enabled |
+| `proxy.ts` | localhost-only preview in development; Better Auth route handling and access enforcement when sign-in is enabled |
 
 ## Check it
 With no dates picked: Client connections = `just report` report 2. Sessions tagged connected, failed and no_attempt (in the side sheet's lists) = report 1, counted by the app's start time instead of the first event, so a range can differ at its edges.

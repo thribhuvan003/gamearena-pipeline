@@ -8,7 +8,7 @@ const DENIED = `<!doctype html><meta charset="utf-8"><title>Access denied</title
 export async function proxy(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
   if (localPreview()) {
-    return LOCAL.has(host.replace(/:\\d+$/, ""))
+    return LOCAL.has(host.replace(/:\d+$/, ""))
       ? NextResponse.next()
       : new NextResponse("Forbidden", { status: 403 });
   }
