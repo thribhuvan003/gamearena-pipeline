@@ -1,4 +1,4 @@
-// server.ts: Better Auth on the server: Google sign-in only, with users and sessions kept in their own database (AUTH_DATABASE_URL), apart from the read-only telemetry.
+// server.ts: Better Auth, Google only, with logins in their own database (AUTH_DATABASE_URL).
 
 import { betterAuth } from "better-auth";
 import { Pool } from "pg";

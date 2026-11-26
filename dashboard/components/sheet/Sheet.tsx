@@ -15,7 +15,7 @@ import {
 // What one step puts in the sheet: the dialog's label, the title (full = its hover text), where back goes, and the body.
 type Step = { label: string; title: ReactNode; full?: string; back?: ReturnType<typeof link>; body: ReactNode };
 
-export default async function Sheet({ range, sheet }: { range: Range; sheet: SheetState }) {   // Picks the step (session, then list, then search) and shows it in the dialog with the backdrop and the head. Called by the dashboard page when ?session=, ?list= or ?q= is set
+export default async function Sheet({ range, sheet }: { range: Range; sheet: SheetState }) {   // Picks the step (session, list or search) and shows it in the dialog
   const step = sheet.session ? await sessionStep(range, sheet) : sheet.list ? await listStep(range, sheet) : await searchStep(range, sheet);
   return (
     <SheetFrame closeHref={linkString(range, {})} label={step.label} stepKey={linkString(range, sheet)}>
@@ -53,7 +53,7 @@ async function sessionStep(range: Range, sheet: SheetState): Promise<Step> {   /
   };
 }
 
-async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // The records behind a clicked number: its count, then one page of them; a reason's errors first for client_reason. Called by Sheet when ?list= is set
+async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // The records behind a clicked number: count, one page, and a reason's evidence
   const key = sheet.list!;
   if (!isCohortKey(key) || COHORTS[key].arg !== (sheet.arg !== undefined)) return hintStep("List", "Unknown list.");
   const cohort = COHORTS[key];
@@ -115,7 +115,7 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   };
 }
 
-function ReasonErrors({ errors }: { errors: ReasonErrorRow[] }) {   // The errors recorded on one reason's client connections, six shown and the rest behind "Show all" (the round-1 reason sheet's look). Called by listStep for client_reason
+function ReasonErrors({ errors }: { errors: ReasonErrorRow[] }) {   // A reason's errors: six shown, the rest behind "Show all"
   const shown = errors.filter((row) => row.error !== null || row.clients !== "0");
   return (
     <div className="sheet-section">
@@ -163,7 +163,7 @@ function sessionRow(row: SessionListRow, range: Range, sheet: SheetState) {   //
   );
 }
 
-function clientRow(row: ClientListRow, range: Range, sheet: SheetState) {   // One client connection of a list: its session, client number, start, tag, the app's connected_at → disconnected_at and whether another client connected; opens the session with it marked. Called by listStep
+function clientRow(row: ClientListRow, range: Range, sheet: SheetState) {   // One client in a list: session, number, tag, app seconds, other client connected; opens the session
   return (
     <Link key={row.connection_id} href={link(range, { list: sheet.list, arg: sheet.arg, filter: sheet.filter, page: sheet.page, session: row.session_id, client: row.connection_id })} scroll={false} className="list-row">
       <div className="row-main">
@@ -177,7 +177,7 @@ function clientRow(row: ClientListRow, range: Range, sheet: SheetState) {   // O
   );
 }
 
-async function searchStep(range: Range, sheet: SheetState): Promise<Step> {   // Lists the sessions and client connections whose ID starts with the search (a single match was already opened by the page). Called by Sheet when ?q= is set
+async function searchStep(range: Range, sheet: SheetState): Promise<Step> {   // Sessions and client connections whose ID starts with the search
   const q = searchPrefix(sheet.q);
   if (q === null) return hintStep("Search", "Type at least the first 8 characters of an ID.");
   const rows = await searchIds(q);

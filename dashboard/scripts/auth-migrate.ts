@@ -1,4 +1,4 @@
-// auth-migrate.ts: creates or updates Better Auth's tables (users, sessions, accounts, verifications) in the AUTH_DATABASE_URL database; safe to run again. Run with npm run auth:migrate.
+// auth-migrate.ts: creates or updates Better Auth's tables in AUTH_DATABASE_URL; safe to rerun (npm run auth:migrate).
 
 import { getMigrations } from "better-auth/db/migration";
 import { auth } from "../lib/auth/server.ts";

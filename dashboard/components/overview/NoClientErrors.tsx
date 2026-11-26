@@ -1,4 +1,4 @@
-// NoClientErrors.tsx: the overview's errors that name no client ID (session-level): each error + code with what its payload says, the app sessions it happened in, and how often it was logged.
+// NoClientErrors.tsx: errors logged with no client ID: what the payload says, sessions, and times logged.
 
 import Link from "next/link";
 import { eventLabel, formatNumber, redact } from "@/lib/format";
@@ -29,7 +29,7 @@ export default async function NoClientErrors({ range }: { range: Range }) {   //
   );
 }
 
-function ErrorRow({ row, range }: { row: NoClientErrorRow; range: Range }) {   // One error + code: its label, the payload's most common phase, stage and reason in brackets (private bits hidden), sessions and times; opens its sessions. Called by NoClientErrors for each row
+function ErrorRow({ row, range }: { row: NoClientErrorRow; range: Range }) {   // One error: label, payload in brackets (private bits hidden), sessions, times; opens its sessions
   const payload = [
     row.phase && `phase: ${row.phase}`,
     row.stage && `stage: ${row.stage}`,

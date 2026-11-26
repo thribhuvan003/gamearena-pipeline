@@ -2,10 +2,9 @@
 // DailyBarChart.tsx: the one bar chart of a count per day, shared by the client trend and the per-error chart.
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { dayLabel } from "@/lib/format";
+import { dayLabel, isoDay } from "@/lib/format";
 
 const DAY = 86_400_000;
-const date = (value: number) => new Date(value).toISOString().slice(0, 10);
 
 type ChartProps = {
   days: { day: number; count: number }[];
@@ -14,7 +13,7 @@ type ChartProps = {
   colour?: string;
 };
 
-export default function DailyBarChart({   // Draws one bar per day with about five date ticks. Called by ConnectionTrend and ClientErrorChart; client JS because Recharts draws in the browser
+export default function DailyBarChart({   // One bar per day with about five date ticks; runs in the browser because Recharts draws there
   days, height = 184, seriesLabel = "Didn't connect", colour = "var(--accent)",
 }: ChartProps) {
   const first = days[0].day;
@@ -31,14 +30,14 @@ export default function DailyBarChart({   // Draws one bar per day with about fi
           <CartesianGrid stroke="var(--separator)" vertical={false} />
           <XAxis
             dataKey="day" type="number" domain={[first - DAY / 2, last + DAY / 2]}
-            ticks={ticks} interval={0} tickFormatter={(value) => dayLabel(date(value), false)}
+            ticks={ticks} interval={0} tickFormatter={(value) => dayLabel(isoDay(value), false)}
             tick={{ fill: "var(--text-2)", fontSize: 11 }} tickLine={false} axisLine={false}
           />
           <YAxis width={34} domain={[0, max]} allowDecimals={false} tickCount={4}
             tick={{ fill: "var(--text-2)", fontSize: 11 }} tickLine={false} axisLine={false}
           />
           <Tooltip
-            labelFormatter={(value) => typeof value === "number" ? dayLabel(date(value)) : value}
+            labelFormatter={(value) => typeof value === "number" ? dayLabel(isoDay(value)) : value}
             contentStyle={{ background: "var(--surface)", borderColor: "var(--separator)", borderRadius: 8 }}
             cursor={{ fill: "var(--accent-bg)" }}
           />

@@ -11,7 +11,7 @@ function currentTheme(): Theme {   // The theme on screen now: the switch's choi
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export default function ThemeToggle() {   // A button that flips between light and dark and remembers it (localStorage). Called by the dashboard header; client JS because the theme lives in the browser
+export default function ThemeToggle() {   // Flips light / dark and remembers it in this browser
   const [theme, setTheme] = useState<Theme | null>(null);
   useEffect(() => setTheme(currentTheme()), []);
 

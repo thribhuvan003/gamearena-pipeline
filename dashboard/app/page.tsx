@@ -1,4 +1,4 @@
-// page.tsx: the dashboard at http://localhost:3000: the header (dates, ID search, views, sign-out, theme), then the Overview or Diagnostics view, and the side sheet when one is open.
+// page.tsx: the dashboard: header, then Overview or Diagnostics, then the side sheet when one is open.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -31,7 +31,7 @@ export default function Home({ searchParams }: PageProps<"/">) {          // Lay
   );
 }
 
-async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">) {   // Reads the dates (?from=&to=) and the sheet state (list, session, search) from the URL, opens a search's only match straight away, and renders the selected view with the sheet last. Called by Home inside <Suspense> (shows "Loading…" until ready), because the URL is only known when someone visits
+async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">) {   // Reads dates and sheet state from the URL, opens a single search match, and renders the view
   await connection();
   await requireDashboardAccess();
   const params = await searchParams;
@@ -90,7 +90,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
   );
 }
 
-function readDate(value: string | string[] | undefined): string | null {   // Keeps a URL value only if it is a real calendar day like 2026-10-01 (2026-02-31 rolls over, so it won't read back the same), else null = no limit. Called by Dashboard for ?from= and ?to=
+function readDate(value: string | string[] | undefined): string | null {   // A real calendar day like 2026-10-01, else null (2026-02-31 doesn't read back the same)
   if (typeof value !== "string") return null;
   const parsed = new Date(value);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? value : null;

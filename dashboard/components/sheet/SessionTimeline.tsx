@@ -1,4 +1,4 @@
-// SessionTimeline.tsx: one session's errors (every one), its warnings (one row per event name), then all its events page by page, with private bits hidden.
+// SessionTimeline.tsx: a session's errors, its warnings per event name, then all its events page by page.
 
 import Pager from "./Pager";
 import { eventLabel, formatClock, formatNumber, redact } from "@/lib/format";
@@ -7,7 +7,7 @@ import { ERROR_LIMIT, EVENT_PAGE_SIZE, getErrorEvents, getEventPage, getWarningS
 // The link to one event page of this session; the sheet and the session page each build their own.
 export type PageHref = (epage: number) => { pathname: string; query: Record<string, string> };
 
-export default async function SessionTimeline({ sessionId, detail, eventPage, pageHref }: { sessionId: string; detail: SessionDetail; eventPage: number; pageHref: PageHref }) {   // Reads the session's errors, its warnings per event name and one page of all its events, and shows all three. Called by SessionView, under the client connections; detail has the real counts
+export default async function SessionTimeline({ sessionId, detail, eventPage, pageHref }: { sessionId: string; detail: SessionDetail; eventPage: number; pageHref: PageHref }) {   // Reads and shows the three lists; detail holds the real counts
   const total = Number(detail.events);
   const [errors, warnings, events] = total > 0
     ? await Promise.all([getErrorEvents(sessionId), getWarningSummary(sessionId), getEventPage(sessionId, eventPage)])

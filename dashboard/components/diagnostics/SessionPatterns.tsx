@@ -1,4 +1,4 @@
-// SessionPatterns.tsx: the sessions that didn't connect, by pipeline category, and the session-level event patterns; every row has a one-line meaning taken from its rule and opens exactly its sessions.
+// SessionPatterns.tsx: sessions that didn't connect by category, and session event patterns; each row opens its sessions.
 
 import Link from "next/link";
 import { cohortExplanation, formatNumber, reasonLabel } from "@/lib/format";

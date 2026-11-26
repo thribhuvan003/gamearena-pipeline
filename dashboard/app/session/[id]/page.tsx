@@ -22,7 +22,7 @@ export default function SessionPage({ params, searchParams }: PageProps<"/sessio
   );
 }
 
-async function SessionPageBody({ params, searchParams }: PageProps<"/session/[id]">) {   // Checks the ID, reads the event page (?epage=) and shows the session. Called by SessionPage inside <Suspense> (shows "Loading…" until ready), because the ID is only known when someone visits
+async function SessionPageBody({ params, searchParams }: PageProps<"/session/[id]">) {   // Checks the ID, reads ?epage= and shows the session
   await connection();
   await requireDashboardAccess();
   const { id } = await params;

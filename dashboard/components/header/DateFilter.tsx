@@ -5,7 +5,7 @@ import { dayLabel } from "@/lib/format";
 import { link } from "@/lib/links";
 import { getDataDays, type Range } from "@/lib/queries";
 
-export default async function DateFilter({ range }: { range: Range }) {   // Shows the two date boxes, filled with the current range and limited to the days that have data, and one line saying which days have data. Called by the dashboard page in the header, next to the title
+export default async function DateFilter({ range }: { range: Range }) {   // The from / to boxes, limited to the days with data, and a line saying which days those are
   const { first, last } = await getDataDays();
   const limits = { min: first ?? undefined, max: last ?? undefined };
 

@@ -1,12 +1,12 @@
 "use client";
-// SheetFrame.tsx: the side sheet as a modal dialog: focus moves into it and back, Tab stays inside it, Escape closes it, and the page behind it is inert.
+// SheetFrame.tsx: the side sheet as a modal dialog: focus, Tab trap, Escape to close, page behind inert.
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 
 const FOCUSABLE = "a[href], button, input, summary, [tabindex]:not([tabindex='-1'])";
 
-export default function SheetFrame({ closeHref, label, stepKey, children }: { closeHref: string; label: string; stepKey: string; children: ReactNode }) {   // Wraps the backdrop and the sheet in a dialog. Called by Sheet; the only client JS besides the chart, because focus and keys need the browser. stepKey changes with every new step or page
+export default function SheetFrame({ closeHref, label, stepKey, children }: { closeHref: string; label: string; stepKey: string; children: ReactNode }) {   // Wraps the sheet in a dialog; stepKey changes with every new step or page
   const frame = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -21,7 +21,7 @@ export default function SheetFrame({ closeHref, label, stepKey, children }: { cl
     };
   }, []);
 
-  useEffect(() => {   // Scrolls the sheet to the top and focuses it, so each new step or page starts at its beginning. Run by React when the sheet opens and on each new step or page
+  useEffect(() => {   // Scrolls the sheet to the top and focuses it on every new step or page
     const sheet = frame.current?.querySelector<HTMLElement>(".sheet");
     if (!sheet) return;
     sheet.scrollTop = 0;

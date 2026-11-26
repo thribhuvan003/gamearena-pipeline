@@ -2,7 +2,7 @@
 
 import type { Range } from "@/lib/queries";
 
-export default function SearchBox({ range, q }: { range: Range; q?: string }) {   // Shows the search box, filled with the current search, with the dates as hidden fields. Called by the dashboard page in the header, after the date filter
+export default function SearchBox({ range, q }: { range: Range; q?: string }) {   // The ID search box, keeping the dates as hidden fields
   return (
     <form className="search" action="/" method="get">
       {range.view && <input type="hidden" name="view" value={range.view} />}

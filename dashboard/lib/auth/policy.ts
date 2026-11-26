@@ -1,9 +1,9 @@
 // policy.ts: the sign-in rules: when the local preview skips login, which verified emails are allowed, and whether Better Auth is fully configured.
 
-// Every setting sign-in needs; if one is missing (or the secret is under 32 characters), the dashboard refuses to serve rather than run half-protected.
+// Every setting sign-in needs; if one is missing, the dashboard refuses to serve.
 const REQUIRED = ["APP_BASE_URL", "BETTER_AUTH_SECRET", "AUTH_DATABASE_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "AUTH_ALLOWED_EMAILS"];
 
-export function localPreview(): boolean {   // True only for npm run dev without AUTH_MODE=better-auth: no login, localhost only. Called by the proxy, the access check and the pages (to hide Sign out)
+export function localPreview(): boolean {   // True only for npm run dev without AUTH_MODE=better-auth: no login, localhost only
   return process.env.NODE_ENV === "development" && process.env.AUTH_MODE !== "better-auth";
 }
 

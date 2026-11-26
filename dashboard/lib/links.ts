@@ -1,8 +1,8 @@
-// links.ts: the dashboard's URL state (dates plus what the sheet shows) and the one function that builds every link, so a link always keeps the dates.
+// links.ts: the URL state (dates + what the sheet shows) and the one function that builds every link.
 
 import type { Range } from "./queries";
 
-// What the sheet shows: a cohort list (list, arg, page), a session (session, client = the client to mark, epage = its event page), or a search (q). Empty = closed.
+// What the sheet shows: a list (list, arg, page), a session (client, epage) or a search (q); empty = closed.
 export type Sheet = { filter?: string; list?: string; arg?: string; page?: number; session?: string; client?: string; epage?: number; q?: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -11,7 +11,7 @@ export function isUuid(value: string | undefined): value is string {   // True f
   return value !== undefined && UUID.test(value);
 }
 
-export function searchPrefix(q: string | undefined): string | null {   // The search text trimmed and lowercased if it can start an ID (8 to 36 hex digits or dashes), else null. Called by the page (one match opens it) and the sheet's search step
+export function searchPrefix(q: string | undefined): string | null {   // The search text if it can start an ID (8 to 36 hex digits or dashes), else null
   const prefix = q?.trim().toLowerCase();
   return prefix && /^[0-9a-f-]{8,36}$/.test(prefix) ? prefix : null;
 }
@@ -27,7 +27,7 @@ export function linkString(range: Range, sheet: Sheet = {}): string {   // The s
   return query ? `/?${query}` : "/";
 }
 
-export function link(range: Range, sheet: Sheet = {}): { pathname: "/"; query: Record<string, string> } {   // A link to the dashboard with these dates and this sheet state (empty parts left out; page 0 is the default). Called by every Link that opens, pages or closes something
+export function link(range: Range, sheet: Sheet = {}): { pathname: "/"; query: Record<string, string> } {   // A dashboard link with these dates and sheet state (empty parts and page 0 left out)
   const parts: Record<string, string | number | null | undefined> = { from: range.from, to: range.to, view: range.view, ...sheet };
   const query: Record<string, string> = {};
   for (const [key, value] of Object.entries(parts)) {

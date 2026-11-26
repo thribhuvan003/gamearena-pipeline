@@ -1,8 +1,8 @@
 "use client";
-// ClientErrorChart.tsx: the per-day chart of one chosen client error at a time, with buttons to switch errors (warnings last) and that error's details.
+// ClientErrorChart.tsx: one client error's daily bars at a time, with buttons to switch and its details.
 
 import { useState, type ReactNode } from "react";
-import { dayLabel, formatNumber } from "@/lib/format";
+import { dayLabel, formatNumber, isoDay } from "@/lib/format";
 import DailyBarChart from "@/components/shared/DailyBarChart";
 
 export type IssueSeries = {
@@ -14,10 +14,11 @@ export type IssueSeries = {
   details: ReactNode;
 };
 
-export default function ClientErrorChart({ series }: { series: IssueSeries[] }) {   // Shows one error's daily bars and lets you pick another (errors by size, then Other, then warnings). Called by ClientErrorTrend; client JS because the choice happens in the browser
-  const errors = series.filter((issue) => !issue.warning);
+export default function ClientErrorChart({ series }: { series: IssueSeries[] }) {   // One error's daily bars, with buttons to pick another; runs in the browser for the choice
+  // Errors by size with "Other" last, then the warnings.
+  const errors = series.filter((issue) => !issue.warning).sort((a, b) => Number(a.id === "Other") - Number(b.id === "Other"));
   const warnings = series.filter((issue) => issue.warning);
-  const choices = [...errors.filter((issue) => issue.id !== "Other"), ...errors.filter((issue) => issue.id === "Other"), ...warnings];
+  const choices = [...errors, ...warnings];
   const [selected, setSelected] = useState(choices[0].id);
   const issue = choices.find((choice) => choice.id === selected) ?? choices[0];
 
@@ -42,7 +43,7 @@ export default function ClientErrorChart({ series }: { series: IssueSeries[] }) 
       <div className="issue-trend-grid">
         <div>
           <div className="issue-list-heading"><strong>Issue</strong><span>Connections</span></div>
-          {errors.length > 0 && <div className="issue-choices" role="group" aria-label="Errors">{choices.filter((choice) => !choice.warning).map(issueButton)}</div>}
+          {errors.length > 0 && <div className="issue-choices" role="group" aria-label="Errors">{errors.map(issueButton)}</div>}
           {warnings.length > 0 && (
             <div className="issue-warning-group" role="group" aria-label="Warnings">
               <h4>Warnings</h4>
@@ -66,7 +67,7 @@ export default function ClientErrorChart({ series }: { series: IssueSeries[] }) 
             <ul className="issue-daily-values">
               {issue.points.filter(({ count }) => count > 0).map(({ day, count }) => (
                 <li key={day}>
-                  <time dateTime={dayString(day)}>{dayLabel(dayString(day))}</time>
+                  <time dateTime={isoDay(day)}>{dayLabel(isoDay(day))}</time>
                   <span>{formatNumber(String(count))}</span>
                 </li>
               ))}
@@ -81,8 +82,4 @@ export default function ClientErrorChart({ series }: { series: IssueSeries[] }) 
       <p className="hint issue-count-note">Totals count each connection once per issue. A connection can appear under multiple issues or on multiple days.</p>
     </>
   );
-}
-
-function dayString(value: number): string {   // A chart day (milliseconds) as "YYYY-MM-DD". Called by ClientErrorChart for its day labels
-  return new Date(value).toISOString().slice(0, 10);
 }

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 // Runs before the page paints: applies the light / dark choice saved by ThemeToggle, so the page never flashes the other theme.
 const THEME_SCRIPT = `try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}`;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {   // Wraps each page in <html> and <body>, with the saved theme applied first. suppressHydrationWarning: the script sets data-theme on <html> before React loads
+export default function RootLayout({ children }: LayoutProps<"/">) {   // Wraps each page in <html>, with the saved theme set before React loads (hence suppressHydrationWarning)
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

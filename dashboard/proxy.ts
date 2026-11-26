@@ -1,4 +1,4 @@
-// proxy.ts: runs before every request: the localhost-only preview in development, otherwise the host check, Better Auth sign-in and the email allowlist.
+// proxy.ts: runs before every request: host check, sign-in and the email allowlist (or the local preview).
 
 import { NextResponse, type NextRequest } from "next/server";
 import { approvedUser, authConfigured, localPreview } from "./lib/auth/policy";
@@ -7,7 +7,7 @@ const LOCAL = new Set(["localhost", "127.0.0.1"]);
 // Shown to a signed-in account that is not on the allowlist; signing in again opens Google's account chooser.
 const DENIED = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Access denied</title><body style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 16px"><h1>Access denied</h1><p>This account is not allowed to see the GameArena dashboard.</p><p><a href="/sign-in">Sign in with another Google account</a></p></body>`;
 
-export async function proxy(request: NextRequest) {   // Lets a request through only if it passes every check in order; otherwise answers 403 or 503, or sends it to /sign-in. Called by Next.js before every page and route
+export async function proxy(request: NextRequest) {   // Lets a request through only if every check passes; otherwise 403, 503 or /sign-in
   const requestHost = request.headers.get("host") ?? "";
   if (localPreview()) {
     return LOCAL.has(requestHost.replace(/:\d+$/, "")) ? NextResponse.next() : new NextResponse("Forbidden", { status: 403 });

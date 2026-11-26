@@ -1,4 +1,4 @@
-// ClientErrorTrend.tsx: diagnostics' per-day chart of clients that didn't connect, by error (top 5 + Other), with what the app recorded for each error.
+// ClientErrorTrend.tsx: per day, clients that didn't connect by error (top 5 + Other), with what the app logged.
 
 import { type ReactNode } from "react";
 import ClientErrorChart, { type IssueSeries } from "./ClientErrorChart";

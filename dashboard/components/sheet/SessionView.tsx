@@ -1,10 +1,10 @@
-// SessionView.tsx: one session: the app's record, each client connection with its device and outcome, and the event timeline. Shown in the side sheet and on /session/<id>.
+// SessionView.tsx: one session: its outcome, each client connection, and the timeline (sheet and /session/<id>).
 
 import SessionTimeline, { type PageHref } from "@/components/sheet/SessionTimeline";
 import { dayLabel, formatNumber, formatTime, reasonLabel, redact, tagText } from "@/lib/format";
 import { getClientConnections, getSessionDetail, type ClientConnectionRow, type SessionDetail } from "@/lib/queries";
 
-export default async function SessionView({ id, highlight, eventPage, pageHref }: { id: string; highlight?: string; eventPage: number; pageHref: PageHref }) {   // Reads the session and its clients and shows the facts, each client, then the timeline. Called by the sheet's session step and the /session/<id> page; highlight = the client to open
+export default async function SessionView({ id, highlight, eventPage, pageHref }: { id: string; highlight?: string; eventPage: number; pageHref: PageHref }) {   // Reads the session and its clients and shows them; highlight = the client to open
   const [session, connections] = await Promise.all([getSessionDetail(id), getClientConnections(id)]);
   if (!session) return <p className="hint">No app session or events with this ID.</p>;
   const { title, note } = outcome(session);

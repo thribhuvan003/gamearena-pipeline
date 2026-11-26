@@ -1,4 +1,4 @@
-// policy.test.ts: tests for the sign-in rules (allowlist, no local preview in production, missing settings or a short secret fail closed); run with npm run test:auth.
+// policy.test.ts: tests for the sign-in rules; run with npm run test:auth.
 
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";

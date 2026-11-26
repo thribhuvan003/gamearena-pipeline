@@ -1,4 +1,4 @@
-// ClientErrors.tsx: diagnostics' client error list: each error + code with the clients it hit and how many of them connected or didn't; warnings folded at the end.
+// ClientErrors.tsx: each client error with the clients it hit and how many connected or didn't; warnings last.
 
 import Link from "next/link";
 import { eventLabel, formatNumber } from "@/lib/format";

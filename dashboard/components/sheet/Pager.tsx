@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ComponentProps } from "react";
 import { formatNumber } from "@/lib/format";
 
-export default function Pager({ page, size, shown, total, href }: { page: number; size: number; shown: number; total: number; href: (page: number) => ComponentProps<typeof Link>["href"] }) {   // Shows which rows of how many are on this page; Previous from past the end goes to the last page. Called by the sheet's lists and the session timeline
+export default function Pager({ page, size, shown, total, href }: { page: number; size: number; shown: number; total: number; href: (page: number) => ComponentProps<typeof Link>["href"] }) {   // "1–50 of 1,279" with Previous / Next; Previous from past the end goes to the last page
   const last = Math.max(0, Math.ceil(total / size) - 1);
   const from = page * size;
   return (
