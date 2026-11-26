@@ -12,7 +12,7 @@ export default async function ErrorTable({ range }: { range: Range }) {
     <section className="diagnostics-panel diagnostics-errors" aria-labelledby="logged-errors-title">
       <h3 id="logged-errors-title">Client error events</h3>
       <div className="diagnostics-error-list">
-        <p className="hint">Distinct client IDs with each error by event day (UTC). IDs can later succeed or have several errors. Code 500 is app-reported, not a proven cause or HTTP status.</p>
+        <p className="hint">Same event log, counted by distinct client IDs with each error (UTC event day). One client can later succeed or have several errors. Code 500 is app-reported, not a proven cause or HTTP status.</p>
         {errors.length === 0 && <p className="hint">No client errors recorded.</p>}
         <div className="diagnostic-list">
           {errors.slice(0, 5).map((row) => <ClientError key={row.error} row={row} range={range} />)}

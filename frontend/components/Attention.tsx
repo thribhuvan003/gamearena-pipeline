@@ -36,8 +36,8 @@ export default async function Attention({ range }: { range: Range }) {
         )}
       </section>
       <section className="diagnostics-panel" aria-labelledby="signals-title">
-        <h3 id="signals-title">Events seen during sessions</h3>
-        <p className="hint">App sessions by start day. Rows overlap and can include successful sessions; events may belong to different clients.</p>
+        <h3 id="signals-title">Session-level event patterns</h3>
+        <p className="hint">Same event log, counted once per session ID when the pattern occurs across its clients. Rows overlap; a session may also have a success.</p>
         <div className="diagnostic-list">{MAIN.map(signal)}</div>
         <details className="disclosure nested-disclosure">
           <summary>More event patterns</summary>
