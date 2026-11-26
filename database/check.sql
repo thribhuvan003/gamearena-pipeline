@@ -1,6 +1,6 @@
--- check.sql (just check): works out every tag, reason and start time again from the raw events in plain SQL and compares them with what the pipeline saved. Every *_wrong must be 0; not_tagged_yet is 0 after a full run.
+-- check.sql (just check): recomputes every tag, reason and time in plain SQL and compares with the pipeline. Every *_wrong must be 0.
 
--- Check 1, sessions: the same rules as tags.py tag_session / failure_reason, compared with session_tags. no_end_event = sessions that never sent session_ended, so they can't be tagged.
+-- Check 1, sessions: the tags.py rules in SQL vs session_tags. no_end_event = never sent session_ended, so not tagged.
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
     FROM session_telemetry_events
@@ -63,7 +63,7 @@ SELECT count(*) AS ended_sessions,
 FROM expected x
 LEFT JOIN session_tags t USING (session_id);
 
--- Check 2, client connections: the same rules as tags.py tag_connection / failure_reason, compared with connection_tags; sessions_wrong = a connection saved under the wrong session.
+-- Check 2, client connections: the tags.py rules in SQL vs connection_tags (sessions_wrong = saved under another session).
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
     FROM session_telemetry_events
@@ -79,6 +79,7 @@ connections AS (
                WHEN count(*) FILTER (WHERE e.source <> 'system') = 0 THEN 'unknown'
                ELSE 'not_connected'
            END AS tag,
+           min(e.recorded_at) FILTER (WHERE e.payload->>'event' = 'pipeline.connect.success') AS connected_at,
            bool_or(e.payload->>'event' = 'webrtc.connection.state' AND e.payload->>'state' = 'failed') AS video_failed,
            bool_or(e.payload->>'event' = 'ice.connection.state' AND e.payload->>'state' = 'failed') AS network_failed,
            bool_or(e.payload->>'event' = 'media.decode.error') AS decode_error,
@@ -104,6 +105,7 @@ expected AS (
     SELECT c.connection_id,
            c.session_id,
            c.started_at,
+           c.connected_at,
            c.tag,
            CASE
                WHEN c.tag <> 'not_connected' THEN NULL
@@ -125,11 +127,12 @@ SELECT count(*) AS client_connections,
        count(*) FILTER (WHERE t.session_id <> x.session_id) AS sessions_wrong,
        count(*) FILTER (WHERE t.tag <> x.tag) AS tags_wrong,
        count(*) FILTER (WHERE t.connection_id IS NOT NULL AND t.reason IS DISTINCT FROM x.reason) AS reasons_wrong,
-       count(*) FILTER (WHERE t.started_at <> x.started_at) AS dates_wrong
+       count(*) FILTER (WHERE t.started_at <> x.started_at) AS dates_wrong,
+       count(*) FILTER (WHERE t.connection_id IS NOT NULL AND t.connected_at IS DISTINCT FROM x.connected_at) AS connected_at_wrong
 FROM expected x
 LEFT JOIN connection_tags t USING (connection_id);
 
--- Check 3, facts: session_facts and error_events counted again from the raw events in plain SQL. Every *_wrong must be 0; sessions_missing is 0 after a refresh (just facts).
+-- Check 3, facts: session_facts and error_events recounted from the raw events. sessions_missing is 0 after just facts.
 WITH raw AS (
     SELECT session_id,
            count(*) AS events,

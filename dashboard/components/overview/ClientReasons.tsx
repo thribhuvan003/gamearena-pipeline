@@ -1,17 +1,18 @@
 // ClientReasons.tsx: why clients didn't connect: the pipeline's category per client with its one-line meaning; each row opens exactly its clients.
 
 import Link from "next/link";
-import { formatNumber, reasonExplanation, reasonLabel } from "@/lib/format";
+import { formatNumber, reasonLabel } from "@/lib/format";
 import { link, type Sheet } from "@/lib/links";
 import { getConnectionReasons, type Range } from "@/lib/queries";
 
 export default async function ClientReasons({ range, sheet }: { range: Range; sheet: Sheet }) {   // Lists each category with its meaning, count and share; the open one is highlighted. Called by the overview
   const rows = await getConnectionReasons(range);
+  const total = rows.reduce((sum, row) => sum + Number(row.clients), 0);
 
   return (
     <section className="overview-panel" aria-labelledby="reasons-title">
-      <h2 id="reasons-title">Why clients didn't connect</h2>
-      <p className="hint">One category per client that didn't connect, from the first logged signal: failure phase, failed video or network state, decode error or drop. A clue, not a proven cause.</p>
+      <h3 id="reasons-title">{formatNumber(String(total))} clients didn&apos;t connect</h3>
+      <p className="hint">One reason per client; the rows add up to {formatNumber(String(total))}.</p>
       {rows.length === 0 ? (
         <p className="hint">No clients that didn't connect in this period.</p>
       ) : (
@@ -25,7 +26,6 @@ export default async function ClientReasons({ range, sheet }: { range: Range; sh
               >
                 <span className="row-main">
                   <strong>{reasonLabel(row.reason)}</strong>
-                  {reasonExplanation(row.reason, "clients") && <span className="reason-detail">{reasonExplanation(row.reason, "clients")}</span>}
                 </span>
                 <span className="row-end"><strong>{formatNumber(row.clients)}</strong><small>{row.percent}%</small></span>
                 <span className="chevron" aria-hidden="true">›</span>

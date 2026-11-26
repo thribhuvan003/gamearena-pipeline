@@ -55,6 +55,7 @@ SELECT e.connection_id,
        e.session_id,
        min(e.recorded_at) AS started_at,
        count(*) FILTER (WHERE e.source <> 'system') AS app_events,
+       min(e.recorded_at) FILTER (WHERE coalesce(e.payload->>'event', e.event_type::STRING) = 'pipeline.connect.success') AS connected_at,
        array_agg(coalesce(e.payload->>'event', e.event_type::STRING) ORDER BY e.recorded_at, e.id) AS event_names,
        array_agg(e.payload->>'phase' ORDER BY e.recorded_at, e.id) AS phases,
        array_agg(e.payload->>'state' ORDER BY e.recorded_at, e.id) AS states
@@ -73,11 +74,12 @@ def read_connections(conn, session_ids):                     # Reads the client 
         rows = cursor.fetchall()
 
     connections = {}
-    for connection_id, session_id, started_at, app_events, event_names, phases, states in rows:
+    for connection_id, session_id, started_at, app_events, connected_at, event_names, phases, states in rows:
         connections[connection_id] = {
             "session_id": session_id,
             "started_at": started_at,
             "app_events": app_events,
+            "connected_at": connected_at,
             "event_names": event_names,
             "phases": phases,
             "states": states,

@@ -1,24 +1,23 @@
-// page.tsx: the dashboard: header, then Overview or Diagnostics, then the side sheet when one is open.
+// page.tsx: the dashboard: header, then Sessions, Clients and Trends, then the side sheet when open.
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { connection } from "next/server";
-import ClientErrorTrend from "@/components/diagnostics/ClientErrorTrend";
-import ClientErrors from "@/components/diagnostics/ClientErrors";
+import ClientErrors from "@/components/overview/ClientErrors";
 import ClientReasons from "@/components/overview/ClientReasons";
-import ConnectionTrend from "@/components/overview/ConnectionTrend";
+import ConnectionTrend from "@/components/trends/ConnectionTrend";
 import DateFilter from "@/components/header/DateFilter";
 import NoClientErrors from "@/components/overview/NoClientErrors";
 import SearchBox from "@/components/header/SearchBox";
-import SessionPatterns from "@/components/diagnostics/SessionPatterns";
+import SessionPatterns from "@/components/trends/SessionPatterns";
+import SessionReasons from "@/components/overview/SessionReasons";
 import Sheet from "@/components/sheet/Sheet";
 import SignOut from "@/components/auth/SignOut";
 import SummaryCards from "@/components/overview/SummaryCards";
 import ThemeToggle from "@/components/header/ThemeToggle";
 import { requireDashboardAccess } from "@/lib/auth/access";
 import { localPreview } from "@/lib/auth/policy";
-import { link, linkString, readSheet, searchPrefix } from "@/lib/links";
+import { linkString, readSheet, searchPrefix } from "@/lib/links";
 import { searchIds, type Range } from "@/lib/queries";
 
 export default function Home({ searchParams }: PageProps<"/">) {          // Lays out the page. Next.js calls it on every visit to /
@@ -38,9 +37,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
   const range: Range = {
     from: readDate(params.from),
     to: readDate(params.to),
-    view: params.view === "diagnostics" ? "diagnostics" : undefined,
   };
-  const diagnostics = range.view === "diagnostics";
   const sheet = readSheet(params);
   const prefix = sheet.session ? null : searchPrefix(sheet.q);
   const found = prefix ? await searchIds(prefix) : [];
@@ -51,9 +48,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
       <header className="dashboard-header">
         <div className="page-head">
           <h1>GameArena</h1>
-          <nav className="dashboard-nav" aria-label="Dashboard views">
-            <Link href={link({ ...range, view: undefined })} aria-current={!diagnostics ? "page" : undefined}>Overview</Link>
-            <Link href={link({ ...range, view: "diagnostics" })} aria-current={diagnostics ? "page" : undefined}>Diagnostics</Link>
+          <nav className="dashboard-nav" aria-label="Account and theme">
             {!localPreview() && <SignOut />}
             <ThemeToggle />
           </nav>
@@ -63,28 +58,23 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
           <SearchBox range={range} q={sheet.q} />
         </div>
       </header>
-      {diagnostics ? (
-        <>
-          <div className="diagnostics-content">
-            <div className="view-heading">
-              <h2>Diagnostics</h2>
-              <p className="hint">A session can have several clients. Connected = the app logged pipeline.connect.success.</p>
-            </div>
-            <SessionPatterns range={range} />
-            <ClientErrors range={range} />
-            <ClientErrorTrend range={range} />
-          </div>
-        </>
-      ) : (
-        <>
-          <SummaryCards range={range} />
-          <div className="overview-grid">
-            <ClientReasons range={range} sheet={sheet} />
-            <ConnectionTrend range={range} />
-          </div>
-          <NoClientErrors range={range} />
-        </>
-      )}
+      <SummaryCards range={range} unit="sessions" />
+      <div className="card-grid">
+        <SessionReasons range={range} sheet={sheet} />
+        <NoClientErrors range={range} />
+      </div>
+      <SummaryCards range={range} unit="clients" />
+      <div className="card-grid">
+        <ClientReasons range={range} sheet={sheet} />
+        <ClientErrors range={range} />
+      </div>
+      <section className="metric-groups" aria-labelledby="trends-title">
+        <h2 id="trends-title">Trends</h2>
+      </section>
+      <div className="card-grid">
+        <ConnectionTrend range={range} />
+        <SessionPatterns range={range} />
+      </div>
       {(sheet.list || sheet.session || sheet.q) && <Suspense fallback={<><div className="sheet-backdrop" /><div className="sheet"><p className="hint">Loading…</p></div></>}><Sheet range={range} sheet={sheet} /></Suspense>}
     </>
   );

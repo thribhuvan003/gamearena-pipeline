@@ -145,6 +145,12 @@ h3 {
   font-size: var(--fs-small);
 }
 
+/* The one-line share above each strip of numbers, e.g. "76.6% of tracked clients connected". */
+.headline-share {
+  margin: 0 0 var(--s3);
+  font-size: var(--fs-body);
+}
+
 .filter {
   display: flex;
   flex-wrap: wrap;
@@ -606,11 +612,6 @@ details.more > summary::-webkit-details-marker {
   font-size: 17px;
 }
 
-.metric-heading > span {
-  font-size: var(--fs-small);
-  color: var(--text-2);
-}
-
 .overview-errors {
   margin-top: var(--s2);
   border: 1px solid var(--separator);
@@ -641,18 +642,6 @@ details.more > summary::-webkit-details-marker {
   font-size: var(--fs-small);
 }
 
-.overview-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--s3);
-  align-items: start;
-  margin-top: var(--s3);
-}
-
-.overview-grid section {
-  margin: 0;
-}
-
 .overview-panel {
   min-width: 0;
   border: 1px solid var(--separator);
@@ -669,8 +658,7 @@ details.more > summary::-webkit-details-marker {
   background: var(--accent-bg);
 }
 
-.reason-list small,
-.reason-detail {
+.reason-list small {
   display: block;
   font-size: var(--fs-small);
   color: var(--text-2);
@@ -708,7 +696,7 @@ details.more > summary::-webkit-details-marker {
 }
 
 /* Shared spacing and controls for the overview, diagnostics, and session details. */
-.metric-groups section, .top-errors, .overview-grid, .diagnostics-content {
+.metric-groups section, .top-errors, .overview-panel {
   margin-top: var(--s5);
 }
 
@@ -724,36 +712,10 @@ details.more > summary::-webkit-details-marker {
   white-space: nowrap;
 }
 
-.diagnostics-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s3);
-  align-items: start;
-}
-
-.diagnostics-panel {
-  min-width: 0;
-  margin: 0;
-  padding: var(--s4);
-  border: 1px solid var(--separator);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.diagnostics-content > * + * {
-  margin-top: var(--s4);
-}
-
-.diagnostics-panel h3, .session-group h3 {
+.overview-panel h3, .session-group h3 {
   margin: 0 0 var(--s1);
   font-size: 17px;
   font-weight: 650;
-}
-
-.diagnostics-panel h4 {
-  margin: var(--s2) 0 var(--s1);
-  font-size: var(--fs-body);
-  font-weight: 600;
 }
 
 .diagnostics-error-list {
@@ -851,10 +813,6 @@ details.more > summary::-webkit-details-marker {
   overflow-wrap: anywhere;
 }
 
-.trend-disclosure > summary {
-  min-height: 30px;
-}
-
 .session-view {
   max-width: 680px;
   margin-top: var(--s2);
@@ -920,10 +878,6 @@ details.more > summary::-webkit-details-marker {
   .client-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .overview-grid, .diagnostics-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 400px) {
@@ -937,17 +891,37 @@ details.more > summary::-webkit-details-marker {
   }
 }
 
-.issue-trend-grid {
-  display: grid;
-  grid-template-columns: minmax(230px, 2fr) minmax(0, 3fr);
-  gap: var(--s5);
-  margin-top: var(--s4);
+/* The overview's per-day chart: the picker above it and the daily list in its fold. */
+.trend-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: var(--s2) 0 var(--s1);
+  color: var(--text-2);
+  font-size: var(--fs-small);
 }
 
-.issue-list-heading,
-.issue-choice,
-.issue-signatures li,
-.issue-daily-values li {
+.trend-picker select {
+  min-width: 0;
+  max-width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-sm);
+  padding: 4px var(--s2);
+}
+
+.daily-values {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+  font-size: var(--fs-small);
+}
+
+.daily-values li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -955,90 +929,31 @@ details.more > summary::-webkit-details-marker {
   padding: var(--s2) var(--s3);
 }
 
-.issue-list-heading {
-  color: var(--text-2);
-  font-size: var(--fs-small);
-}
-
-.issue-choice {
-  align-items: center;
-  width: 100%;
-  min-height: 44px;
-  font: inherit;
-  text-align: start;
-  color: var(--text);
-  background: transparent;
-  border: 0;
-  border-top: 1px solid var(--separator);
-  cursor: pointer;
-}
-
-.issue-choice span,
-.issue-signatures code {
+.daily-values code {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.issue-choice strong,
-.issue-signatures span,
-.issue-daily-values span {
+.daily-values span {
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
 
-.issue-choice:hover,
-.issue-choice[aria-pressed="true"] {
-  background: var(--accent-bg);
+/* Two cards side by side, one column on narrow screens; the cards inside lose their own top margin. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+  align-items: start;
+  margin-top: var(--s5);
 }
 
-.issue-choice[aria-pressed="true"] {
-  box-shadow: inset 2px 0 var(--accent);
-}
-
-.issue-warning-group {
-  margin-top: var(--s3);
-}
-
-.issue-warning-group h4 {
-  color: var(--text-2);
-  font-size: var(--fs-small);
-  margin-inline: var(--s3);
-}
-
-.issue-trend-panel {
-  min-width: 0;
-  padding: var(--s3) var(--s4) 0;
-  background: var(--surface-2);
-  border-radius: var(--radius-sm);
-}
-
-.issue-trend-panel > .disclosure {
-  border-top: 1px solid var(--separator);
-}
-
-.issue-signatures, .issue-daily-values {
-  list-style: none;
+.card-grid > * {
   margin: 0;
-  padding: 0;
-  font-size: var(--fs-small);
 }
 
-.issue-daily-values {
-  max-height: 12rem;
-  overflow-y: auto;
-}
-
-.issue-count-note {
-  margin-top: var(--s3);
-}
-
-@media (max-width: 680px) {
-  .issue-trend-grid {
+@media (max-width: 760px) {
+  .card-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--s3);
-  }
-
-  .issue-trend-panel {
-    padding-inline: var(--s2);
   }
 }

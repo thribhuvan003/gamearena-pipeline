@@ -1,4 +1,4 @@
-// NoClientErrors.tsx: errors logged with no client ID: what the payload says, sessions, and times logged.
+// NoClientErrors.tsx: the overview's session-level errors (no client ID): what the payload says, sessions, and times logged.
 
 import Link from "next/link";
 import { eventLabel, formatNumber, redact } from "@/lib/format";
@@ -9,11 +9,11 @@ export default async function NoClientErrors({ range }: { range: Range }) {   //
   const errors = await getNoClientErrors(range);
 
   return (
-    <section className="top-errors" aria-labelledby="top-errors-title">
+    <section className="overview-panel top-errors" aria-labelledby="top-errors-title">
       <div className="section-line">
-        <h2 id="top-errors-title">Errors with no client ID</h2>
+        <h3 id="top-errors-title">Errors logged by sessions</h3>
       </div>
-      <p className="hint">Logged without a client ID, so they belong to the session, not to one client; the phase in brackets is what the payload recorded. Sessions = app sessions that logged it; times logged = how often it was logged in total (a session can log it more than once). In brackets: the payload’s most common values.</p>
+      <p className="hint">Errors with no client ID, counted by sessions. In brackets: what the payload says most often.</p>
       {errors.length === 0 ? <p className="hint">No errors without a client ID in this period.</p> : (
         <div className="list overview-errors">
           <div className="overview-error-row overview-error-labels" aria-hidden="true">

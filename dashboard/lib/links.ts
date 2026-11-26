@@ -28,7 +28,7 @@ export function linkString(range: Range, sheet: Sheet = {}): string {   // The s
 }
 
 export function link(range: Range, sheet: Sheet = {}): { pathname: "/"; query: Record<string, string> } {   // A dashboard link with these dates and sheet state (empty parts and page 0 left out)
-  const parts: Record<string, string | number | null | undefined> = { from: range.from, to: range.to, view: range.view, ...sheet };
+  const parts: Record<string, string | number | null | undefined> = { from: range.from, to: range.to, ...sheet };
   const query: Record<string, string> = {};
   for (const [key, value] of Object.entries(parts)) {
     if (value !== undefined && value !== null && value !== "" && !((key === "page" || key === "epage") && value === 0)) query[key] = String(value);

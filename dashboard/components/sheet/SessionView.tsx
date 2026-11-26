@@ -7,13 +7,14 @@ import { getClientConnections, getSessionDetail, type ClientConnectionRow, type 
 export default async function SessionView({ id, highlight, eventPage, pageHref }: { id: string; highlight?: string; eventPage: number; pageHref: PageHref }) {   // Reads the session and its clients and shows them; highlight = the client to open
   const [session, connections] = await Promise.all([getSessionDetail(id), getClientConnections(id)]);
   if (!session) return <p className="hint">No app session or events with this ID.</p>;
-  const { title, note } = outcome(session);
+  const index = connections.findIndex((row) => row.connection_id === highlight);
+  const { title, note, status } = index >= 0 ? clientOutcome(connections[index], index + 1, session) : outcome(session);
   const started = session.started_at ?? session.first_event_at;
 
   return (
     <div className="session-view">
       <div className="session-outcome">
-        <h3 data-status={session.tag ?? undefined}>{title}</h3>
+        <h3 data-status={status}>{title}</h3>
         {note && <p>{note}</p>}
         {started && <p className="hint">{session.started_at ? "Started" : "First seen"} {readableTime(started)}</p>}
       </div>
@@ -24,6 +25,7 @@ export default async function SessionView({ id, highlight, eventPage, pageHref }
           <span className="section-count">{formatNumber(String(connections.length))}</span>
         </div>
         <p className="hint">Each client has its own outcome. “Didn't connect” means the app never logged pipeline.connect.success for it.</p>
+        {Number(session.events) === 0 && connections.length > 0 && <p className="hint">These come from the app's own client records; no telemetry was logged for them, so their outcome is unavailable.</p>}
         {connections.length === 0 ? (
           <p className="hint">{session.in_app ? "No client connections recorded." : "Client records are unavailable in the app backup."}</p>
         ) : (
@@ -59,15 +61,15 @@ function ClientDetails({ row, index, selected }: { row: ClientConnectionRow; ind
     <details className={`disclosure client-details${selected ? " selected" : ""}`}>
       <summary>
         <span>Client {index}{device && <small>{device}</small>}</span>
-        <span className="disclosure-value">{row.tag ? tagText(row.tag, null) : "Outcome unavailable"}</span>
+        <span className="disclosure-value">{row.tag ? tagText(row.tag, null) : "Outcome not recorded"}</span>
       </summary>
       <div className="disclosure-body">
         <dl className="compact-facts">
           {row.reason && <div><dt>Reason</dt><dd>{reasonLabel(row.reason)}</dd></div>}
           <div><dt>Connection ID</dt><dd className="id">{row.connection_id}</dd></div>
           <div><dt>Access</dt><dd>{row.auth_type}</dd></div>
-          <div><dt>First app timestamp</dt><dd>{formatTime(row.connected_at)}</dd></div>
-          <div><dt>Last app timestamp</dt><dd>{row.disconnected_at ? formatTime(row.disconnected_at) : "No timestamp recorded"}</dd></div>
+          <div><dt>App record start</dt><dd>{formatTime(row.connected_at)}</dd></div>
+          <div><dt>App record end</dt><dd>{row.disconnected_at ? formatTime(row.disconnected_at) : "No timestamp recorded"}</dd></div>
           {!device && <div><dt>Device and browser</dt><dd>Unknown</dd></div>}
         </dl>
       </div>
@@ -80,11 +82,27 @@ function readableTime(value: Date): string {   // A timestamp as "17 Oct 2026 at
   return `${dayLabel(time.slice(0, 10))} at ${time.slice(11, 16)} UTC`;
 }
 
-function outcome(session: SessionDetail): { title: string; note?: string } {   // The session's outcome in words, or why there is none (no telemetry, not classified yet, no end event). Called by SessionView
-  if (session.tag) return { title: tagText(session.tag, null), note: session.reason ? reasonLabel(session.reason) : undefined };
-  if (Number(session.events) === 0) return { title: "Outcome unavailable", note: "No telemetry was recorded." };
+// Reasons that come from the phase of the last connect failure.
+const PHASE_REASONS = ["setup_error", "error_while_connecting", "error_other"];
+
+type Headline = { title: string; note?: string; status?: string };
+
+function clientOutcome(client: ClientConnectionRow, number: number, session: SessionDetail): Headline {   // The headline for the client the viewer opened, with the session's outcome underneath
+  const own = client.tag ? tagText(client.tag, null) : "Outcome not recorded";
+  const reason = client.reason ? `${reasonLabel(client.reason)} · ` : "";
+  const other = session.tag === "connected" && client.tag !== "connected" ? " (another client logged pipeline.connect.success)" : "";
+  return { title: `Client ${number}: ${own}`, note: `${reason}Session: ${outcome(session).title}${other}`, status: client.tag === "not_connected" ? "failed" : undefined };
+}
+
+function outcome(session: SessionDetail): Headline {   // The session's outcome with a short note, or why there is none
+  if (session.tag === "connected") return { title: tagText(session.tag, null), note: "At least one client in this session connected.", status: "connected" };
+  if (session.reason && PHASE_REASONS.includes(session.reason) && session.failure_no_client) {
+    return { title: tagText(session.tag!, null), note: `${reasonLabel(session.reason)} · from an error logged with no client ID; each client below shows its own evidence.`, status: session.tag! };
+  }
+  if (session.tag) return { title: tagText(session.tag, null), note: session.reason ? reasonLabel(session.reason) : undefined, status: session.tag };
+  if (Number(session.events) === 0) return { title: "Session outcome unavailable", note: "No telemetry was recorded." };
   return {
-    title: "Outcome unavailable",
-    note: session.has_end_event ? "Telemetry has yet to be classified." : "No session end event was recorded.",
+    title: "Session outcome unavailable",
+    note: session.has_end_event ? "Telemetry has yet to be tagged." : "No session end event was recorded.",
   };
 }

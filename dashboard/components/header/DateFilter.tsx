@@ -11,11 +11,10 @@ export default async function DateFilter({ range }: { range: Range }) {   // The
 
   return (
     <form className="filter" method="get" action="/">
-      {range.view && <input type="hidden" name="view" value={range.view} />}
       <label>From <input type="date" name="from" defaultValue={range.from ?? ""} {...limits} /></label>
       <label>To <input type="date" name="to" defaultValue={range.to ?? ""} {...limits} /></label>
       <button type="submit">Apply dates</button>
-      {(range.from || range.to) && <Link href={link({ from: null, to: null, view: range.view })}>All dates</Link>}
+      {(range.from || range.to) && <Link href={link({ from: null, to: null })}>All dates</Link>}
       <span className="hint">{first && last ? `Available: ${dayLabel(first, first.slice(0, 4) !== last.slice(0, 4))} to ${dayLabel(last)} · UTC` : "No data yet."}</span>
     </form>
   );

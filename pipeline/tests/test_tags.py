@@ -1,4 +1,4 @@
-# test_tags.py: checks the tagging rules in pipeline/tags.py on small made-up sessions (no database, no real data). Run from the repo root: python -m unittest discover -s pipeline/tests (or just test)
+# test_tags.py: checks the rules in pipeline/tags.py on small made-up sessions (no database). Run: just test
 
 import unittest
 

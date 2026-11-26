@@ -1,4 +1,4 @@
-# store.py: writes to our 5 tables: the run history (pipeline_runs), the session and client connection tags (session_tags, connection_tags), and the per-session facts and error copies the dashboard reads (session_facts, error_events).
+# store.py: writes our 5 tables: run history, session and client tags, and the session facts and error copies the dashboard reads.
 
 # Add a 'running' row to the run history and return its ID.
 START_RUN_SQL = """
@@ -34,10 +34,10 @@ def save_tags(conn, sessions, run_id):                       # Saves a batch of 
 
 # Save client connection tags in one database call.
 SAVE_CONNECTIONS_SQL = """
-UPSERT INTO connection_tags (connection_id, session_id, tag, reason, started_at, run_id)
-SELECT connection_id, session_id, tag, reason, started_at, %(run_id)s::UUID
-FROM unnest(%(ids)s::UUID[], %(sessions)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[])
-     AS t(connection_id, session_id, tag, reason, started_at)
+UPSERT INTO connection_tags (connection_id, session_id, tag, reason, started_at, connected_at, run_id)
+SELECT connection_id, session_id, tag, reason, started_at, connected_at, %(run_id)s::UUID
+FROM unnest(%(ids)s::UUID[], %(sessions)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[], %(connected)s::TIMESTAMPTZ[])
+     AS t(connection_id, session_id, tag, reason, started_at, connected_at)
 """
 
 
@@ -48,12 +48,13 @@ def save_connection_tags(conn, connections, run_id):         # Saves a batch of 
         "tags": [connection["tag"] for connection in connections.values()],
         "reasons": [connection["reason"] for connection in connections.values()],
         "started": [connection["started_at"] for connection in connections.values()],
+        "connected": [connection["connected_at"] for connection in connections.values()],
         "run_id": run_id,
     }
     conn.execute(SAVE_CONNECTIONS_SQL, parameters)
 
 
-# Sessions with events newer than the newest event session_facts already has, minus 1 day in case an event is stored well after its recorded time (just facts all catches anything older); oldest first.
+# Sessions with events newer than the newest in session_facts, minus 1 day for late-stored events; oldest first.
 CHANGED_SESSIONS_SQL = """
 SELECT session_id
 FROM session_telemetry_events
@@ -111,7 +112,7 @@ WHERE e.session_id = ANY(%(ids)s::UUID[]) AND e.level = 'error'
 FACTS_BATCH = 1000
 
 
-def refresh_facts(conn, everything=False):                   # Recounts session_facts and recopies error_events for every session with new events (all sessions if everything, also dropping sessions with no raw events left), in one transaction; returns how many. Called by __main__ once per round and by the facts command
+def refresh_facts(conn, everything=False):                   # Recounts facts and recopies errors for sessions with new events (all if everything); returns how many
     sql = ALL_SESSIONS_SQL if everything else CHANGED_SESSIONS_SQL
     ids = [row[0] for row in conn.execute(sql).fetchall()]
     for start in range(0, len(ids), FACTS_BATCH):

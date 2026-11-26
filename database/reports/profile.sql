@@ -1,4 +1,4 @@
--- profile.sql (just profile): how complete the data is and what each result rests on, using only what the payload records. Read-only, counts only (no IDs, messages, user agents or IPs). Needs gamearena_source (the app's sessions and client connections, restored from the 11 Nov backup).
+-- profile.sql (just profile): how complete the data is and what each result rests on. Counts only; needs gamearena_source.
 -- Note: "success" below always means a recorded pipeline.connect.success event, nothing more.
 
 -- 1a. Session coverage: every app session in exactly one row. Rows add up to all app sessions (host_sessions).
@@ -26,7 +26,7 @@ SELECT (SELECT count(*) FROM gamearena_source.host_sessions) AS app_sessions,
        (SELECT count(*) FROM session_tags) AS tagged_sessions,
        (SELECT count(DISTINCT session_id) FROM session_telemetry_stats) AS sessions_with_stats;
 
--- 2. Client connection coverage: every app client connection by whether any event names it and whether the pipeline tagged it. Rows add up to all app client connections.
+-- 2. Client connection coverage: each app client connection by whether events name it and whether it is tagged.
 WITH ev AS (
     SELECT DISTINCT connection_id FROM session_telemetry_events WHERE connection_id IS NOT NULL
 )
@@ -67,7 +67,7 @@ SELECT count(*) AS connections_with_either,
        round(max(extract(epoch FROM first_success - first_decode)), 2) AS longest_gap_seconds
 FROM c;
 
--- 3c. Per session (all events): attempts, successes and failures, and their order. Failures are matched per session because most have no connection_id (see 3a).
+-- 3c. Per session (all events): attempts, successes, failures and their order; failures matched per session (see 3a).
 WITH s AS (
     SELECT session_id,
            count(*) FILTER (WHERE payload->>'event' = 'pipeline.connect.attempt') AS attempts,
@@ -114,7 +114,7 @@ WHERE payload ? 'code' OR payload ? 'errorCode'
 GROUP BY 1, 2, 3, 4, 5
 ORDER BY events DESC;
 
--- 5. Failed sessions per reason, against the evidence behind it (events up to session_ended, like the pipeline). no_error_evidence = no failure event, no failed video state and no error-level event: the reason was reached by elimination.
+-- 5. Failed sessions per reason vs the events behind it (up to session_ended). no_error_evidence = reached by elimination.
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
     FROM session_telemetry_events WHERE event_type = 'session_ended' GROUP BY session_id

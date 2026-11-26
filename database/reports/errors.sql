@@ -1,6 +1,6 @@
--- errors.sql (just errors): for each failed session, its last pipeline.connect.failure before the session ended, grouped by code, phase, stage and text. Only reads.
+-- errors.sql (just errors): each failed session's last pipeline.connect.failure before it ended, by code, phase, stage, text.
 -- This is a subset of failed sessions, not a separate failure population.
--- pipeline.connect.failure carries its code in payload 'code' (500 or 400), never in 'errorCode' (that key is only on ice.candidate.error). See just profile, part 4.
+-- pipeline.connect.failure keeps its code in payload 'code', not 'errorCode'. See just profile, part 4.
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
     FROM session_telemetry_events

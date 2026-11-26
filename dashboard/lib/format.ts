@@ -6,6 +6,10 @@ export function formatNumber(value: string): string {      // "6501" -> "6,501"
   return Number(value).toLocaleString("en-US");
 }
 
+export function percent(part: string, whole: string): string {   // part of whole to one decimal, e.g. "76.6"; "0" when whole is 0
+  return Number(whole) === 0 ? "0" : (Math.round((1000 * Number(part)) / Number(whole)) / 10).toString();
+}
+
 export function formatTime(value: Date): string {          // A timestamp -> "2026-10-17 08:27 UTC"
   return value.toISOString().slice(0, 16).replace("T", " ") + " UTC";
 }
@@ -42,16 +46,16 @@ const TAG_LABELS: Record<string, string> = {
   not_connected: "Didn't connect",
   failed: "Didn't connect",
   no_attempt: "No attempt",
-  unknown: "Unknown",
+  unknown: "Outcome not recorded",
 };
 
 const REASON_LABELS: Record<string, string> = {
-  no_video: "Reason unknown",
+  no_video: "No failure reason recorded",
   setup_error: "Setup failed",
-  video_connection_failed: "Video connection failed",
-  network_connection_failed: "Network connection failed",
+  video_connection_failed: "WebRTC reported failed",
+  network_connection_failed: "ICE reported failed",
   video_decode_error: "Video decoding error",
-  connection_dropped: "Connection dropped",
+  connection_dropped: "Drop logged, never connected",
   someone_never_joined: "Host or client join missing",
   error_while_connecting: "Error while connecting",
   error_other: "Other connection error",
@@ -69,7 +73,7 @@ const REASON_EXPLAINED: Record<string, string> = {
   someone_never_joined: "No failure logged, and host_connected or client_connected never arrived.",
 };
 
-export function reasonLabel(reason: string): string {   // A category's screen name, e.g. no_video -> "Reason unknown"
+export function reasonLabel(reason: string): string {   // A category's screen name, e.g. no_video -> "No failure reason recorded"
   return REASON_LABELS[reason] ?? reason.replaceAll("_", " ");
 }
 
@@ -78,7 +82,7 @@ export function tagText(tag: string, reason: string | null): string {   // A tag
   return reason ? `${label} · ${reasonLabel(reason)}` : label;
 }
 
-export function reasonExplanation(reason: string, unit: "sessions" | "clients"): string | null {   // A category's one-line meaning
+function reasonExplanation(reason: string, unit: "sessions" | "clients"): string | null {   // A category's one-line meaning
   if (reason === "no_video") {
     return unit === "sessions"
       ? "Host and client joined and it tried, but no connect failure, failed video or network state, decode error or drop was logged."
@@ -102,12 +106,13 @@ const COHORT_EXPLAINED: Record<string, string> = {
   reconnected: "At least one client_reconnected was logged.",
   reconnected_10: "client_reconnected was logged 10 or more times.",
   tag_failed: "Ended sessions that logged pipeline.connect.attempt but never pipeline.connect.success.",
+  failed_other: "Ended sessions with no pipeline.connect.success, and a reason other than setup failed or a missing join.",
   clients: "Client connections that logged events, one row per connection ID.",
   clients_connected: "The app logged pipeline.connect.success for this client.",
   clients_not_connected: "The app logged events for this client, but never pipeline.connect.success.",
-  clients_unknown: "Only server events exist for this client; the app logged nothing, so the outcome is unknown.",
-  no_client_error: "Sessions that logged this error without a client ID, so it belongs to the session, not to one client.",
-  client_error: "Clients that logged this error at least once. Some of them may still have connected.",
+  clients_unknown: "Only server (system) events exist for this client; the app logged none.",
+  no_client_error: "Sessions that logged this error with no client ID.",
+  client_error: "Clients that logged this error at least once, any outcome.",
 };
 
 export function cohortExplanation(key: string, arg: string | null): string | null {   // A list's one-line logic, under its row and at the top of its sheet

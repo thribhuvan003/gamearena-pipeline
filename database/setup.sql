@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS session_tags (
     run_id UUID NULL
 );
 
--- connection_tags: one row per client connection (a session can have several): connected, not_connected or unknown (the app sent nothing on it), why it didn't connect, when it started, and which run tagged it.
+-- connection_tags: one row per client connection: its tag, reason, first event, first success and the run that tagged it.
 CREATE TABLE IF NOT EXISTS connection_tags (
     -- The client connection, as the events name it.
     connection_id UUID PRIMARY KEY,
@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS connection_tags (
     reason STRING NULL,
     -- The connection's first event; the dashboard's daily client charts use this day (UTC).
     started_at TIMESTAMPTZ NOT NULL,
+    -- Its first pipeline.connect.success (up to session_ended); NULL = never connected. Tells an error before connecting from one after.
+    connected_at TIMESTAMPTZ NULL,
     -- The run that wrote this tag, as in session_tags.
     run_id UUID NULL
 );
@@ -49,7 +51,7 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     error STRING NULL
 );
 
--- session_facts: one row per session with events: how many events, attempts and reconnects, its first and last failure and success, whether it sent session_ended, and its newest event. Counted from all its events and refreshed whenever new events arrive, so the dashboard never has to read every raw event.
+-- session_facts: one row per session with events: counts and first/last failure and success, refreshed as events arrive.
 CREATE TABLE IF NOT EXISTS session_facts (
     session_id UUID PRIMARY KEY,
     -- Every raw event of the session, of any level.
@@ -71,7 +73,7 @@ CREATE TABLE IF NOT EXISTS session_facts (
     INDEX (last_event_at)
 );
 
--- error_events: a copy of every error-level event (about 6% of all events) with only the fields the dashboard shows, keyed by the event's own id, so copying it again changes nothing.
+-- error_events: a copy of every error-level event with only the fields the dashboard shows, keyed by the event's own id.
 CREATE TABLE IF NOT EXISTS error_events (
     -- The raw event's own id.
     id UUID PRIMARY KEY,
@@ -97,6 +99,9 @@ CREATE TABLE IF NOT EXISTS error_events (
     INDEX (session_id),
     INDEX (connection_id)
 );
+
+-- Columns added after the first release, so tables created earlier get them too.
+ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS connected_at TIMESTAMPTZ NULL;
 
 -- The reasons each tag table allows, set here (dropped and added again) so a new reason also reaches tables created earlier.
 ALTER TABLE session_tags DROP CONSTRAINT IF EXISTS check_reason;

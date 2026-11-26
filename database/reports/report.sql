@@ -1,4 +1,4 @@
--- report.sql (just report): the four main summaries from the tag tables: session outcomes, client connection outcomes, and the reasons for each. Only reads.
+-- report.sql (just report): session and client connection outcomes, and the reasons for each, from the tag tables.
 -- Sessions and client connections are different units: one session can have several client connections.
 
 -- 1. Session outcomes: did an ended session record a successful connection?

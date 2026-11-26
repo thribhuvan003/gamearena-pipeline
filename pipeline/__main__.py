@@ -1,4 +1,4 @@
-# __main__.py: the start of the program; functions in the order they run: main -> run_command -> run_one_round -> tag_new_sessions (then the facts refresh), or main -> status_command, or main -> facts_command.
+# __main__.py: the program's start: main -> run_command -> run_one_round -> tag_new_sessions, or the status / facts commands.
 
 import argparse
 import time
