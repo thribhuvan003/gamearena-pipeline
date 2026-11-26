@@ -1,16 +1,19 @@
+// access-policy.test.ts: tests for the sign-in rules (allowlist, no local preview in production, missing settings or a short secret fail closed); run with npm run test:auth.
+
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { approvedUser, authConfigured, localPreview } from "./access-policy.ts";
 
+// The environment as a plain record, so the tests can set NODE_ENV (typed read-only by Next.js).
+const env = process.env as Record<string, string | undefined>;
 const keys = ["NODE_ENV", "AUTH_MODE", "AUTH_ALLOWED_EMAILS", "APP_BASE_URL",
-  "BETTER_AUTH_SECRET", "AUTH_DATABASE_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] as const;
-const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  "BETTER_AUTH_SECRET", "AUTH_DATABASE_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"];
+const before = Object.fromEntries(keys.map((key) => [key, env[key]]));
 
-afterEach(() => {
+afterEach(() => {   // Puts every setting a test changed back as it was. Run by node:test after each test
   for (const key of keys) {
-    const value = before[key];
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
+    if (before[key] === undefined) delete env[key];
+    else env[key] = before[key];
   }
 });
 
@@ -24,13 +27,13 @@ test("only verified, allowlisted users can enter", () => {
 });
 
 test("localhost preview cannot bypass production auth", () => {
-  process.env.NODE_ENV = "development";
-  delete process.env.AUTH_MODE;
+  env.NODE_ENV = "development";
+  delete env.AUTH_MODE;
   assert.equal(localPreview(), true);
-  process.env.AUTH_MODE = "better-auth";
+  env.AUTH_MODE = "better-auth";
   assert.equal(localPreview(), false);
-  process.env.NODE_ENV = "production";
-  process.env.AUTH_MODE = "local";
+  env.NODE_ENV = "production";
+  env.AUTH_MODE = "local";
   assert.equal(localPreview(), false);
 });
 

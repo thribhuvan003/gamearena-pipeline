@@ -45,28 +45,29 @@ Then open http://localhost:3000 (or http://127.0.0.1:3000). Development defaults
 
 It uses the pipeline's settings and defaults (`DB_HOST` 127.0.0.1, `DB_PORT` 26257, `DB_NAME` gamearena_analytics, `DB_USER` root, `DB_PASSWORD` not set). To change them, put them in a `.env.local` file here.
 
-## Better Auth sign-in (draft migration)
+## Better Auth sign-in
 
-This branch replaces Auth0 with Better Auth and **Google OAuth only**; no local password or public email/password signup is enabled. The application requires a Google-verified email on `AUTH_ALLOWED_EMAILS`. Unauthorized accounts may be stored by the auth provider but cannot read dashboard data.
+Sign-in is Better Auth with **Google only** (no passwords, no public sign-up). Only a Google-verified email on `AUTH_ALLOWED_EMAILS` can see data; Google's account chooser opens on every sign-in, so a denied user can pick another account.
 
-Use a **separate PostgreSQL database** for auth identities, accounts and sessions. `AUTH_DATABASE_URL` must not point to GameArena's `gamearena_analytics` CockroachDB unless the exact Better Auth migration and runtime compatibility have been validated. The telemetry database stays read-only and uses `DB_*` settings.
+Logins (users, sessions) live in **their own database**, `AUTH_DATABASE_URL`, apart from the telemetry. Locally that is a separate `gamearena_auth` database in the same CockroachDB container (tested: Better Auth's tables, writes and reads work on CockroachDB); the telemetry databases stay read-only and use the `DB_*` settings.
 
-Create a Google Cloud OAuth **Web application** and register `http://localhost:3000/api/auth/callback/google` as an authorized redirect URI. Configure the matching production HTTPS callback separately.
-
-Example `frontend/.env.local` (never commit actual secrets):
+Set up once:
+1. Create the auth database: `docker exec cockroachdb ./cockroach sql --insecure -e "CREATE DATABASE IF NOT EXISTS gamearena_auth;"`
+2. In Google Cloud Console, create an OAuth client ID of type **Web application** with the authorized redirect URI `http://localhost:3000/api/auth/callback/google` (add the HTTPS one for a real deployment).
+3. Fill `frontend/.env.local` (git-ignored; never commit it):
 ```env
 AUTH_MODE=better-auth
 APP_BASE_URL=http://localhost:3000
-BETTER_AUTH_SECRET=replace-with-32-plus-character-random-secret
-AUTH_DATABASE_URL=postgresql://auth_user:password@localhost:5432/gamearena_auth
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-AUTH_ALLOWED_EMAILS=user1@example.com,user2@example.com
+BETTER_AUTH_SECRET=64-hex-characters
+AUTH_DATABASE_URL=postgresql://root@127.0.0.1:26257/gamearena_auth?sslmode=disable
+GOOGLE_CLIENT_ID=from-google-cloud-console
+GOOGLE_CLIENT_SECRET=from-google-cloud-console
+AUTH_ALLOWED_EMAILS=you@example.com,kc@example.com
 ```
+   Make the secret with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+4. From `frontend/`, create Better Auth's tables: `npm run auth:migrate` (safe to run again).
 
-After setting up the auth database, from `frontend/` run `npm install` to update `package-lock.json`, then `npx auth@latest migrate` with the above environment variables loaded. Verify the generated schema targets **only the auth database** before applying it. Run `npm run test:auth` and `npm run build`; test login, rejected accounts, logout, expired sessions and direct session URLs before merging. This draft PR does not create provider credentials, run migrations, or claim verified deployment.
-
-In development, omitting `AUTH_MODE=better-auth` retains the prior localhost-only preview. A production process always requires working Better Auth settings.
+Without `AUTH_MODE=better-auth`, `npm run dev` stays a localhost-only preview with no login. A built server (`npm start`) always requires every setting above, and HTTPS for any address other than localhost. For a real deployment, use a secured auth database and a read-only telemetry account instead of the local root/insecure defaults.
 
 ## Files
 | File | What it does |
@@ -74,7 +75,9 @@ In development, omitting `AUTH_MODE=better-auth` retains the prior localhost-onl
 | `app/page.tsx` | the dashboard page |
 | `app/session/[id]/page.tsx` | one session's page, for a direct link |
 | `app/layout.tsx`, `app/globals.css` | the HTML frame, title and the only stylesheet |
-| `components/*.tsx` | one file per section, plus the side sheet (`Sheet`, `SheetFrame`), `SessionView`, `SessionTimeline` and `Pager`. `ErrorChart.tsx` and `SheetFrame.tsx` are the only ones that run in the browser |
+| `components/*.tsx` | one file per section, plus the side sheet (`Sheet`, `SheetFrame`), `SessionView`, `SessionTimeline` and `Pager`. The ones that run in the browser start with `"use client"`: the charts, `SheetFrame`, `ThemeToggle`, `SignInButton` and `SignOut` |
+| `app/sign-in/page.tsx`, `app/api/auth/[...all]/route.ts` | the sign-in page, and Better Auth's endpoints (Google redirect and callback, session, sign-out) |
+| `lib/auth-client.ts`, `scripts/auth-migrate.ts` | Better Auth in the browser; `npm run auth:migrate` creates its tables |
 | `lib/queries.ts` | the data: the database connection, the cohorts and every SQL the dashboard runs |
 | `lib/links.ts` | the page's URL state and the one function that builds every link |
 | `lib/format.ts` | number and time formatting, and hiding private bits in messages |

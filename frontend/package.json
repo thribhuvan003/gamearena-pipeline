@@ -6,7 +6,8 @@
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start -H 127.0.0.1",
-    "test:auth": "node --test lib/access-policy.test.ts"
+    "test:auth": "node --test lib/access-policy.test.ts",
+    "auth:migrate": "node --experimental-strip-types --no-warnings --env-file-if-exists=.env.local scripts/auth-migrate.ts"
   },
   "dependencies": {
     "next": "16.4.6",
