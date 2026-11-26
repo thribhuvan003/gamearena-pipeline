@@ -4,7 +4,7 @@ A small read-only dashboard over the pipeline's results (the pipeline is in `../
 
 ## Problem statement
 **What data we have:**
-- the pipeline's tables in CockroachDB: `session_tags` (one row per ended session with telemetry: connected, failed or no_attempt, with a reason), `connection_tags` (one row per client connection with telemetry: connected, not_connected or unknown, with a reason) and `pipeline_runs` (not shown)
+- the pipeline's tables in CockroachDB: `session_tags` (one row per ended session with telemetry: connected, failed or no_attempt, with a reason), `connection_tags` (one row per client connection with telemetry: connected, not_connected or unknown, with a reason), `session_facts` (one row per session with events: counts and first/last failure and success), `error_events` (a copy of the error-level events) and `pipeline_runs` (not shown). Page totals and error numbers come from these small tables, never from adding up every raw event, so the dashboard stays fast as telemetry grows; raw events are read only for one session's timeline or one reason's detail.
 - the raw events in `session_telemetry_events`
 - the app's records in `gamearena_source`, restored from the 11 Nov 2026 backup: every app session (`host_sessions`, 18,982) and client connection (`session_client_connections`)
 
@@ -41,7 +41,7 @@ Needs Node.js 20+, the `cockroachdb` Docker container running (with `gamearena_s
 just dashboard
 ```
 That installs the packages and starts it. Without just, run `npm install` then `npm run dev` in this `frontend` folder (or `npm run build` then `npm start` for the faster built version).
-Then open http://localhost:3000 (or http://127.0.0.1:3000). Development defaults to a localhost-only preview without login. `npm start` and other production builds require Auth0 configuration and HTTPS. Ctrl+C stops it.
+Then open http://localhost:3000 (or http://127.0.0.1:3000). Development defaults to a localhost-only preview without login. `npm start` and other production builds require Auth0 configuration, and HTTPS for any address other than localhost (so the fast build can be demoed on this machine with `APP_BASE_URL=http://localhost:3000`). Ctrl+C stops it.
 
 It uses the pipeline's settings and defaults (`DB_HOST` 127.0.0.1, `DB_PORT` 26257, `DB_NAME` gamearena_analytics, `DB_USER` root, `DB_PASSWORD` not set). To change them, put them in a `.env.local` file here.
 

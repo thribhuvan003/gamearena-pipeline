@@ -12,7 +12,7 @@ export default async function ErrorTable({ range }: { range: Range }) {
     <section className="diagnostics-panel diagnostics-errors" aria-labelledby="logged-errors-title">
       <h3 id="logged-errors-title">Client error events</h3>
       <div className="diagnostics-error-list">
-        <p className="hint">Same event log, counted by distinct client IDs with each error (UTC event day). One client can later succeed or have several errors. Code 500 is app-reported, not a proven cause or HTTP status.</p>
+        <p className="hint">Distinct client IDs with each error (UTC event day); one ID can have several errors or succeed later. “Times recorded” counts events; the share leaves out unknown and untagged connections.</p>
         {errors.length === 0 && <p className="hint">No client errors recorded.</p>}
         <div className="diagnostic-list">
           {errors.slice(0, 5).map((row) => <ClientError key={row.error} row={row} range={range} />)}
@@ -50,7 +50,6 @@ function ClientError({ row, range }: { row: ErrorRow; range: Range }) {
       <div className="disclosure-body">
         {eventExplanation(row.error) && <p className="hint">{eventExplanation(row.error)}</p>}
         <dl className="compact-facts">{stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-        <p className="hint">The share excludes unknown and untagged connections. “Times recorded” counts events, so it may exceed the connection count.</p>
         <p className="id">{row.error}</p>
         {Number(row.clients) > 0 && <Link href={link(range, { list: "client_error", arg: row.error })} scroll={false}>View connections ›</Link>}
       </div>

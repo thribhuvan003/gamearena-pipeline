@@ -32,7 +32,8 @@ export type SessionReasonRow = { reason: string; sessions: string };
 export type ReasonErrorRow = { error: string | null; warning: boolean; clients: string; phase: string | null; stage: string | null; top_percent: string | null };
 export type ReasonSteps = { clients: string; gathered: string; decoded: string };
 export type ErrorRow = { error: string; warning: boolean; events: string; clients: string; not_tagged_clients: string; not_connected_clients: string; connected_clients: string; not_connected_percent: string | null };
-export type SessionErrorRow = { error: string; events: string; sessions: string };
+export type PreClientErrorRow = { error: string; events: string; sessions: string; phase: string | null; stage: string | null; detail: string | null };
+export type DailySessionRow = { day: string; failed: string };
 export type ErrorSeriesRow = { day: string | null; series: string; warning: boolean; clients: string };
 export type ErrorKeyRow = { error: string; field: "clients" | "message" | "phase" | "stage" | "text"; value: string | null; events: string };
 export type SessionListRow = { session_id: string; started_at: Date; ended_at: Date | null; events: string | null; tag: string | null; reason: string | null; clients: string };
@@ -60,31 +61,23 @@ export type TimelineRow = {
 const IN_RANGE = (column: string) =>
   `($1::DATE IS NULL OR ${column} >= $1::DATE::TIMESTAMPTZ) AND ($2::DATE IS NULL OR ${column} < ($2::DATE + 1)::TIMESTAMPTZ)`;
 
-// The event's name as the app sent it.
+// The event's name as the app sent it (raw events, alias e).
 const EVENT = `coalesce(e.payload->>'event', e.event_type::STRING)`;
-// An error's name plus its code when the payload has one ("code" or "errorCode"), e.g. "pipeline.connect.failure 500".
-const ERROR_NAME = `${EVENT} || coalesce(' ' || coalesce(e.payload->>'code', e.payload->>'errorCode'), '')`;
 // ice.candidate.error is logged as an error, but most clients that hit it still connect, so the dashboard shows it as a warning, always last.
 const WARNING = `(${EVENT} = 'ice.candidate.error')`;
-const RECORDED_ERROR = `e.level = 'error' AND NOT ${WARNING} AND ${IN_RANGE("e.recorded_at")}`;
 
-// One row per app session (gamearena_source.host_sessions, the whole population) with its telemetry facts (events NULL = no telemetry) and the pipeline's tag. No date filter here; the cohorts add it on the app's started_at.
+// One row per app session (gamearena_source.host_sessions, the whole population) with the pipeline's facts (events NULL = no telemetry) and tag. The facts are counted once by the pipeline (session_facts), never from the raw events here. No date filter; the cohorts add it on the app's started_at.
 const SESSIONS = `(
   SELECT h.id AS session_id, h.started_at, h.ended_at, t.tag, t.reason,
-         ev.events, coalesce(ev.has_end, false) AS has_end, coalesce(ev.attempts, 0) AS attempts,
-         ev.first_failure, ev.last_failure, ev.first_success, ev.last_success, coalesce(ev.reconnects, 0) AS reconnects
+         f.events, coalesce(f.has_end, false) AS has_end, coalesce(f.attempts, 0) AS attempts,
+         f.first_failure, f.last_failure, f.first_success, f.last_success, coalesce(f.reconnects, 0) AS reconnects
   FROM gamearena_source.host_sessions h
-  LEFT JOIN (
-    SELECT e.session_id, count(*) AS events, bool_or(e.event_type = 'session_ended') AS has_end,
-           count(*) FILTER (WHERE ${EVENT} = 'pipeline.connect.attempt') AS attempts,
-           min(e.recorded_at) FILTER (WHERE ${EVENT} = 'pipeline.connect.failure') AS first_failure,
-           max(e.recorded_at) FILTER (WHERE ${EVENT} = 'pipeline.connect.failure') AS last_failure,
-           min(e.recorded_at) FILTER (WHERE ${EVENT} = 'pipeline.connect.success') AS first_success,
-           max(e.recorded_at) FILTER (WHERE ${EVENT} = 'pipeline.connect.success') AS last_success,
-           count(*) FILTER (WHERE e.event_type = 'client_reconnected') AS reconnects
-    FROM session_telemetry_events e
-    GROUP BY e.session_id) ev ON ev.session_id = h.id
+  LEFT JOIN session_facts f ON f.session_id = h.id
   LEFT JOIN session_tags t ON t.session_id = h.id) s`;
+
+// Error names for error_events (the pipeline's copy of the error-level events, alias e): error + code ("pipeline.connect.failure 500") and the warning test.
+const EE_NAME = `e.event || coalesce(' ' || coalesce(e.code, e.error_code), '')`;
+const EE_WARNING = `(e.event = 'ice.candidate.error')`;
 
 // One row per tagged client connection (connection_tags). The cohorts add the date filter on its first event time.
 const CLIENTS = `(SELECT connection_id, session_id, started_at, tag, reason FROM connection_tags) s`;
@@ -95,7 +88,7 @@ type Cohort = { unit: Unit; title: string; arg: boolean; where: string };   // w
 
 const S = IN_RANGE("s.started_at");
 const ERROR_ON = (link: string, tied: boolean) =>   // An error event with this error + code ($3), recorded in the range, on this session (no client named) or this client
-  `EXISTS (SELECT 1 FROM session_telemetry_events e WHERE ${link} AND e.level = 'error' AND e.connection_id IS ${tied ? "NOT NULL" : "NULL"} AND ${ERROR_NAME} = $3 AND ${IN_RANGE("e.recorded_at")})`;
+  `EXISTS (SELECT 1 FROM error_events e WHERE ${link} AND e.connection_id IS ${tied ? "NOT NULL" : "NULL"} AND ${EE_NAME} = $3 AND ${IN_RANGE("e.recorded_at")})`;
 
 // Every cohort. Titles use the data's own names; arg cohorts show their argument after the title.
 export const COHORTS = {
@@ -113,11 +106,7 @@ export const COHORTS = {
   tag_failed: { unit: "sessions", title: "Sessions without recorded success after an attempt", arg: false, where: `${S} AND s.tag = 'failed'` },
   tag_no_attempt: { unit: "sessions", title: "Sessions tagged no_attempt", arg: false, where: `${S} AND s.tag = 'no_attempt'` },
   session_reason: { unit: "sessions", title: "App sessions without recorded success", arg: true, where: `${S} AND s.tag = 'failed' AND s.reason = $3` },
-  recorded_error: {
-    unit: "sessions", title: "Affected sessions", arg: true,
-    where: `EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = s.session_id AND ${RECORDED_ERROR} AND ${ERROR_NAME} = $3)`,
-  },
-  untied_error: { unit: "sessions", title: "Sessions with an error that names no client", arg: true, where: ERROR_ON("e.session_id = s.session_id", false) },
+  untied_error: { unit: "sessions", title: "Sessions with an error before any client connected", arg: true, where: ERROR_ON("e.session_id = s.session_id", false) },
   clients: { unit: "clients", title: "Client connections with telemetry", arg: false, where: S },
   clients_connected: { unit: "clients", title: "Client connections with a recorded success", arg: false, where: `${S} AND s.tag = 'connected'` },
   clients_not_connected: { unit: "clients", title: "Client connections without a recorded success", arg: false, where: `${S} AND s.tag = 'not_connected'` },
@@ -250,10 +239,10 @@ export async function getReasonErrors(reason: string, range: Range): Promise<Rea
   // Error events of this reason's clients; per error + code: clients hit, and the most common phase + stage with its share of the times recorded. Then one row (error NULL) for the clients with no error at all. Warnings last.
   return query<ReasonErrorRow>(`
     WITH ev AS (
-      SELECT ${ERROR_NAME} AS error, ${WARNING} AS warning, e.payload->>'phase' AS phase, e.payload->>'stage' AS stage, e.connection_id
+      SELECT ${EE_NAME} AS error, ${EE_WARNING} AS warning, e.phase, e.stage, e.connection_id
       FROM connection_tags t
-      JOIN session_telemetry_events e ON e.connection_id = t.connection_id
-      WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")} AND e.level = 'error'),
+      JOIN error_events e ON e.connection_id = t.connection_id
+      WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")}),
     per AS (SELECT error, bool_or(warning) AS warning, count(DISTINCT connection_id) AS clients, count(*) AS events FROM ev GROUP BY error),
     top AS (SELECT DISTINCT ON (error) error, phase, stage, count(*) AS n FROM ev GROUP BY error, phase, stage ORDER BY error, n DESC, phase, stage)
     SELECT * FROM (
@@ -263,13 +252,13 @@ export async function getReasonErrors(reason: string, range: Range): Promise<Rea
       SELECT NULL::STRING, false, count(*), NULL::STRING, NULL::STRING, NULL::STRING
       FROM connection_tags t
       WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")}
-        AND NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.connection_id = t.connection_id AND e.level = 'error')
+        AND NOT EXISTS (SELECT 1 FROM error_events e WHERE e.connection_id = t.connection_id)
     ) evidence
     ORDER BY warning, error IS NULL, clients DESC, error`, [range.from, range.to, reason]);
 }
 
 export async function getReasonSteps(reason: string, range: Range): Promise<ReasonSteps> {   // How far one reason's clients got: how many recorded ice.gathering.complete and how many media.first_decode (every connected client has one). Called by the sheet's client_reason list
-  // This reason's clients, and how many of them recorded each of the two events.
+  // This reason's clients, and how many of them recorded each of the two events. It reads raw events, but only when a reason's sheet is opened, never on page load.
   const rows = await query<ReasonSteps>(`
     SELECT count(DISTINCT t.connection_id) AS clients,
            count(DISTINCT CASE WHEN ${EVENT} = 'ice.gathering.complete' THEN t.connection_id END) AS gathered,
@@ -280,23 +269,11 @@ export async function getReasonSteps(reason: string, range: Range): Promise<Reas
   return rows[0];
 }
 
-// Aggregate errors by app session, including host events and client-linked events.
-export async function getTopSessionErrors(range: Range): Promise<SessionErrorRow[]> {
-  return query<SessionErrorRow>(`
-    SELECT ${ERROR_NAME} AS error, count(*) AS events, count(DISTINCT e.session_id) AS sessions
-    FROM session_telemetry_events e
-    JOIN gamearena_source.host_sessions h ON h.id = e.session_id
-    WHERE ${RECORDED_ERROR}
-    GROUP BY 1
-    ORDER BY sessions DESC, events DESC, error
-    LIMIT 3`, [range.from, range.to]);
-}
-
 export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {          // Each error + code in the range, counted per tagged client connection it hit, worst share first, warnings last. Called by ErrorTable (the error table Sravya asked for)
   // Error events that name a client: times recorded; tagged clients hit (the client_error cohort), untagged clients apart; of the tagged, how many didn't connect and connected anyway. % = didn't connect / (didn't connect + connected).
   return query<ErrorRow>(`
-    SELECT ${ERROR_NAME} AS error,
-           bool_or(${WARNING}) AS warning,
+    SELECT ${EE_NAME} AS error,
+           bool_or(${EE_WARNING}) AS warning,
            count(*) AS events,
            count(DISTINCT CASE WHEN t.connection_id IS NOT NULL THEN e.connection_id END) AS clients,
            count(DISTINCT CASE WHEN t.connection_id IS NULL THEN e.connection_id END) AS not_tagged_clients,
@@ -304,32 +281,46 @@ export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {    
            count(DISTINCT CASE WHEN t.tag = 'connected' THEN e.connection_id END) AS connected_clients,
            round(100.0 * count(DISTINCT CASE WHEN t.tag = 'not_connected' THEN e.connection_id END)
                  / nullif(count(DISTINCT CASE WHEN t.tag IN ('connected', 'not_connected') THEN e.connection_id END), 0), 1) AS not_connected_percent
-    FROM session_telemetry_events e
+    FROM error_events e
     LEFT JOIN connection_tags t ON t.connection_id = e.connection_id
-    WHERE e.level = 'error' AND e.connection_id IS NOT NULL AND ${IN_RANGE("e.recorded_at")}
+    WHERE e.connection_id IS NOT NULL AND ${IN_RANGE("e.recorded_at")}
     GROUP BY 1
     ORDER BY warning, not_connected_percent DESC NULLS LAST, not_connected_clients DESC`, [range.from, range.to]);
 }
 
-export async function getUntiedErrors(range: Range): Promise<SessionErrorRow[]> {     // Errors in the range that name no client connection (mostly setup failures before any player connected), with the sessions they happened in (the untied_error cohort). Called by ErrorTable
-  // Events the app logged as errors with no connection_id: times recorded and sessions they happened in, per error + code.
-  return query<SessionErrorRow>(`
-    SELECT ${ERROR_NAME} AS error, count(*) AS events, count(DISTINCT e.session_id) AS sessions
-    FROM session_telemetry_events e
-    JOIN gamearena_source.host_sessions h ON h.id = e.session_id
-    WHERE e.level = 'error' AND e.connection_id IS NULL AND ${IN_RANGE("e.recorded_at")}
+export async function getUntiedErrors(range: Range): Promise<PreClientErrorRow[]> {     // Errors in the range that name no client connection, i.e. logged before any client connected: the sessions they happened in (the untied_error cohort), times recorded, and what the payload says most often (phase, stage and reason text). Called by TopErrors on the overview
+  // Error events with no connection_id, per error + code; the most common phase, stage and payload reason text of each.
+  return query<PreClientErrorRow>(`
+    WITH ev AS (
+      SELECT ${EE_NAME} AS error, e.session_id, e.phase, e.stage, e.detail
+      FROM error_events e
+      JOIN gamearena_source.host_sessions h ON h.id = e.session_id
+      WHERE e.connection_id IS NULL AND ${IN_RANGE("e.recorded_at")}),
+    per AS (SELECT error, count(*) AS events, count(DISTINCT session_id) AS sessions FROM ev GROUP BY error),
+    top AS (SELECT DISTINCT ON (error) error, phase, stage, detail FROM ev GROUP BY error, phase, stage, detail ORDER BY error, count(*) DESC, phase, stage, detail)
+    SELECT p.error, p.events, p.sessions, top.phase, top.stage, top.detail
+    FROM per p JOIN top ON top.error = p.error
+    ORDER BY p.sessions DESC, p.error`, [range.from, range.to]);
+}
+
+export async function getDailySessions(range: Range): Promise<DailySessionRow[]> {   // Per app start day (UTC), how many sessions had an attempt but no recorded success (the tag_failed cohort's condition, per day). Called by SessionTrend on the overview
+  // App sessions in the range by start day, counting those tagged failed.
+  return query<DailySessionRow>(`
+    SELECT (s.started_at AT TIME ZONE 'UTC')::DATE::STRING AS day, count(*) FILTER (WHERE s.tag = 'failed') AS failed
+    FROM ${SESSIONS}
+    WHERE ${S}
     GROUP BY 1
-    ORDER BY events DESC`, [range.from, range.to]);
+    ORDER BY 1`, [range.from, range.to]);
 }
 
 export async function getErrorSeries(range: Range): Promise<ErrorSeriesRow[]> {         // Per day (UTC), not_connected client connections per error: the 5 errors that hit the most, warnings apart, the rest as one "Other" series. day NULL = the whole range. Called by ErrorTrend for the chart and its key
   // Rank the non-warning errors by clients over the range, keep the top 5 names, fold the rest into "Other", then count distinct clients per day and over the range.
   return query<ErrorSeriesRow>(`
     WITH ev AS (
-      SELECT (e.recorded_at AT TIME ZONE 'UTC')::DATE::STRING AS day, ${ERROR_NAME} AS error, ${WARNING} AS warning, e.connection_id
-      FROM session_telemetry_events e
+      SELECT (e.recorded_at AT TIME ZONE 'UTC')::DATE::STRING AS day, ${EE_NAME} AS error, ${EE_WARNING} AS warning, e.connection_id
+      FROM error_events e
       JOIN connection_tags t ON t.connection_id = e.connection_id
-      WHERE e.level = 'error' AND t.tag = 'not_connected' AND ${IN_RANGE("e.recorded_at")}),
+      WHERE t.tag = 'not_connected' AND ${IN_RANGE("e.recorded_at")}),
     ranked AS (SELECT error, row_number() OVER (ORDER BY count(DISTINCT connection_id) DESC, error) AS n FROM ev WHERE NOT warning GROUP BY error),
     named AS (SELECT ev.day, CASE WHEN ev.warning OR r.n <= 5 THEN ev.error ELSE 'Other' END AS series, ev.warning, ev.connection_id
               FROM ev LEFT JOIN ranked r ON r.error = ev.error)
@@ -343,11 +334,10 @@ export async function getErrorKey(range: Range): Promise<ErrorKeyRow[]> {   // F
   // The chart's errors (same filter as getErrorSeries); field "clients" = distinct clients over the range (events holds the count), then one row per error and each value of message, phase, stage and text (payload "reason" or "errorText").
   return query<ErrorKeyRow>(`
     WITH errs AS (
-      SELECT ${ERROR_NAME} AS error, e.connection_id, e.message, e.payload->>'phase' AS phase, e.payload->>'stage' AS stage,
-             coalesce(e.payload->>'reason', e.payload->>'errorText') AS text
-      FROM session_telemetry_events e
+      SELECT ${EE_NAME} AS error, e.connection_id, e.message, e.phase, e.stage, e.detail AS text
+      FROM error_events e
       JOIN connection_tags t ON t.connection_id = e.connection_id
-      WHERE e.level = 'error' AND t.tag = 'not_connected' AND ${IN_RANGE("e.recorded_at")})
+      WHERE t.tag = 'not_connected' AND ${IN_RANGE("e.recorded_at")})
     SELECT error, 'clients' AS field, NULL::STRING AS value, count(DISTINCT connection_id) AS events FROM errs GROUP BY error
     UNION ALL
     SELECT error, 'message', message, count(*) FROM errs WHERE message IS NOT NULL GROUP BY error, message
@@ -361,11 +351,18 @@ export async function getErrorKey(range: Range): Promise<ErrorKeyRow[]> {   // F
 }
 
 export async function searchIds(prefix: string): Promise<SearchRow[]> {   // App sessions and client connections whose ID starts with prefix (8 to 36 lowercase hex or dash characters, checked by the caller), at most 20 of each. Called by the page (one match opens it) and the sheet's search step
-  // Sessions, then client connections (with their session), by ID prefix; all telemetry sessions and tagged clients are in these app tables.
+  // Sessions, then client connections (with their session), whose ID falls between the prefix padded with 0s and with fs: an index range, not a scan of every ID as text.
+  const [low, high] = uuidBounds(prefix);
   return query<SearchRow>(`
-    (SELECT 'session' AS kind, id::STRING AS id, id::STRING AS session_id FROM gamearena_source.host_sessions WHERE id::STRING LIKE $1 ORDER BY id LIMIT 20)
+    (SELECT 'session' AS kind, id::STRING AS id, id::STRING AS session_id FROM gamearena_source.host_sessions WHERE id BETWEEN $1::UUID AND $2::UUID ORDER BY id LIMIT 20)
     UNION ALL
-    (SELECT 'client', id::STRING, session_id::STRING FROM gamearena_source.session_client_connections WHERE id::STRING LIKE $1 ORDER BY id LIMIT 20)`, [`${prefix}%`]);
+    (SELECT 'client', id::STRING, session_id::STRING FROM gamearena_source.session_client_connections WHERE id BETWEEN $1::UUID AND $2::UUID ORDER BY id LIMIT 20)`, [low, high]);
+}
+
+function uuidBounds(prefix: string): [string, string] {   // The lowest and highest UUIDs that start with these hex digits (dashes ignored), e.g. "1a2b3c4d" -> 1a2b3c4d-0000-… and 1a2b3c4d-ffff-…. Called by searchIds
+  const hex = prefix.replaceAll("-", "").slice(0, 32);
+  const shape = (digits: string) => `${digits.slice(0, 8)}-${digits.slice(8, 12)}-${digits.slice(12, 16)}-${digits.slice(16, 20)}-${digits.slice(20)}`;
+  return [shape(hex.padEnd(32, "0")), shape(hex.padEnd(32, "f"))];
 }
 
 // Device, OS and browser from a client's user agent (column u), decided by well-known tokens. Only these labels leave the database, never the user agent itself.

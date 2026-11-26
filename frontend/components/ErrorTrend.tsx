@@ -40,7 +40,7 @@ export default async function ErrorTrend({ range }: { range: Range }) {
 
   return (
     <details className="disclosure diagnostics-panel trend-disclosure">
-      <summary>Daily errors on IDs with no success</summary>
+      <summary>Per day: client IDs with no success, by error (the “No success recorded” numbers above, over time)</summary>
       <div className="disclosure-body">
         {series.length === 0 ? (
           <p className="hint">No errors or warnings recorded on client IDs without a success event in this period.</p>

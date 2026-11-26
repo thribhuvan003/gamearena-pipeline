@@ -101,13 +101,3 @@ export function eventLabel(signature: string): string {
   return code ? `${label} · Code ${code}` : label;
 }
 
-const OVERVIEW_ERROR_LABELS: Record<string, string> = {
-  "webrtc.connection.state": "Video connection issue",
-  "ice.connection.state": "Network connection issue",
-};
-
-export function overviewErrorLabel(signature: string): string {
-  const [name, code] = signature.split(" ", 2);
-  const label = OVERVIEW_ERROR_LABELS[name];
-  return label ? (code ? `${label} · Code ${code}` : label) : eventLabel(signature);
-}

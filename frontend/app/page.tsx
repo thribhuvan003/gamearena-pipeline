@@ -11,6 +11,7 @@ import ReasonsTable from "@/components/ReasonsTable";
 import SearchBox from "@/components/SearchBox";
 import Sheet from "@/components/Sheet";
 import SummaryCards from "@/components/SummaryCards";
+import ThemeToggle from "@/components/ThemeToggle";
 import TopErrors from "@/components/TopErrors";
 import { requireDashboardAccess } from "@/lib/access";
 import { localPreview } from "@/lib/access-policy";
@@ -51,6 +52,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
             <Link href={link({ ...range, view: undefined })} aria-current={!diagnostics ? "page" : undefined}>Overview</Link>
             <Link href={link({ ...range, view: "diagnostics" })} aria-current={diagnostics ? "page" : undefined}>Diagnostics</Link>
             {!localPreview() && <a href="/auth/logout">Sign out</a>}
+            <ThemeToggle />
           </nav>
         </div>
         <div className="dashboard-tools">
@@ -73,11 +75,11 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
       ) : (
         <>
           <SummaryCards range={range} />
-          <TopErrors range={range} />
           <div className="overview-grid">
             <ReasonsTable range={range} sheet={sheet} />
             <ConnectionTrend range={range} />
           </div>
+          <TopErrors range={range} />
         </>
       )}
       {(sheet.list || sheet.session || sheet.q) && <Suspense fallback={<><div className="sheet-backdrop" /><div className="sheet"><p className="hint">Loading…</p></div></>}><Sheet range={range} sheet={sheet} /></Suspense>}
