@@ -1,6 +1,6 @@
 # GameArena dashboard
 
-A small read-only dashboard over the pipeline's results (the pipeline is in `../backend`) and the app's own session records. Local development stays on your own machine; Auth0 sign-in protects it when configured for sharing.
+A small read-only dashboard over the pipeline's results (the pipeline is in `../backend`) and the app's own session records. Local development stays on your own machine; Better Auth sign-in protects it when configured for sharing.
 
 ## Problem statement
 **What data we have:**
@@ -41,26 +41,32 @@ Needs Node.js 20+, the `cockroachdb` Docker container running (with `gamearena_s
 just dashboard
 ```
 That installs the packages and starts it. Without just, run `npm install` then `npm run dev` in this `frontend` folder (or `npm run build` then `npm start` for the faster built version).
-Then open http://localhost:3000 (or http://127.0.0.1:3000). Development defaults to a localhost-only preview without login. `npm start` and other production builds require Auth0 configuration, and HTTPS for any address other than localhost (so the fast build can be demoed on this machine with `APP_BASE_URL=http://localhost:3000`). Ctrl+C stops it.
+Then open http://localhost:3000 (or http://127.0.0.1:3000). Development defaults to a localhost-only preview without login. `npm start` and other production builds require Better Auth configuration, and HTTPS for any address other than localhost (so the fast build can be demoed on this machine with `APP_BASE_URL=http://localhost:3000`). Ctrl+C stops it.
 
 It uses the pipeline's settings and defaults (`DB_HOST` 127.0.0.1, `DB_PORT` 26257, `DB_NAME` gamearena_analytics, `DB_USER` root, `DB_PASSWORD` not set). To change them, put them in a `.env.local` file here.
 
-## Auth0 sign-in
-Create a **Regular Web Application** in Auth0. In its settings, add `http://localhost:3000/auth/callback` to Allowed Callback URLs and `http://localhost:3000` to Allowed Logout URLs. Use the corresponding HTTPS URLs for the eventual deployment. Choose and enable the identity connection the team will use; only users on the app's allowlist can see data.
+## Better Auth sign-in (draft migration)
 
-For local sign-in, add this to `frontend/.env.local`, then restart `npm run dev`:
-```
-AUTH_MODE=auth0
+This branch replaces Auth0 with Better Auth and **Google OAuth only**; no local password or public email/password signup is enabled. The application requires a Google-verified email on `AUTH_ALLOWED_EMAILS`. Unauthorized accounts may be stored by the auth provider but cannot read dashboard data.
+
+Use a **separate PostgreSQL database** for auth identities, accounts and sessions. `AUTH_DATABASE_URL` must not point to GameArena's `gamearena_analytics` CockroachDB unless the exact Better Auth migration and runtime compatibility have been validated. The telemetry database stays read-only and uses `DB_*` settings.
+
+Create a Google Cloud OAuth **Web application** and register `http://localhost:3000/api/auth/callback/google` as an authorized redirect URI. Configure the matching production HTTPS callback separately.
+
+Example `frontend/.env.local` (never commit actual secrets):
+```env
+AUTH_MODE=better-auth
 APP_BASE_URL=http://localhost:3000
-AUTH0_DOMAIN=your-tenant.auth0.com
-AUTH0_CLIENT_ID=your-client-id
-AUTH0_CLIENT_SECRET=your-client-secret
-AUTH0_SECRET=64-hex-characters
-AUTH0_ALLOWED_EMAILS=tribhuvan@example.com,kc@example.com,sravya@example.com
+BETTER_AUTH_SECRET=replace-with-32-plus-character-random-secret
+AUTH_DATABASE_URL=postgresql://auth_user:password@localhost:5432/gamearena_auth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+AUTH_ALLOWED_EMAILS=user1@example.com,user2@example.com
 ```
-Generate `AUTH0_SECRET` with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Replace the example addresses with the team's real verified sign-in emails. `.env.local` is gitignored; do not commit secrets. Use `http://localhost:3000` consistently during the local Auth0 test.
 
-The Auth0 SDK handles `/auth/login`, `/auth/callback`, and `/auth/logout`. The proxy checks the host, session, verified email, and allowlist before serving pages; database reads independently check access. Other SDK routes, including `/auth/profile` and `/auth/access-token`, are not exposed. Production refuses requests if Auth0 settings, an allowlist, or a matching HTTPS `APP_BASE_URL` is missing. Configure the deployment's database connection and network access separately before sharing the site.
+After setting up the auth database, from `frontend/` run `npm install` to update `package-lock.json`, then `npx auth@latest migrate` with the above environment variables loaded. Verify the generated schema targets **only the auth database** before applying it. Run `npm run test:auth` and `npm run build`; test login, rejected accounts, logout, expired sessions and direct session URLs before merging. This draft PR does not create provider credentials, run migrations, or claim verified deployment.
+
+In development, omitting `AUTH_MODE=better-auth` retains the prior localhost-only preview. A production process always requires working Better Auth settings.
 
 ## Files
 | File | What it does |
@@ -72,7 +78,7 @@ The Auth0 SDK handles `/auth/login`, `/auth/callback`, and `/auth/logout`. The p
 | `lib/queries.ts` | the data: the database connection, the cohorts and every SQL the dashboard runs |
 | `lib/links.ts` | the page's URL state and the one function that builds every link |
 | `lib/format.ts` | number and time formatting, and hiding private bits in messages |
-| `lib/access-policy.ts`, `lib/access.ts`, `lib/auth0.ts` | local preview rule, Auth0 session and email allowlist, and server-side access check before database reads |
+| `lib/access-policy.ts`, `lib/access.ts`, `lib/auth.ts` | local preview rule, Better Auth session and email allowlist, and server-side access check before database reads |
 | `proxy.ts` | localhost-only preview in development; Auth0 route handling and access enforcement when sign-in is enabled |
 
 ## Check it

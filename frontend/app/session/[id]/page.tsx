@@ -7,6 +7,7 @@ import { connection } from "next/server";
 import SessionView from "@/components/SessionView";
 import { requireDashboardAccess } from "@/lib/access";
 import { localPreview } from "@/lib/access-policy";
+import SignOut from "@/components/SignOut";
 import { shortId } from "@/lib/format";
 import { isUuid, readSheet } from "@/lib/links";
 
@@ -32,7 +33,7 @@ async function SessionPageBody({ params, searchParams }: PageProps<"/session/[id
     <>
       <div className="page-head">
         <h1>Session {shortId(id)}</h1>
-        {!localPreview() && <a href="/auth/logout">Sign out</a>}
+        {!localPreview() && <SignOut />}
       </div>
       <SessionView
         id={id}

@@ -9,12 +9,12 @@
     "test:auth": "node --test lib/access-policy.test.ts"
   },
   "dependencies": {
-    "@auth0/nextjs-auth0": "^4.33.0",
     "next": "16.4.6",
     "pg": "8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "recharts": "3.11.0"
+    "recharts": "3.11.0",
+    "better-auth": "1.7.28"
   },
   "devDependencies": {
     "@types/node": "^20",

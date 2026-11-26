@@ -17,6 +17,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import TopErrors from "@/components/TopErrors";
 import { requireDashboardAccess } from "@/lib/access";
 import { localPreview } from "@/lib/access-policy";
+import SignOut from "@/components/SignOut";
 import { link, linkString, readSheet, searchPrefix } from "@/lib/links";
 import { searchIds, type Range } from "@/lib/queries";
 
@@ -53,7 +54,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
           <nav className="dashboard-nav" aria-label="Dashboard views">
             <Link href={link({ ...range, view: undefined })} aria-current={!diagnostics ? "page" : undefined}>Overview</Link>
             <Link href={link({ ...range, view: "diagnostics" })} aria-current={diagnostics ? "page" : undefined}>Diagnostics</Link>
-            {!localPreview() && <a href="/auth/logout">Sign out</a>}
+            {!localPreview() && <SignOut />}
             <ThemeToggle />
           </nav>
         </div>
