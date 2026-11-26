@@ -1,4 +1,4 @@
-# justfile: every command for the backend (pipeline + SQL) and the frontend (dashboard), on Linux and Windows.
+# justfile: every command for the pipeline (Python), the database (SQL) and the dashboard (Next.js), run from the repo root, on Linux and Windows.
 
 set windows-shell := ["cmd.exe", "/C"]
 
@@ -12,55 +12,55 @@ default:
 
 # Create the five generated tables if missing
 setup:
-    {{db}} < backend/sql/setup.sql
+    {{db}} < database/setup.sql
 
 # Process pending sessions (just run 20 = at most 20)
 run n="":
-    cd backend && {{python}} -m pipeline run --once {{ if n == "" { "" } else { "--limit " + n } }}
+    {{python}} -m pipeline run --once {{ if n == "" { "" } else { "--limit " + n } }}
 
 # Run continuously until Ctrl+C
 live:
-    cd backend && {{python}} -m pipeline run
+    {{python}} -m pipeline run
 
 # Refresh session_facts and error_events (just facts all = recount every session)
 facts mode="":
-    cd backend && {{python}} -m pipeline facts {{ if mode == "all" { "--all" } else { "" } }}
+    {{python}} -m pipeline facts {{ if mode == "all" { "--all" } else { "" } }}
 
 # Show processing status
 status:
-    cd backend && {{python}} -m pipeline status
+    {{python}} -m pipeline status
 
 # Validate the results
 check:
-    {{db}} < backend/sql/check.sql
+    {{db}} < database/check.sql
 
 # Four main analytics summaries
 report:
-    {{db}} < backend/sql/report.sql
+    {{db}} < database/reports/report.sql
 
 # Daily session and connection outcomes
 trends:
-    {{db}} < backend/sql/trends.sql
+    {{db}} < database/reports/trends.sql
 
 # Detailed errors recorded for failed sessions
 errors:
-    {{db}} < backend/sql/errors.sql
+    {{db}} < database/reports/errors.sql
 
 # How complete the data is and what each result rests on (counts only; needs gamearena_source)
 profile:
-    {{db}} < backend/sql/profile.sql
+    {{db}} < database/reports/profile.sql
 
 # Check the tagging rules on small made-up sessions (no database needed)
 test:
-    cd backend && {{python}} -m unittest discover -s tests
+    {{python}} -m unittest discover -s pipeline/tests
 
 # Preview ten rows from each generated table
 tables:
-    {{db}} < backend/sql/tables.sql
+    {{db}} < database/reports/tables.sql
 
 # Inspect the raw data (tables, columns, event names)
 explore:
-    {{db}} < backend/sql/explore.sql
+    {{db}} < database/reports/explore.sql
 
 # Open the SQL shell (\q to leave)
 sql:
@@ -68,7 +68,7 @@ sql:
 
 # Start the dashboard at http://localhost:3000 (Ctrl+C stops it)
 dashboard:
-    cd frontend && npm install && npm run dev
+    cd dashboard && npm install && npm run dev
 
 # Clear the generated tables (raw telemetry is not touched)
 [confirm("Delete every row in session_tags, connection_tags, pipeline_runs, session_facts and error_events?")]
