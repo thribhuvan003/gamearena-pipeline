@@ -288,6 +288,7 @@ a.list-row.selected:hover {
 }
 
 .row-meta {
+  display: block;
   margin-top: 2px;
   color: var(--text-2);
   font-size: var(--fs-small);
@@ -964,4 +965,16 @@ details.more > summary::-webkit-details-marker {
   .card-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* A short labelled list inside a card, e.g. Device then OS. */
+.label-group + .label-group {
+  margin-top: var(--s3);
+}
+
+.label-group h4 {
+  margin: var(--s2) 0 0;
+  color: var(--text-2);
+  font-size: var(--fs-small);
+  font-weight: 600;
 }

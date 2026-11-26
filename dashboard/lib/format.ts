@@ -113,6 +113,8 @@ const COHORT_EXPLAINED: Record<string, string> = {
   clients_unknown: "Only server (system) events exist for this client; the app logged none.",
   no_client_error: "Sessions that logged this error with no client ID.",
   client_error: "Clients that logged this error at least once, any outcome.",
+  session_end_reason: "App sessions with this end reason in the app's own record.",
+  client_label: "Client connections whose app record has this device, OS, browser or access type.",
 };
 
 export function cohortExplanation(key: string, arg: string | null): string | null {   // A list's one-line logic, under its row and at the top of its sheet
@@ -141,6 +143,11 @@ export function eventLabel(signature: string): string {   // "pipeline.connect.f
   const [name, code] = signature.split(" ", 2);
   const label = EVENT_LABELS[name] ?? name.replaceAll(/[._]/g, " ").replace(/^./, (first) => first.toUpperCase());
   return code ? `${label} · Code ${code}` : label;
+}
+
+export function labelText(arg: string): string {   // A client label list's "kind|value" -> "Browser: Chrome"
+  const [kind, value] = [arg.slice(0, arg.indexOf("|")), arg.slice(arg.indexOf("|") + 1)];
+  return `${{ device: "Device", os: "OS", browser: "Browser", access: "Access" }[kind] ?? kind}: ${value}`;
 }
 
 // ---------- Private text ----------

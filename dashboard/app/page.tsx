@@ -4,12 +4,14 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import ClientErrors from "@/components/overview/ClientErrors";
+import ClientLabels from "@/components/overview/ClientLabels";
 import ClientReasons from "@/components/overview/ClientReasons";
 import ConnectionTrend from "@/components/trends/ConnectionTrend";
 import DateFilter from "@/components/header/DateFilter";
 import NoClientErrors from "@/components/overview/NoClientErrors";
 import SearchBox from "@/components/header/SearchBox";
-import SessionPatterns from "@/components/trends/SessionPatterns";
+import SessionEndReasons from "@/components/overview/SessionEndReasons";
+import SessionPatterns from "@/components/overview/SessionPatterns";
 import SessionReasons from "@/components/overview/SessionReasons";
 import Sheet from "@/components/sheet/Sheet";
 import SignOut from "@/components/auth/SignOut";
@@ -63,18 +65,23 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
         <SessionReasons range={range} sheet={sheet} />
         <NoClientErrors range={range} />
       </div>
+      <div className="card-grid">
+        <SessionEndReasons range={range} />
+        <SessionPatterns range={range} />
+      </div>
       <SummaryCards range={range} unit="clients" />
       <div className="card-grid">
         <ClientReasons range={range} sheet={sheet} />
         <ClientErrors range={range} />
       </div>
+      <div className="card-grid">
+        <ClientLabels range={range} title="Clients by device and OS" kinds={["device", "os"]} />
+        <ClientLabels range={range} title="Clients by browser and access" kinds={["browser", "access"]} />
+      </div>
       <section className="metric-groups" aria-labelledby="trends-title">
         <h2 id="trends-title">Trends</h2>
       </section>
-      <div className="card-grid">
-        <ConnectionTrend range={range} />
-        <SessionPatterns range={range} />
-      </div>
+      <ConnectionTrend range={range} />
       {(sheet.list || sheet.session || sheet.q) && <Suspense fallback={<><div className="sheet-backdrop" /><div className="sheet"><p className="hint">Loading…</p></div></>}><Sheet range={range} sheet={sheet} /></Suspense>}
     </>
   );

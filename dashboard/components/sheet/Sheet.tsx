@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import Pager from "./Pager";
 import SessionView from "./SessionView";
 import SheetFrame from "./SheetFrame";
-import { cohortExplanation, eventLabel, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
+import { cohortExplanation, eventLabel, labelText, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
 import { isUuid, link, linkString, searchPrefix, type Sheet as SheetState } from "@/lib/links";
 import {
   COHORTS, getClientPage, getCohortCount, getNoReasonBreakdown, getReasonErrors, getReasonProgress, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
@@ -60,7 +60,11 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   const arg = sheet.arg ?? null;
   const page = sheet.page ?? 0;
   const prefix = searchPrefix(sheet.filter) ?? undefined;
-  const shownArg = arg === null ? null : key === "session_reason" || key === "client_reason" ? reasonLabel(arg) : eventLabel(arg);
+  const shownArg = arg === null ? null
+    : key === "session_reason" || key === "client_reason" ? reasonLabel(arg)
+    : key === "session_end_reason" ? (arg === "(none)" ? "No end reason recorded" : arg)
+    : key === "client_label" ? labelText(arg)
+    : eventLabel(arg);
   const [total, rows, steps, errors, noReason] = await Promise.all([
     getCohortCount(key, arg, range, prefix),
     cohort.unit === "sessions"

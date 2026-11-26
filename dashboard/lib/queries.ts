@@ -27,6 +27,8 @@ async function query<Row extends QueryResultRow>(sql: string, params: unknown[] 
 export type Range = { from: string | null; to: string | null };
 
 type DailyConnectionRow = { day: string; not_connected: string };
+export type EndReasonRow = { end_reason: string; sessions: string; connected: string; not_connected: string };
+export type ClientLabelRow = { kind: "device" | "os" | "browser" | "access"; value: string; clients: string; connected: string; not_connected: string };
 type NoReasonBreakdown = { no_error: string; only_warning: string; other_error: string };
 type ClientReasonRow = { reason: string; clients: string; percent: string };
 type SessionReasonRow = { reason: string; sessions: string };
@@ -79,7 +81,7 @@ const IS_WARNING = `(e.event = 'ice.candidate.error')`;
 
 // Every app session (host_sessions) with the pipeline's facts (events NULL = no telemetry) and tag, as alias s.
 const SESSIONS = `(
-  SELECT h.id AS session_id, h.started_at, h.ended_at, t.tag, t.reason,
+  SELECT h.id AS session_id, h.started_at, h.ended_at, h.end_reason, t.tag, t.reason,
          f.events, coalesce(f.has_end, false) AS has_end, coalesce(f.attempts, 0) AS attempts,
          f.first_failure, f.last_failure, f.first_success, f.last_success, coalesce(f.reconnects, 0) AS reconnects
   FROM gamearena_source.host_sessions h
@@ -88,6 +90,38 @@ const SESSIONS = `(
 
 // Every tagged client connection, as alias s.
 const CLIENTS = `(SELECT connection_id, session_id, started_at, tag, reason FROM connection_tags) s`;
+
+// Device, OS and browser from a client's user agent (column u), by well-known tokens; only these labels leave the database.
+const DEVICE = `CASE
+    WHEN u ILIKE '%smart-tv%' OR u ILIKE '%smarttv%' OR u ILIKE '%tizen%' OR u ILIKE '%web0s%' OR u ILIKE '%webos%'
+      OR u ILIKE '%crkey%' OR u ILIKE '%googletv%' OR u ILIKE '%android tv%' OR u ILIKE '%bravia%' OR u ILIKE '% aft%' THEN 'TV'
+    WHEN u ILIKE '%iphone%' OR u ILIKE '%ipod%' OR (u ILIKE '%android%' AND u ILIKE '%mobile%') THEN 'Phone'
+    WHEN u ILIKE '%ipad%' OR u ILIKE '%android%' THEN 'Tablet'
+    WHEN u ILIKE '%samsungbrowser%' AND u ILIKE '%x11%' THEN 'Samsung desktop mode (phone, tablet or DeX: unconfirmed)'
+    WHEN u ILIKE '%windows%' OR u ILIKE '%macintosh%' OR u ILIKE '%cros%' OR u ILIKE '%x11%' THEN 'Desktop'
+    ELSE 'Unknown' END`;
+const OS = `CASE
+    WHEN u ILIKE '%tizen%' THEN 'Tizen (Samsung TV)'
+    WHEN u ILIKE '%android%' THEN 'Android'
+    WHEN u ILIKE '%iphone%' OR u ILIKE '%ipad%' OR u ILIKE '%ipod%' THEN 'iOS'
+    WHEN u ILIKE '%windows%' THEN 'Windows'
+    WHEN u ILIKE '%cros%' THEN 'ChromeOS'
+    WHEN u ILIKE '%macintosh%' THEN 'macOS'
+    WHEN u ILIKE '%linux%' THEN 'Linux'
+    ELSE 'Unknown' END`;
+const BROWSER = `CASE
+    WHEN u ILIKE '%edg/%' OR u ILIKE '%edga/%' OR u ILIKE '%edgios/%' THEN 'Edge'
+    WHEN u ILIKE '%; wv)%' THEN 'Android WebView (in-app)'
+    WHEN u ILIKE '%opr/%' THEN 'Opera'
+    WHEN u ILIKE '%samsungbrowser%' THEN 'Samsung Internet'
+    WHEN u ILIKE '%firefox%' OR u ILIKE '%fxios%' THEN 'Firefox'
+    WHEN u ILIKE '%crios%' OR u ILIKE '%chrome%' THEN 'Chrome'
+    WHEN u ILIKE '%safari%' THEN 'Safari'
+    ELSE 'Unknown' END`;
+
+// One client's label of a kind, from its app record: $3 = "kind|value" (kind = device, os, browser or access); no app record = "No app record".
+const CLIENT_LABEL = `coalesce((SELECT CASE split_part($3, '|', 1) WHEN 'device' THEN ${DEVICE} WHEN 'os' THEN ${OS} WHEN 'browser' THEN ${BROWSER} ELSE x.access END
+    FROM (SELECT user_agent AS u, auth_type::STRING AS access FROM gamearena_source.session_client_connections WHERE id = s.connection_id) x), 'No app record')`;
 
 // An error with this error + code ($3), recorded in the range, on this session with no client named (tied false) or on this client (tied true).
 const ERROR_ON = (link: string, tied: boolean) =>
@@ -112,6 +146,7 @@ export const COHORTS = {
   reconnected_10: { unit: "sessions", title: "Sessions with 10 or more client reconnects", arg: false, where: `${STARTED_IN_RANGE} AND s.reconnects >= 10` },
   tag_failed: { unit: "sessions", title: "Sessions that didn't connect", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'failed'` },
   session_reason: { unit: "sessions", title: "Sessions that didn't connect", arg: true, where: `${STARTED_IN_RANGE} AND s.tag = 'failed' AND s.reason = $3` },
+  session_end_reason: { unit: "sessions", title: "App sessions by end reason", arg: true, where: `${STARTED_IN_RANGE} AND coalesce(s.end_reason, '(none)') = $3` },
   failed_other: { unit: "sessions", title: "Sessions that didn't connect, other reasons", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'failed' AND s.reason NOT IN ('setup_error', 'someone_never_joined')` },
   no_client_error: { unit: "sessions", title: "Sessions with an error that names no client", arg: true, where: ERROR_ON("e.session_id = s.session_id", false) },
   clients: { unit: "clients", title: "Client connections with telemetry", arg: false, where: STARTED_IN_RANGE },
@@ -119,6 +154,7 @@ export const COHORTS = {
   clients_not_connected: { unit: "clients", title: "Clients that didn't connect", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected'` },
   clients_unknown: { unit: "clients", title: "Clients with outcome not recorded (no app events)", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'unknown'` },
   client_reason: { unit: "clients", title: "Clients that didn't connect", arg: true, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected' AND s.reason = $3` },
+  client_label: { unit: "clients", title: "Client connections", arg: true, where: `${STARTED_IN_RANGE} AND ${CLIENT_LABEL} = substring($3 FROM position('|' IN $3) + 1)` },
   client_error: { unit: "clients", title: "Client connections that recorded", arg: true, where: ERROR_ON("e.connection_id = s.connection_id", true) },
 } satisfies Record<string, Cohort>;
 export type CohortKey = keyof typeof COHORTS;
@@ -270,6 +306,35 @@ export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {   /
     ORDER BY warning, not_connected_percent DESC NULLS LAST, not_connected_clients DESC`, [range.from, range.to]);
 }
 
+export async function getSessionsByEndReason(range: Range): Promise<EndReasonRow[]> {   // App sessions per end reason in their own record, with how many connected or didn't
+  return query<EndReasonRow>(`
+    SELECT coalesce(s.end_reason, '(none)') AS end_reason, count(*) AS sessions,
+           count(*) FILTER (WHERE s.tag = 'connected') AS connected, count(*) FILTER (WHERE s.tag = 'failed') AS not_connected
+    FROM ${SESSIONS}
+    WHERE ${STARTED_IN_RANGE}
+    GROUP BY 1
+    ORDER BY sessions DESC`, [range.from, range.to]);
+}
+
+// cache(): the device and browser cards share one query per page load.
+export const getClientsByLabel = cache(async (range: Range): Promise<ClientLabelRow[]> => {   // Tagged clients per device, OS, browser and access type (app record), with how many connected or didn't
+  return query<ClientLabelRow>(`
+    WITH j AS (
+      SELECT s.tag, x.id IS NOT NULL AS in_app, x.user_agent AS u, x.auth_type::STRING AS access
+      FROM ${CLIENTS}
+      LEFT JOIN gamearena_source.session_client_connections x ON x.id = s.connection_id
+      WHERE ${STARTED_IN_RANGE}),
+    c AS (
+      SELECT tag, CASE WHEN NOT in_app THEN 'No app record' ELSE ${DEVICE} END AS device, CASE WHEN NOT in_app THEN 'No app record' ELSE ${OS} END AS os,
+             CASE WHEN NOT in_app THEN 'No app record' ELSE ${BROWSER} END AS browser, CASE WHEN NOT in_app THEN 'No app record' ELSE access END AS access
+      FROM j)
+    SELECT kind, value, count(*) AS clients, count(*) FILTER (WHERE tag = 'connected') AS connected, count(*) FILTER (WHERE tag = 'not_connected') AS not_connected
+    FROM (SELECT 'device' AS kind, device AS value, tag FROM c UNION ALL SELECT 'os', os, tag FROM c
+          UNION ALL SELECT 'browser', browser, tag FROM c UNION ALL SELECT 'access', access, tag FROM c) k
+    GROUP BY kind, value
+    ORDER BY kind, clients DESC, value`, [range.from, range.to]);
+});
+
 // ---------- Trends ----------
 
 export async function getDailyConnections(range: Range): Promise<DailyConnectionRow[]> {   // Per day (UTC, client's first event), how many clients didn't connect
@@ -368,34 +433,6 @@ function uuidBounds(prefix: string): [string, string] {   // Lowest and highest 
 }
 
 // ---------- Session ----------
-
-// Device, OS and browser from a client's user agent (column u), by well-known tokens; only these labels leave the database.
-const DEVICE = `CASE
-    WHEN u ILIKE '%smart-tv%' OR u ILIKE '%smarttv%' OR u ILIKE '%tizen%' OR u ILIKE '%web0s%' OR u ILIKE '%webos%'
-      OR u ILIKE '%crkey%' OR u ILIKE '%googletv%' OR u ILIKE '%android tv%' OR u ILIKE '%bravia%' OR u ILIKE '% aft%' THEN 'TV'
-    WHEN u ILIKE '%iphone%' OR u ILIKE '%ipod%' OR (u ILIKE '%android%' AND u ILIKE '%mobile%') THEN 'Phone'
-    WHEN u ILIKE '%ipad%' OR u ILIKE '%android%' THEN 'Tablet'
-    WHEN u ILIKE '%samsungbrowser%' AND u ILIKE '%x11%' THEN 'Samsung desktop mode (phone, tablet or DeX: unconfirmed)'
-    WHEN u ILIKE '%windows%' OR u ILIKE '%macintosh%' OR u ILIKE '%cros%' OR u ILIKE '%x11%' THEN 'Desktop'
-    ELSE 'Unknown' END`;
-const OS = `CASE
-    WHEN u ILIKE '%tizen%' THEN 'Tizen (Samsung TV)'
-    WHEN u ILIKE '%android%' THEN 'Android'
-    WHEN u ILIKE '%iphone%' OR u ILIKE '%ipad%' OR u ILIKE '%ipod%' THEN 'iOS'
-    WHEN u ILIKE '%windows%' THEN 'Windows'
-    WHEN u ILIKE '%cros%' THEN 'ChromeOS'
-    WHEN u ILIKE '%macintosh%' THEN 'macOS'
-    WHEN u ILIKE '%linux%' THEN 'Linux'
-    ELSE 'Unknown' END`;
-const BROWSER = `CASE
-    WHEN u ILIKE '%edg/%' OR u ILIKE '%edga/%' OR u ILIKE '%edgios/%' THEN 'Edge'
-    WHEN u ILIKE '%; wv)%' THEN 'Android WebView (in-app)'
-    WHEN u ILIKE '%opr/%' THEN 'Opera'
-    WHEN u ILIKE '%samsungbrowser%' THEN 'Samsung Internet'
-    WHEN u ILIKE '%firefox%' OR u ILIKE '%fxios%' THEN 'Firefox'
-    WHEN u ILIKE '%crios%' OR u ILIKE '%chrome%' THEN 'Chrome'
-    WHEN u ILIKE '%safari%' THEN 'Safari'
-    ELSE 'Unknown' END`;
 
 export async function getSessionDetail(sessionId: string): Promise<SessionDetail | undefined> {   // One session: app record, tag, event counts, and whether its last connect failure named no client
   // Starts from the wanted ID, so a session found in one place only still returns a row; failure_no_client stops at session_ended.
