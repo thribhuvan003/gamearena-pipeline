@@ -1,11 +1,11 @@
-// ErrorTable.tsx: diagnostics' client error list: each error + code with the clients it hit and how many of them connected or didn't; warnings folded at the end.
+// ClientErrors.tsx: diagnostics' client error list: each error + code with the clients it hit and how many of them connected or didn't; warnings folded at the end.
 
 import Link from "next/link";
 import { eventLabel, formatNumber } from "@/lib/format";
 import { link } from "@/lib/links";
 import { getErrorFrequency, type ErrorRow, type Range } from "@/lib/queries";
 
-export default async function ErrorTable({ range }: { range: Range }) {
+export default async function ClientErrors({ range }: { range: Range }) {   // Lists the five client errors that hit the most clients, the rest and the warnings folded below. Called by the diagnostics view
   const rows = await getErrorFrequency(range);
   const errors = rows.filter((row) => !row.warning).sort((a, b) => Number(b.clients) - Number(a.clients));
   const warnings = rows.filter((row) => row.warning);
@@ -36,7 +36,7 @@ export default async function ErrorTable({ range }: { range: Range }) {
   );
 }
 
-function ClientError({ row, range }: { row: ErrorRow; range: Range }) {
+function ClientError({ row, range }: { row: ErrorRow; range: Range }) {   // One error as a fold: clients hit, how many connected or didn't, and a link to exactly those clients. Called by ClientErrors for each error
   const unknown = Number(row.clients) - Number(row.connected_clients) - Number(row.not_connected_clients);
   const stats = [
     ["Times recorded", formatNumber(row.events)],
@@ -59,7 +59,7 @@ function ClientError({ row, range }: { row: ErrorRow; range: Range }) {
   );
 }
 
-function eventExplanation(signature: string): string | null {
+function eventExplanation(signature: string): string | null {   // A one-line note on what an error event does and doesn't prove, for the events that need one. Called by ClientError
   const event = signature.split(" ", 1)[0];
   if (event === "pipeline.connection.dropped") return "The app logged a drop event. It alone does not prove the client had connected before.";
   if (event === "pipeline.connect.failure") return "The app logged a failed attempt. The same client or session may still connect later.";

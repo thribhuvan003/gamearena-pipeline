@@ -1,4 +1,4 @@
-// Attention.tsx: the sessions that didn't connect, by pipeline category, and the session-level event patterns; every row has a one-line meaning taken from its rule and opens exactly its sessions.
+// SessionPatterns.tsx: the sessions that didn't connect, by pipeline category, and the session-level event patterns; every row has a one-line meaning taken from its rule and opens exactly its sessions.
 
 import Link from "next/link";
 import { cohortExplanation, formatNumber, reasonLabel } from "@/lib/format";
@@ -19,7 +19,7 @@ const EXTRA = [
   ["no_end_event", "No session end event"],
 ] as const;
 
-export default async function Attention({ range }: { range: Range }) {   // Shows the two panels for the range, hiding nothing; each row links to its cohort. Called by the dashboard's diagnostics view
+export default async function SessionPatterns({ range }: { range: Range }) {   // Shows the two panels for the range, hiding nothing; each row links to its cohort. Called by the dashboard's diagnostics view
   const [counts, reasons] = await Promise.all([getSessionCounts(range), getSessionReasons(range)]);
   const signal = ([key, label]: (typeof MAIN | typeof EXTRA)[number]) => (
     <DiagnosticRow key={key} range={range} sheet={{ list: key }} label={label} detail={cohortExplanation(key, null)} count={counts[key]} />
@@ -51,7 +51,7 @@ export default async function Attention({ range }: { range: Range }) {   // Show
   );
 }
 
-function DiagnosticRow({ range, sheet, label, detail, count }: { range: Range; sheet: Sheet; label: string; detail: string | null; count: string }) {   // One row: the name, its one-line meaning underneath, and the count; opens its sessions. Called by Attention for every row
+function DiagnosticRow({ range, sheet, label, detail, count }: { range: Range; sheet: Sheet; label: string; detail: string | null; count: string }) {   // One row: the name, its one-line meaning underneath, and the count; opens its sessions. Called by SessionPatterns for every row
   return (
     <Link href={link(range, sheet)} scroll={false} className="list-row">
       <span className="row-main">{label}{detail && <span className="reason-detail">{detail}</span>}</span>

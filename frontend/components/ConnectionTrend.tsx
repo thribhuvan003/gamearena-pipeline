@@ -3,7 +3,7 @@
 import ConnectionChart from "./ConnectionChart";
 import { getDailyConnections, type Range } from "@/lib/queries";
 
-export default async function ConnectionTrend({ range }: { range: Range }) {
+export default async function ConnectionTrend({ range }: { range: Range }) {   // Reads the per-day counts and draws them. Called by the overview, next to the client categories
   const rows = await getDailyConnections(range);
   const days = rows.map((row) => ({
     day: Date.parse(row.day + "T00:00:00Z"),

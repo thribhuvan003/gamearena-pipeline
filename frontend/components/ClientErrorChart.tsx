@@ -1,4 +1,5 @@
 "use client";
+// ClientErrorChart.tsx: the per-day chart of one chosen client error at a time, with buttons to switch errors (warnings last) and that error's details.
 
 import { useState, type ReactNode } from "react";
 import { dayLabel, formatNumber } from "@/lib/format";
@@ -13,7 +14,7 @@ export type IssueSeries = {
   details: ReactNode;
 };
 
-export default function ErrorChart({ series }: { series: IssueSeries[] }) {
+export default function ClientErrorChart({ series }: { series: IssueSeries[] }) {   // Shows one error's daily bars and lets you pick another (errors by size, then Other, then warnings). Called by ClientErrorTrend; client JS because the choice happens in the browser
   const errors = series.filter((issue) => !issue.warning);
   const warnings = series.filter((issue) => issue.warning);
   const choices = [...errors.filter((issue) => issue.id !== "Other"), ...errors.filter((issue) => issue.id === "Other"), ...warnings];
@@ -82,6 +83,6 @@ export default function ErrorChart({ series }: { series: IssueSeries[] }) {
   );
 }
 
-function dayString(value: number): string {
+function dayString(value: number): string {   // A chart day (milliseconds) as "YYYY-MM-DD". Called by ClientErrorChart for its day labels
   return new Date(value).toISOString().slice(0, 10);
 }

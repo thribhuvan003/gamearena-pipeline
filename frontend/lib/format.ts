@@ -28,7 +28,7 @@ const TAG_LABELS: Record<string, string> = {
   unknown: "Unknown",
 };
 
-export function tagText(tag: string, reason: string | null): string {
+export function tagText(tag: string, reason: string | null): string {   // A pipeline tag in words, with its category if any, e.g. "Didn't connect · Setup failed". Called by the sheet's rows and the session view
   const label = TAG_LABELS[tag] ?? reasonLabel(tag);
   return reason ? `${label} · ${reasonLabel(reason)}` : label;
 }
@@ -36,7 +36,7 @@ export function tagText(tag: string, reason: string | null): string {
 const DAY_FORMAT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const FULL_DAY_FORMAT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
-export function dayLabel(day: string, year = true): string {
+export function dayLabel(day: string, year = true): string {   // "2026-10-17" -> "17 Oct 2026" (or "17 Oct" without the year). Called by the charts, the date filter and the session view
   return (year ? FULL_DAY_FORMAT : DAY_FORMAT).format(new Date(day + "T00:00:00Z"));
 }
 
@@ -46,12 +46,6 @@ export function formatSeconds(value: string | null): string {   // "33" -> "33 s
   return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 }
 
-// Events shown muted in a timeline: ice.candidate.error (most clients that hit it still connect) and ws_error (in 6,136 of 6,546 sessions, connected ones too).
-const MUTED_EVENTS = new Set(["ice.candidate.error", "ws_error"]);
-
-export function isMuted(event: string): boolean {          // True for an event shown muted. Called by the session timeline
-  return MUTED_EVENTS.has(event);
-}
 
 const REASON_LABELS: Record<string, string> = {
   no_video: "Reason unknown",
@@ -71,7 +65,7 @@ const REASON_EXPLAINED: Record<string, string> = {
   someone_never_joined: "No failure logged, and host_connected or client_connected never arrived.",
 };
 
-export function reasonExplanation(reason: string, unit: "sessions" | "clients"): string | null {   // The one-line meaning of a category, for the line under its name. Called by ReasonsTable (clients) and Attention (sessions)
+export function reasonExplanation(reason: string, unit: "sessions" | "clients"): string | null {   // The one-line meaning of a category, for the line under its name. Called by ClientReasons (clients) and SessionPatterns (sessions)
   if (reason === "no_video") {
     return unit === "sessions"
       ? "Host and client joined and it tried, but no failure or failed video state was logged."
@@ -92,25 +86,22 @@ const COHORT_EXPLAINED: Record<string, string> = {
   success_then_failure: "A pipeline.connect.failure came after its first pipeline.connect.success.",
   reconnected: "At least one client_reconnected was logged.",
   reconnected_10: "client_reconnected was logged 10 or more times.",
-  tag_connected: "Ended sessions that logged pipeline.connect.success.",
   tag_failed: "Ended sessions that logged pipeline.connect.attempt but never pipeline.connect.success.",
-  tag_no_attempt: "Ended sessions that never logged pipeline.connect.attempt.",
   clients: "Client connections that logged events, one row per connection ID.",
   clients_connected: "The app logged pipeline.connect.success for this client.",
   clients_not_connected: "The app logged events for this client, but never pipeline.connect.success.",
-  clients_alone: "Clients that didn't connect, in sessions where no client connected.",
   clients_unknown: "Only server events exist for this client; the app logged nothing, so the outcome is unknown.",
-  untied_error: "Sessions that logged this error without a client ID, so it belongs to the session, not to one client.",
+  no_client_error: "Sessions that logged this error without a client ID, so it belongs to the session, not to one client.",
   client_error: "Clients that logged this error at least once. Some of them may still have connected.",
 };
 
-export function cohortExplanation(key: string, arg: string | null): string | null {   // The one-line logic of a list, shown under its row and at the top of its sheet. Called by Attention and the sheet's list step
+export function cohortExplanation(key: string, arg: string | null): string | null {   // The one-line logic of a list, shown under its row and at the top of its sheet. Called by SessionPatterns and the sheet's list step
   if (key === "session_reason" && arg) return reasonExplanation(arg, "sessions");
   if (key === "client_reason" && arg) return reasonExplanation(arg, "clients");
   return COHORT_EXPLAINED[key] ?? null;
 }
 
-export function reasonLabel(reason: string): string {
+export function reasonLabel(reason: string): string {   // A pipeline category's name for the screen, e.g. no_video -> "Reason unknown". Called wherever a category is shown
   return REASON_LABELS[reason] ?? reason.replaceAll("_", " ");
 }
 
@@ -143,7 +134,7 @@ const EVENT_LABELS: Record<string, string> = {
   ws_error: "WebSocket warning",
 };
 
-export function eventLabel(signature: string): string {
+export function eventLabel(signature: string): string {   // An event + code as a readable name, e.g. "pipeline.connect.failure 500" -> "Connection failed · Code 500". Called by the error lists, charts and timeline
   const [name, code] = signature.split(" ", 2);
   const label = EVENT_LABELS[name] ?? name.replaceAll(/[._]/g, " ").replace(/^./, (first) => first.toUpperCase());
   return code ? `${label} · Code ${code}` : label;

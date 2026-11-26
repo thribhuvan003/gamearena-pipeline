@@ -15,7 +15,7 @@ def events(*items, app_events=1):   # Builds the dict tags.py receives: each ite
     }
 
 
-class SessionRules(unittest.TestCase):   # Session tag and reason, the same order of rules as RUNBOOK.md
+class SessionRules(unittest.TestCase):   # Session tag and reason, the same order of rules as pipeline/tags.py
     def check(self, session, tag, reason):   # Asserts the tag and the reason for one made-up session. Called by each test
         self.assertEqual(tags.tag_session(session), tag)
         self.assertEqual(tags.failure_reason(session, tag), reason)

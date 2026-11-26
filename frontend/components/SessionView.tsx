@@ -4,7 +4,7 @@ import SessionTimeline, { type PageHref } from "@/components/SessionTimeline";
 import { dayLabel, formatNumber, formatTime, reasonLabel, redact, tagText } from "@/lib/format";
 import { getClientConnections, getSessionDetail, type ClientConnectionRow, type SessionDetail } from "@/lib/queries";
 
-export default async function SessionView({ id, highlight, eventPage, pageHref }: { id: string; highlight?: string; eventPage: number; pageHref: PageHref }) {
+export default async function SessionView({ id, highlight, eventPage, pageHref }: { id: string; highlight?: string; eventPage: number; pageHref: PageHref }) {   // Reads the session and its clients and shows the facts, each client, then the timeline. Called by the sheet's session step and the /session/<id> page; highlight = the client to open
   const [session, connections] = await Promise.all([getSessionDetail(id), getClientConnections(id)]);
   if (!session) return <p className="hint">No app session or events with this ID.</p>;
   const { title, note } = outcome(session);
@@ -53,7 +53,7 @@ export default async function SessionView({ id, highlight, eventPage, pageHref }
   );
 }
 
-function ClientDetails({ row, index, selected }: { row: ClientConnectionRow; index: number; selected: boolean }) {
+function ClientDetails({ row, index, selected }: { row: ClientConnectionRow; index: number; selected: boolean }) {   // One client as a fold: device, outcome, reason, ID, access type and the app's two timestamps. Called by SessionView for each client
   const device = [row.device, row.os, row.browser].filter((part) => part !== "Unknown").join(" · ");
   return (
     <details className={`disclosure client-details${selected ? " selected" : ""}`}>
@@ -75,12 +75,12 @@ function ClientDetails({ row, index, selected }: { row: ClientConnectionRow; ind
   );
 }
 
-function readableTime(value: Date): string {
+function readableTime(value: Date): string {   // A timestamp as "17 Oct 2026 at 08:27 UTC". Called by SessionView
   const time = value.toISOString();
   return `${dayLabel(time.slice(0, 10))} at ${time.slice(11, 16)} UTC`;
 }
 
-function outcome(session: SessionDetail): { title: string; note?: string } {
+function outcome(session: SessionDetail): { title: string; note?: string } {   // The session's outcome in words, or why there is none (no telemetry, not classified yet, no end event). Called by SessionView
   if (session.tag) return { title: tagText(session.tag, null), note: session.reason ? reasonLabel(session.reason) : undefined };
   if (Number(session.events) === 0) return { title: "Outcome unavailable", note: "No telemetry was recorded." };
   return {

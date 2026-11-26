@@ -1,12 +1,12 @@
-// TopErrors.tsx: the overview's errors that name no client ID (session-level): each error + code with what its payload says, the app sessions it happened in, and how often it was logged.
+// NoClientErrors.tsx: the overview's errors that name no client ID (session-level): each error + code with what its payload says, the app sessions it happened in, and how often it was logged.
 
 import Link from "next/link";
 import { eventLabel, formatNumber, redact } from "@/lib/format";
 import { link } from "@/lib/links";
-import { getUntiedErrors, type PreClientErrorRow, type Range } from "@/lib/queries";
+import { getNoClientErrors, type NoClientErrorRow, type Range } from "@/lib/queries";
 
-export default async function TopErrors({ range }: { range: Range }) {   // Lists every error logged with no client ID in the range; each row opens exactly its sessions. Called by the dashboard's overview
-  const errors = await getUntiedErrors(range);
+export default async function NoClientErrors({ range }: { range: Range }) {   // Lists every error logged with no client ID in the range; each row opens exactly its sessions. Called by the dashboard's overview
+  const errors = await getNoClientErrors(range);
 
   return (
     <section className="top-errors" aria-labelledby="top-errors-title">
@@ -29,7 +29,7 @@ export default async function TopErrors({ range }: { range: Range }) {   // List
   );
 }
 
-function ErrorRow({ row, range }: { row: PreClientErrorRow; range: Range }) {   // One error + code: its label, the payload's most common phase, stage and reason in brackets (private bits hidden), sessions and times; opens its sessions. Called by TopErrors for each row
+function ErrorRow({ row, range }: { row: NoClientErrorRow; range: Range }) {   // One error + code: its label, the payload's most common phase, stage and reason in brackets (private bits hidden), sessions and times; opens its sessions. Called by NoClientErrors for each row
   const payload = [
     row.phase && `phase: ${row.phase}`,
     row.stage && `stage: ${row.stage}`,
@@ -37,7 +37,7 @@ function ErrorRow({ row, range }: { row: PreClientErrorRow; range: Range }) {   
   ].filter(Boolean).join(" · ");
   return (
     <Link
-      href={link(range, { list: "untied_error", arg: row.error })} scroll={false} className="list-row overview-error-row"
+      href={link(range, { list: "no_client_error", arg: row.error })} scroll={false} className="list-row overview-error-row"
       aria-label={`${eventLabel(row.error)}: ${formatNumber(row.sessions)} sessions, recorded ${formatNumber(row.events)} times`}
     >
       <span>

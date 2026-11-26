@@ -1,11 +1,11 @@
-// ReasonsTable.tsx: why clients didn't connect: the pipeline's category per client with its one-line meaning; each row opens exactly its clients.
+// ClientReasons.tsx: why clients didn't connect: the pipeline's category per client with its one-line meaning; each row opens exactly its clients.
 
 import Link from "next/link";
 import { formatNumber, reasonExplanation, reasonLabel } from "@/lib/format";
 import { link, type Sheet } from "@/lib/links";
 import { getConnectionReasons, type Range } from "@/lib/queries";
 
-export default async function ReasonsTable({ range, sheet }: { range: Range; sheet: Sheet }) {
+export default async function ClientReasons({ range, sheet }: { range: Range; sheet: Sheet }) {   // Lists each category with its meaning, count and share; the open one is highlighted. Called by the overview
   const rows = await getConnectionReasons(range);
 
   return (

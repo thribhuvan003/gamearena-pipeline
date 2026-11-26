@@ -1,4 +1,5 @@
 "use client";
+// ConnectionChart.tsx: the one bar chart of a count per day, shared by the client trend and the per-error chart.
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { dayLabel } from "@/lib/format";
@@ -13,7 +14,7 @@ type ChartProps = {
   colour?: string;
 };
 
-export default function ConnectionChart({
+export default function ConnectionChart({   // Draws one bar per day with about five date ticks. Called by ConnectionTrend and ClientErrorChart; client JS because Recharts draws in the browser
   days, height = 184, seriesLabel = "Didn't connect", colour = "var(--accent)",
 }: ChartProps) {
   const first = days[0].day;

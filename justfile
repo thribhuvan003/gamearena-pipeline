@@ -1,4 +1,4 @@
-# justfile: every command for the backend (pipeline + SQL) and the frontend (dashboard), on Linux and Windows. See RUNBOOK.md.
+# justfile: every command for the backend (pipeline + SQL) and the frontend (dashboard), on Linux and Windows.
 
 set windows-shell := ["cmd.exe", "/C"]
 

@@ -54,7 +54,7 @@ export default async function SessionTimeline({ sessionId, detail, eventPage, pa
   );
 }
 
-function eventRow(row: TimelineRow, i: number) {
+function eventRow(row: TimelineRow, i: number) {   // One event: its label, client or sender, time, level, raw name and known fields. Called by SessionTimeline for both lists
   const meta = [details(row), message(row)].filter((text) => text !== "-").join(" · ");
   return (
     <div key={i} className="evidence-row">

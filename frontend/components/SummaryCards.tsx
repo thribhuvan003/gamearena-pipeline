@@ -5,7 +5,7 @@ import { formatNumber } from "@/lib/format";
 import { link } from "@/lib/links";
 import { getClientCounts, getSessionCounts, type CohortKey, type Range } from "@/lib/queries";
 
-export default async function SummaryCards({ range }: { range: Range }) {
+export default async function SummaryCards({ range }: { range: Range }) {   // Reads both cohort counts and shows the session strip, then the client connection strip. Called by the overview
   const [sessions, clients] = await Promise.all([getSessionCounts(range), getClientCounts(range)]);
 
   return (
@@ -36,7 +36,7 @@ export default async function SummaryCards({ range }: { range: Range }) {
   );
 }
 
-function Metric({ range, list, label, value }: { range: Range; list: CohortKey; label: string; value: string }) {
+function Metric({ range, list, label, value }: { range: Range; list: CohortKey; label: string; value: string }) {   // One headline number as a link to exactly its records. Called by SummaryCards
   return (
     <Link href={link(range, { list })} scroll={false} className="metric-cell">
       <strong>{formatNumber(value)}</strong>

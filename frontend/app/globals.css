@@ -205,29 +205,6 @@ h3 {
   margin-top: var(--s3);
 }
 
-.stat {
-  min-width: 0;
-  padding: var(--s4);
-  background: var(--surface);
-  border-radius: var(--radius);
-}
-
-a.stat {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-}
-
-a.stat:hover {
-  background: var(--surface-2);
-}
-
-.stat-label {
-  color: var(--text-2);
-  font-size: var(--fs-small);
-  font-weight: 500;
-}
-
 .stat-value {
   margin: var(--s1) 0;
   font-size: var(--fs-hero);
@@ -241,14 +218,6 @@ a.stat:hover {
 .stat-sub {
   color: var(--text-2);
   font-size: var(--fs-small);
-}
-
-.stats.secondary .stat {
-  padding: var(--s3) var(--s4);
-}
-
-.stats.secondary .stat-value {
-  font-size: var(--fs-h2);
 }
 
 .group-label {
@@ -342,52 +311,6 @@ a.list-row.selected:hover {
 .pager a {
   color: var(--accent);
   text-decoration: none;
-}
-
-.level-error {
-  border-left: 3px solid var(--bad);
-}
-
-.level-warn {
-  border-left: 3px solid var(--warn);
-}
-
-.table-card {
-  background: var(--surface);
-  border-radius: var(--radius);
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-small);
-}
-
-th,
-td {
-  padding: var(--s2) var(--s4);
-  text-align: left;
-  border-bottom: 1px solid var(--separator);
-}
-
-tr:last-child td {
-  border-bottom: 0;
-}
-
-th {
-  color: var(--text-2);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-tr.muted {
-  color: var(--text-3);
 }
 
 .mono {
@@ -502,23 +425,6 @@ tr.muted {
   border: 1px solid var(--separator);
 }
 
-dl.kv {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--s2) var(--s4);
-  margin: 0;
-}
-
-dl.kv dt {
-  color: var(--text-2);
-}
-
-dl.kv dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
 details.more > summary {
   padding: var(--s3) 0;
   color: var(--accent);
@@ -545,13 +451,6 @@ details.more > summary::-webkit-details-marker {
   margin-top: var(--s3);
 }
 
-.swatch {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-}
-
 @media (max-width: 800px) {
   .sheet {
     width: 100%;
@@ -574,11 +473,6 @@ details.more > summary::-webkit-details-marker {
   .search input {
     flex: 1;
     width: auto;
-  }
-
-  th,
-  td {
-    padding: var(--s2) var(--s3);
   }
 
   .sheet-head,

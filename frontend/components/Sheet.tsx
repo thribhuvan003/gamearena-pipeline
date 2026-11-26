@@ -8,7 +8,7 @@ import SheetFrame from "./SheetFrame";
 import { cohortExplanation, eventLabel, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
 import { isUuid, link, linkString, searchPrefix, type Sheet as SheetState } from "@/lib/links";
 import {
-  COHORTS, getClientPage, getCohortCount, getReasonErrors, getReasonSteps, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
+  COHORTS, getClientPage, getCohortCount, getReasonErrors, getReasonProgress, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
   type ClientListRow, type Range, type ReasonErrorRow, type SearchRow, type SessionListRow,
 } from "@/lib/queries";
 
@@ -66,12 +66,12 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
     cohort.unit === "sessions"
       ? getSessionPage(key, arg, range, page, prefix).then((list) => list.map((row) => sessionRow(row, range, sheet)))
       : getClientPage(key, arg, range, page, prefix).then((list) => list.map((row) => clientRow(row, range, sheet))),
-    key === "client_reason" && !prefix ? getReasonSteps(arg!, range) : null,
+    key === "client_reason" && !prefix ? getReasonProgress(arg!, range) : null,
     key === "client_reason" && !prefix ? getReasonErrors(arg!, range) : null,
   ]);
   const unit = cohort.unit === "sessions" ? "sessions" : "client connections";
 
-  const title = key === "client_error" || key === "untied_error"
+  const title = key === "client_error" || key === "no_client_error"
     ? shownArg ?? cohort.title
     : shownArg === null ? cohort.title : `${cohort.title} · ${shownArg}`;
 

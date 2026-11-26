@@ -1,20 +1,20 @@
-// ErrorTrend.tsx: diagnostics' per-day chart of clients that didn't connect, by error (top 5 + Other), with what the app recorded for each error.
+// ClientErrorTrend.tsx: diagnostics' per-day chart of clients that didn't connect, by error (top 5 + Other), with what the app recorded for each error.
 
 import { type ReactNode } from "react";
-import ErrorChart, { type IssueSeries } from "./ErrorChart";
+import ClientErrorChart, { type IssueSeries } from "./ClientErrorChart";
 import { eventLabel, formatNumber, redact } from "@/lib/format";
-import { getErrorKey, getErrorSeries, type ErrorKeyRow, type Range } from "@/lib/queries";
+import { getErrorDetails, getErrorSeries, type ErrorDetailRow, type Range } from "@/lib/queries";
 
 const OTHER = "Other";
-const FIELDS: { field: ErrorKeyRow["field"]; label: string }[] = [
+const FIELDS: { field: ErrorDetailRow["field"]; label: string }[] = [
   { field: "message", label: "App message" },
   { field: "phase", label: "Phase" },
   { field: "stage", label: "Stage" },
   { field: "text", label: "App error text" },
 ];
 
-export default async function ErrorTrend({ range }: { range: Range }) {
-  const [rows, key] = await Promise.all([getErrorSeries(range), getErrorKey(range)]);
+export default async function ClientErrorTrend({ range }: { range: Range }) {   // Reads the per-day counts and the details of each error and hands them to the chart, inside a fold. Called by the diagnostics view
+  const [rows, key] = await Promise.all([getErrorSeries(range), getErrorDetails(range)]);
   const totals = rows.filter((row) => row.day === null).sort((a, b) => Number(b.clients) - Number(a.clients));
   const named = new Set(totals.filter((row) => row.series !== OTHER).map((row) => row.series));
   const folded = key.filter((row) => row.field === "clients" && !named.has(row.error));
@@ -47,14 +47,14 @@ export default async function ErrorTrend({ range }: { range: Range }) {
         {series.length === 0 ? (
           <p className="hint">No errors on clients that didn't connect in this period.</p>
         ) : (
-          <ErrorChart series={series} />
+          <ClientErrorChart series={series} />
         )}
       </div>
     </details>
   );
 }
 
-function IssueDetails({ signature, values }: { signature: string; values: ErrorKeyRow[] }) {
+function IssueDetails({ signature, values }: { signature: string; values: ErrorDetailRow[] }) {   // What the app recorded with one error (message, phase, stage, text; private bits hidden), with counts. Called by ClientErrorTrend for each error
   const fields: { label: string; value: ReactNode }[] = [{ label: "Event signature", value: <code>{signature}</code> }];
   for (const { field, label } of FIELDS) {
     const entries = values.filter((value) => value.field === field && value.value !== null);
