@@ -71,6 +71,6 @@ dashboard:
     cd frontend && npm install && npm run dev
 
 # Clear the generated tables (raw telemetry is not touched)
-[confirm("Delete every row in session_tags, connection_tags and pipeline_runs?")]
+[confirm("Delete every row in session_tags, connection_tags, pipeline_runs, session_facts and error_events?")]
 reset:
-    {{db}} -e "DELETE FROM session_tags WHERE true; DELETE FROM connection_tags WHERE true; DELETE FROM pipeline_runs WHERE true;"
+    {{db}} -e "DELETE FROM session_tags WHERE true; DELETE FROM connection_tags WHERE true; DELETE FROM pipeline_runs WHERE true; DELETE FROM session_facts WHERE true; DELETE FROM error_events WHERE true;"

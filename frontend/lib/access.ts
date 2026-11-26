@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { auth0Client } from "./auth0";
 import { approvedUser, localPreview } from "./access-policy";
 
-export const requireDashboardAccess = cache(async () => {
+export const requireDashboardAccess = cache(async () => {   // Stops the request unless it is the local preview or a signed-in allowed user; cache() runs it once per request. Called by the pages and before every database query, as a second check behind the proxy
   if (localPreview()) return;
 
   const session = await auth0Client().getSession();

@@ -100,7 +100,7 @@ const COHORT_EXPLAINED: Record<string, string> = {
   clients_not_connected: "The app logged events for this client, but never pipeline.connect.success.",
   clients_alone: "Clients that didn't connect, in sessions where no client connected.",
   clients_unknown: "Only server events exist for this client; the app logged nothing, so the outcome is unknown.",
-  untied_error: "Sessions that logged this error with no client ID, before any client connected. They may still connect later.",
+  untied_error: "Sessions that logged this error with no client ID, in phase pre-connect. In some, a client had already connected.",
   client_error: "Clients that logged this error at least once. Some of them may still have connected.",
 };
 

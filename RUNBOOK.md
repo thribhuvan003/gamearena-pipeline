@@ -14,7 +14,7 @@ The pipeline reads GameArena telemetry and classifies ended sessions and their c
 | `session_facts` | One session with events | Its counts (events, attempts, reconnects), first/last failure and success, end event, newest event; so the dashboard never re-reads every raw event |
 | `error_events` | One error-level event | A copy of the error events only (about 6% of all events) with the fields the dashboard shows |
 
-Every round, after tagging, the pipeline refreshes `session_facts` and `error_events` for every session with events newer than the newest it already has (with a 10-minute overlap), so late events and sessions that have not ended yet are covered. `just facts all` recounts every session.
+Every round, after tagging, the pipeline refreshes `session_facts` and `error_events` for every session with events newer than the newest it already has (with a 1-day overlap), so late events and sessions that have not ended yet are covered. `just facts all` recounts every session.
 
 One session can contain multiple client connections. The counts must not be added together.
 

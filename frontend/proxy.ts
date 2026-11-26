@@ -9,12 +9,10 @@ const AUTH_ROUTES = new Set(["/auth/login", "/auth/callback", "/auth/logout"]);
 // Shown to a signed-in account that is not on the allowlist, with a way out to try another account.
 const DENIED = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Access denied</title><body style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 16px"><h1>Access denied</h1><p>This account is not allowed to see the GameArena dashboard.</p><p><a href="/auth/logout">Sign out and use another account</a></p></body>`;
 
-export async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {   // Lets a request through only if it passes every check in order; otherwise answers 403, 404, 503 or sends it to the login. Called by Next.js before every page and route
   const requestHost = request.headers.get("host") ?? "";
   if (localPreview()) {
-    return LOCAL.has(requestHost.replace(/:\d+$/, ""))
-      ? NextResponse.next()
-      : new NextResponse("Forbidden", { status: 403 });
+    return LOCAL.has(requestHost.replace(/:\d+$/, "")) ? NextResponse.next() : new NextResponse("Forbidden", { status: 403 });
   }
 
   if (!authConfigured()) return new NextResponse("Authentication is not configured", { status: 503 });
@@ -24,10 +22,10 @@ export async function proxy(request: NextRequest) {
   } catch {
     return new NextResponse("Invalid APP_BASE_URL", { status: 503 });
   }
-  // A built (production) server needs HTTPS, except on this machine (localhost / 127.0.0.1), so the fast build can be demoed locally.
-  if (requestHost !== baseUrl.host || (process.env.NODE_ENV === "production" && baseUrl.protocol !== "https:" && !LOCAL.has(baseUrl.hostname))) {
-    return new NextResponse("Forbidden", { status: 403 });
-  }
+  // Only the configured address is served, and a built (production) server needs HTTPS unless that address is this machine.
+  const wrongHost = requestHost !== baseUrl.host;
+  const needsHttps = process.env.NODE_ENV === "production" && !LOCAL.has(baseUrl.hostname);
+  if (wrongHost || (needsHttps && baseUrl.protocol !== "https:")) return new NextResponse("Forbidden", { status: 403 });
 
   const path = request.nextUrl.pathname;
   if (path.startsWith("/auth/") && !AUTH_ROUTES.has(path)) return new NextResponse("Not found", { status: 404 });

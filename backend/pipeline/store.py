@@ -53,14 +53,25 @@ def save_connection_tags(conn, connections, run_id):         # Saves a batch of 
     conn.execute(SAVE_CONNECTIONS_SQL, parameters)
 
 
-# Sessions with events newer than the newest event session_facts already has, minus 10 minutes in case an event is stored a little after its recorded time; oldest first.
+# Sessions with events newer than the newest event session_facts already has, minus 1 day in case an event is stored well after its recorded time (just facts all catches anything older); oldest first.
 CHANGED_SESSIONS_SQL = """
 SELECT session_id
 FROM session_telemetry_events
-WHERE recorded_at > (SELECT coalesce(max(last_event_at) - INTERVAL '10 minutes', '-infinity'::TIMESTAMPTZ) FROM session_facts)
+WHERE recorded_at > (SELECT coalesce(max(last_event_at) - INTERVAL '1 day', '-infinity'::TIMESTAMPTZ) FROM session_facts)
 GROUP BY session_id
 ORDER BY max(recorded_at)
 """
+
+# Drop these sessions' copied errors before copying them again, so an error removed from the raw events disappears here too.
+DELETE_ERRORS_SQL = """
+DELETE FROM error_events WHERE session_id = ANY(%(ids)s::UUID[])
+"""
+
+# On a full rebuild, drop facts and copied errors of sessions that no longer have any raw events.
+DELETE_GONE_SQL = [
+    "DELETE FROM session_facts f WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = f.session_id)",
+    "DELETE FROM error_events x WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = x.session_id)",
+]
 
 # Every session with events, for a full rebuild.
 ALL_SESSIONS_SQL = """
@@ -86,7 +97,7 @@ WHERE e.session_id = ANY(%(ids)s::UUID[])
 GROUP BY e.session_id
 """
 
-# Copy these sessions' error-level events (already copied ones are just written again).
+# Copy these sessions' error-level events.
 SAVE_ERRORS_SQL = """
 UPSERT INTO error_events (id, session_id, connection_id, recorded_at, event, code, error_code, phase, stage, message, detail)
 SELECT e.id, e.session_id, e.connection_id, e.recorded_at,
@@ -100,13 +111,17 @@ WHERE e.session_id = ANY(%(ids)s::UUID[]) AND e.level = 'error'
 FACTS_BATCH = 1000
 
 
-def refresh_facts(conn, everything=False):                   # Recounts session_facts and copies error_events for every session with new events (all sessions if everything), in one transaction; returns how many. Called by __main__ once per round and by the facts command
+def refresh_facts(conn, everything=False):                   # Recounts session_facts and recopies error_events for every session with new events (all sessions if everything, also dropping sessions with no raw events left), in one transaction; returns how many. Called by __main__ once per round and by the facts command
     sql = ALL_SESSIONS_SQL if everything else CHANGED_SESSIONS_SQL
     ids = [row[0] for row in conn.execute(sql).fetchall()]
     for start in range(0, len(ids), FACTS_BATCH):
         batch = {"ids": ids[start:start + FACTS_BATCH]}
         conn.execute(SAVE_FACTS_SQL, batch)
+        conn.execute(DELETE_ERRORS_SQL, batch)
         conn.execute(SAVE_ERRORS_SQL, batch)
+    if everything:
+        for delete in DELETE_GONE_SQL:
+            conn.execute(delete)
     conn.commit()
     return len(ids)
 

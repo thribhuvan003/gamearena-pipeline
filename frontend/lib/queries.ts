@@ -105,7 +105,7 @@ export const COHORTS = {
   tag_failed: { unit: "sessions", title: "Sessions that didn't connect", arg: false, where: `${S} AND s.tag = 'failed'` },
   tag_no_attempt: { unit: "sessions", title: "Sessions tagged no_attempt", arg: false, where: `${S} AND s.tag = 'no_attempt'` },
   session_reason: { unit: "sessions", title: "Sessions that didn't connect", arg: true, where: `${S} AND s.tag = 'failed' AND s.reason = $3` },
-  untied_error: { unit: "sessions", title: "Sessions with an error before any client connected", arg: true, where: ERROR_ON("e.session_id = s.session_id", false) },
+  untied_error: { unit: "sessions", title: "Sessions with a pre-connect error that names no client", arg: true, where: ERROR_ON("e.session_id = s.session_id", false) },
   clients: { unit: "clients", title: "Client connections with telemetry", arg: false, where: S },
   clients_connected: { unit: "clients", title: "Clients that connected", arg: false, where: `${S} AND s.tag = 'connected'` },
   clients_not_connected: { unit: "clients", title: "Clients that didn't connect", arg: false, where: `${S} AND s.tag = 'not_connected'` },
@@ -287,7 +287,7 @@ export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {    
     ORDER BY warning, not_connected_percent DESC NULLS LAST, not_connected_clients DESC`, [range.from, range.to]);
 }
 
-export async function getUntiedErrors(range: Range): Promise<PreClientErrorRow[]> {     // Errors in the range that name no client connection, i.e. logged before any client connected: the sessions they happened in (the untied_error cohort), times recorded, and what the payload says most often (phase, stage and reason text). Called by TopErrors on the overview
+export async function getUntiedErrors(range: Range): Promise<PreClientErrorRow[]> {     // Errors in the range that name no client connection (all logged in phase pre-connect, usually but not always before a client connected): the sessions they happened in (the untied_error cohort), times recorded, and what the payload says most often (phase, stage and reason text). Called by TopErrors on the overview
   // Error events with no connection_id, per error + code; the most common phase, stage and payload reason text of each.
   return query<PreClientErrorRow>(`
     WITH ev AS (
