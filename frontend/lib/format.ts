@@ -21,11 +21,11 @@ export function percent(part: string, whole: string): string {   // part as a sh
 }
 
 const TAG_LABELS: Record<string, string> = {
-  connected: "Success recorded",
-  not_connected: "No success recorded",
-  failed: "No success recorded",
-  no_attempt: "No attempt recorded",
-  unknown: "No outcome evidence",
+  connected: "Connected",
+  not_connected: "Didn't connect",
+  failed: "Didn't connect",
+  no_attempt: "No attempt",
+  unknown: "Unknown",
 };
 
 export function tagText(tag: string, reason: string | null): string {
@@ -61,6 +61,24 @@ const REASON_LABELS: Record<string, string> = {
   error_while_connecting: "Error while connecting",
   error_other: "Other connection error",
 };
+
+// One line per pipeline category: what put the session or client in it, from the rules in backend/pipeline/tags.py (checked in this order; first match wins).
+const REASON_EXPLAINED: Record<string, string> = {
+  setup_error: "Its last pipeline.connect.failure was in phase pre-connect.",
+  error_while_connecting: "Its last pipeline.connect.failure was in phase connecting.",
+  error_other: "Its last pipeline.connect.failure was in another phase.",
+  video_connection_failed: "No connect failure logged, but webrtc.connection.state went to failed.",
+  someone_never_joined: "No failure logged, and host_connected or client_connected never arrived.",
+};
+
+export function reasonExplanation(reason: string, unit: "sessions" | "clients"): string | null {   // The one-line meaning of a category, for the line under its name. Called by ReasonsTable (clients) and Attention (sessions)
+  if (reason === "no_video") {
+    return unit === "sessions"
+      ? "Host and client joined and it tried, but no failure or failed video state was logged."
+      : "It tried, but no failure or failed video state was logged.";
+  }
+  return REASON_EXPLAINED[reason] ?? null;
+}
 
 export function reasonLabel(reason: string): string {
   return REASON_LABELS[reason] ?? reason.replaceAll("_", " ");

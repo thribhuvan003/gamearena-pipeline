@@ -1,3 +1,5 @@
+// ErrorTable.tsx: diagnostics' client error list: each error + code with the clients it hit and how many of them connected or didn't; warnings folded at the end.
+
 import Link from "next/link";
 import { eventLabel, formatNumber } from "@/lib/format";
 import { link } from "@/lib/links";
@@ -38,11 +40,11 @@ function ClientError({ row, range }: { row: ErrorRow; range: Range }) {
   const unknown = Number(row.clients) - Number(row.connected_clients) - Number(row.not_connected_clients);
   const stats = [
     ["Times recorded", formatNumber(row.events)],
-    ["No success recorded", formatNumber(row.not_connected_clients)],
-    ["Success recorded", formatNumber(row.connected_clients)],
+    ["Didn't connect", formatNumber(row.not_connected_clients)],
+    ["Connected", formatNumber(row.connected_clients)],
     ["Unknown outcome", formatNumber(String(unknown))],
     ["Connections without telemetry tags", formatNumber(row.not_tagged_clients)],
-    ["Share with no success recorded", row.not_connected_percent === null ? "Unavailable" : `${row.not_connected_percent}%`],
+    ["Share that didn't connect", row.not_connected_percent === null ? "Unavailable" : `${row.not_connected_percent}%`],
   ];
   return (
     <details className="disclosure">
@@ -59,8 +61,8 @@ function ClientError({ row, range }: { row: ErrorRow; range: Range }) {
 
 function eventExplanation(signature: string): string | null {
   const event = signature.split(" ", 1)[0];
-  if (event === "pipeline.connection.dropped") return "The app logged a drop event. This event alone does not prove a success was previously logged for this client ID.";
-  if (event === "pipeline.connect.failure") return "The app logged a failed attempt. The same client or session may later have a success event.";
+  if (event === "pipeline.connection.dropped") return "The app logged a drop event. It alone does not prove the client had connected before.";
+  if (event === "pipeline.connect.failure") return "The app logged a failed attempt. The same client or session may still connect later.";
   if (event === "ice.connection.state") return "A network negotiation state was logged at error level. Open a connection to see its recorded state and timeline.";
   if (event === "webrtc.connection.state") return "A WebRTC state was logged at error level. Open a connection to see its recorded state and timeline.";
   return null;

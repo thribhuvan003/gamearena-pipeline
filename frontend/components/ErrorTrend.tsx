@@ -1,3 +1,5 @@
+// ErrorTrend.tsx: diagnostics' per-day chart of clients that didn't connect, by error (top 5 + Other), with what the app recorded for each error.
+
 import { type ReactNode } from "react";
 import ErrorChart, { type IssueSeries } from "./ErrorChart";
 import { eventLabel, formatNumber, redact } from "@/lib/format";
@@ -40,10 +42,10 @@ export default async function ErrorTrend({ range }: { range: Range }) {
 
   return (
     <details className="disclosure diagnostics-panel trend-disclosure">
-      <summary>Per day: client IDs with no success, by error (the “No success recorded” numbers above, over time)</summary>
+      <summary>Per day: clients that didn't connect, by error</summary>
       <div className="disclosure-body">
         {series.length === 0 ? (
-          <p className="hint">No errors or warnings recorded on client IDs without a success event in this period.</p>
+          <p className="hint">No errors on clients that didn't connect in this period.</p>
         ) : (
           <ErrorChart series={series} />
         )}

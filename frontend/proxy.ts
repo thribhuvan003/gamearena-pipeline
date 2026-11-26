@@ -1,3 +1,5 @@
+// proxy.ts: runs before every request: the localhost-only preview in development, otherwise the host check, Auth0 sign-in and the email allowlist.
+
 import { NextResponse, type NextRequest } from "next/server";
 import { auth0Client } from "./lib/auth0";
 import { approvedUser, authConfigured, localPreview } from "./lib/access-policy";

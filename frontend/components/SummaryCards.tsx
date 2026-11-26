@@ -1,3 +1,5 @@
+// SummaryCards.tsx: the headline numbers: app sessions and client connections, each opening exactly its records.
+
 import Link from "next/link";
 import { formatNumber } from "@/lib/format";
 import { link } from "@/lib/links";
@@ -22,12 +24,12 @@ export default async function SummaryCards({ range }: { range: Range }) {
           <h2 id="connections-title">Client connections</h2>
           <span>One outcome per connection ID</span>
         </div>
-        <p className="hint">Counted by first event. A success means a success event was logged for that ID. No success recorded does not prove a player never connected.</p>
+        <p className="hint">Counted by first event. Connected = the app logged pipeline.connect.success for that client.</p>
         <div className="metric-strip client-metrics">
           <Metric range={range} list="clients" label="Total tracked" value={clients.clients} />
-          <Metric range={range} list="clients_connected" label="Success recorded" value={clients.clients_connected} />
-          <Metric range={range} list="clients_not_connected" label="No success recorded" value={clients.clients_not_connected} />
-          <Metric range={range} list="clients_unknown" label="No outcome evidence" value={clients.clients_unknown} />
+          <Metric range={range} list="clients_connected" label="Connected" value={clients.clients_connected} />
+          <Metric range={range} list="clients_not_connected" label="Didn't connect" value={clients.clients_not_connected} />
+          <Metric range={range} list="clients_unknown" label="Unknown" value={clients.clients_unknown} />
         </div>
       </section>
     </div>

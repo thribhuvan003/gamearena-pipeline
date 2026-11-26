@@ -33,7 +33,6 @@ export type ReasonErrorRow = { error: string | null; warning: boolean; clients: 
 export type ReasonSteps = { clients: string; gathered: string; decoded: string };
 export type ErrorRow = { error: string; warning: boolean; events: string; clients: string; not_tagged_clients: string; not_connected_clients: string; connected_clients: string; not_connected_percent: string | null };
 export type PreClientErrorRow = { error: string; events: string; sessions: string; phase: string | null; stage: string | null; detail: string | null };
-export type DailySessionRow = { day: string; failed: string };
 export type ErrorSeriesRow = { day: string | null; series: string; warning: boolean; clients: string };
 export type ErrorKeyRow = { error: string; field: "clients" | "message" | "phase" | "stage" | "text"; value: string | null; events: string };
 export type SessionListRow = { session_id: string; started_at: Date; ended_at: Date | null; events: string | null; tag: string | null; reason: string | null; clients: string };
@@ -98,21 +97,21 @@ export const COHORTS = {
   no_end_event: { unit: "sessions", title: "Sessions missing an end event", arg: false, where: `${S} AND s.events IS NOT NULL AND NOT s.has_end` },
   several_attempts: { unit: "sessions", title: "Sessions with multiple connection attempts", arg: false, where: `${S} AND s.attempts > 1` },
   failure: { unit: "sessions", title: "Sessions with a recorded connection failure", arg: false, where: `${S} AND s.first_failure IS NOT NULL` },
-  failure_then_success: { unit: "sessions", title: "Sessions with a failure event before a success event", arg: false, where: `${S} AND s.first_failure < s.last_success` },
-  success_then_failure: { unit: "sessions", title: "Sessions with a failure event after a success event", arg: false, where: `${S} AND s.last_failure > s.first_success` },
+  failure_then_success: { unit: "sessions", title: "Sessions with a failure, then connected", arg: false, where: `${S} AND s.first_failure < s.last_success` },
+  success_then_failure: { unit: "sessions", title: "Sessions that connected, then logged a failure", arg: false, where: `${S} AND s.last_failure > s.first_success` },
   reconnected: { unit: "sessions", title: "Sessions with a client reconnect", arg: false, where: `${S} AND s.reconnects > 0` },
   reconnected_10: { unit: "sessions", title: "Sessions with 10 or more client reconnects", arg: false, where: `${S} AND s.reconnects >= 10` },
   tag_connected: { unit: "sessions", title: "Sessions tagged connected", arg: false, where: `${S} AND s.tag = 'connected'` },
-  tag_failed: { unit: "sessions", title: "Sessions without recorded success after an attempt", arg: false, where: `${S} AND s.tag = 'failed'` },
+  tag_failed: { unit: "sessions", title: "Sessions that didn't connect", arg: false, where: `${S} AND s.tag = 'failed'` },
   tag_no_attempt: { unit: "sessions", title: "Sessions tagged no_attempt", arg: false, where: `${S} AND s.tag = 'no_attempt'` },
-  session_reason: { unit: "sessions", title: "App sessions without recorded success", arg: true, where: `${S} AND s.tag = 'failed' AND s.reason = $3` },
+  session_reason: { unit: "sessions", title: "Sessions that didn't connect", arg: true, where: `${S} AND s.tag = 'failed' AND s.reason = $3` },
   untied_error: { unit: "sessions", title: "Sessions with an error before any client connected", arg: true, where: ERROR_ON("e.session_id = s.session_id", false) },
   clients: { unit: "clients", title: "Client connections with telemetry", arg: false, where: S },
-  clients_connected: { unit: "clients", title: "Client connections with a recorded success", arg: false, where: `${S} AND s.tag = 'connected'` },
-  clients_not_connected: { unit: "clients", title: "Client connections without a recorded success", arg: false, where: `${S} AND s.tag = 'not_connected'` },
-  clients_alone: { unit: "clients", title: "Client IDs without success in sessions with no tagged success", arg: false, where: `${S} AND s.tag = 'not_connected' AND NOT EXISTS (SELECT 1 FROM connection_tags o WHERE o.session_id = s.session_id AND o.tag = 'connected')` },
-  clients_unknown: { unit: "clients", title: "Client connections with no outcome evidence", arg: false, where: `${S} AND s.tag = 'unknown'` },
-  client_reason: { unit: "clients", title: "Client connections without a recorded success", arg: true, where: `${S} AND s.tag = 'not_connected' AND s.reason = $3` },
+  clients_connected: { unit: "clients", title: "Clients that connected", arg: false, where: `${S} AND s.tag = 'connected'` },
+  clients_not_connected: { unit: "clients", title: "Clients that didn't connect", arg: false, where: `${S} AND s.tag = 'not_connected'` },
+  clients_alone: { unit: "clients", title: "Clients that didn't connect, in sessions where no client connected", arg: false, where: `${S} AND s.tag = 'not_connected' AND NOT EXISTS (SELECT 1 FROM connection_tags o WHERE o.session_id = s.session_id AND o.tag = 'connected')` },
+  clients_unknown: { unit: "clients", title: "Clients with unknown outcome (no app events)", arg: false, where: `${S} AND s.tag = 'unknown'` },
+  client_reason: { unit: "clients", title: "Clients that didn't connect", arg: true, where: `${S} AND s.tag = 'not_connected' AND s.reason = $3` },
   client_error: { unit: "clients", title: "Client connections that recorded", arg: true, where: ERROR_ON("e.connection_id = s.connection_id", true) },
 } satisfies Record<string, Cohort>;
 export type CohortKey = keyof typeof COHORTS;
@@ -301,16 +300,6 @@ export async function getUntiedErrors(range: Range): Promise<PreClientErrorRow[]
     SELECT p.error, p.events, p.sessions, top.phase, top.stage, top.detail
     FROM per p JOIN top ON top.error = p.error
     ORDER BY p.sessions DESC, p.error`, [range.from, range.to]);
-}
-
-export async function getDailySessions(range: Range): Promise<DailySessionRow[]> {   // Per app start day (UTC), how many sessions had an attempt but no recorded success (the tag_failed cohort's condition, per day). Called by SessionTrend on the overview
-  // App sessions in the range by start day, counting those tagged failed.
-  return query<DailySessionRow>(`
-    SELECT (s.started_at AT TIME ZONE 'UTC')::DATE::STRING AS day, count(*) FILTER (WHERE s.tag = 'failed') AS failed
-    FROM ${SESSIONS}
-    WHERE ${S}
-    GROUP BY 1
-    ORDER BY 1`, [range.from, range.to]);
 }
 
 export async function getErrorSeries(range: Range): Promise<ErrorSeriesRow[]> {         // Per day (UTC), not_connected client connections per error: the 5 errors that hit the most, warnings apart, the rest as one "Other" series. day NULL = the whole range. Called by ErrorTrend for the chart and its key

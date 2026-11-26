@@ -1,3 +1,5 @@
+// page.tsx: the dashboard at http://localhost:3000: the header (dates, ID search, views, sign-out, theme), then the Overview or Diagnostics view, and the side sheet when one is open.
+
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -65,7 +67,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
           <div className="diagnostics-content">
             <div className="view-heading">
               <h2>Diagnostics</h2>
-              <p className="hint">A session can contain several client connections. Outcomes use recorded success events; patterns count events within sessions; errors are individual logs that may repeat.</p>
+              <p className="hint">A session can have several clients. Connected = the app logged pipeline.connect.success.</p>
             </div>
             <Attention range={range} />
             <ErrorTable range={range} />

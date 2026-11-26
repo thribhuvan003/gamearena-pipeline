@@ -37,7 +37,7 @@ export default function ErrorChart({ series }: { series: IssueSeries[] }) {
 
   return (
     <>
-      <p className="hint">Error events on client IDs with no recorded success, grouped by event day (UTC). Choose an event to see its daily count.</p>
+      <p className="hint">Clients that didn't connect, by error and event day (UTC). Pick an error to see its daily count.</p>
       <div className="issue-trend-grid">
         <div>
           <div className="issue-list-heading"><strong>Issue</strong><span>Connections</span></div>

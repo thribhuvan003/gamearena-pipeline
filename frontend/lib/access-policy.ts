@@ -1,3 +1,5 @@
+// access-policy.ts: the sign-in rules: when the local preview skips login, which verified emails are allowed, and whether Auth0 is fully configured.
+
 export function localPreview(): boolean {
   return process.env.NODE_ENV === "development" && process.env.AUTH_MODE !== "auth0";
 }

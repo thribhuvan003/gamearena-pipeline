@@ -1,5 +1,7 @@
+// ReasonsTable.tsx: why clients didn't connect: the pipeline's category per client with its one-line meaning; each row opens exactly its clients.
+
 import Link from "next/link";
-import { formatNumber, reasonLabel } from "@/lib/format";
+import { formatNumber, reasonExplanation, reasonLabel } from "@/lib/format";
 import { link, type Sheet } from "@/lib/links";
 import { getConnectionReasons, type Range } from "@/lib/queries";
 
@@ -8,10 +10,10 @@ export default async function ReasonsTable({ range, sheet }: { range: Range; she
 
   return (
     <section className="overview-panel" aria-labelledby="reasons-title">
-      <h2 id="reasons-title">No success recorded: pipeline categories</h2>
-      <p className="hint">The pipeline assigns one category per client connection without a success event, using logged failure phase, video state, or missing evidence. These are clues, not confirmed root causes.</p>
+      <h2 id="reasons-title">Why clients didn't connect</h2>
+      <p className="hint">One category per client that didn't connect, from its logged failure phase or video state. A clue, not a proven cause.</p>
       {rows.length === 0 ? (
-        <p className="hint">No connections without a recorded success in this period.</p>
+        <p className="hint">No clients that didn't connect in this period.</p>
       ) : (
         <ul className="list reason-list">
           {rows.map((row) => (
@@ -23,7 +25,7 @@ export default async function ReasonsTable({ range, sheet }: { range: Range; she
               >
                 <span className="row-main">
                   <strong>{reasonLabel(row.reason)}</strong>
-                  {row.reason === "no_video" && <span className="reason-detail">The logs don’t establish a cause.</span>}
+                  {reasonExplanation(row.reason, "clients") && <span className="reason-detail">{reasonExplanation(row.reason, "clients")}</span>}
                 </span>
                 <span className="row-end"><strong>{formatNumber(row.clients)}</strong><small>{row.percent}%</small></span>
                 <span className="chevron" aria-hidden="true">›</span>
