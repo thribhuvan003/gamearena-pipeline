@@ -43,7 +43,6 @@ function ErrorRow({ row, range }: { row: NoClientErrorRow; range: Range }) {   /
       <span>
         <strong>{eventLabel(row.error)}</strong>
         {payload && <span className="row-meta">({payload})</span>}
-        <span className="id">{row.error}</span>
       </span>
       <strong>{formatNumber(row.sessions)}</strong>
       <span>{formatNumber(row.events)}</span>
