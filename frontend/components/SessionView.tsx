@@ -23,7 +23,7 @@ export default async function SessionView({ id, highlight, eventPage, pageHref }
           <h3 id="session-clients">Client connections</h3>
           <span className="section-count">{formatNumber(String(connections.length))}</span>
         </div>
-        <p className="hint">Each client has its own outcome. “Didn't connect” means the app never logged pipeline.connect.success for it.</p>
+        <p className="hint">Each client has its own outcome. “No success recorded” means pipeline.connect.success was not found for that client; it does not prove the network connection failed.</p>
         {connections.length === 0 ? (
           <p className="hint">{session.in_app ? "No client connections recorded." : "Client records are unavailable in the app backup."}</p>
         ) : (

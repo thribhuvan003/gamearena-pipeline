@@ -28,8 +28,8 @@ export default async function Attention({ range }: { range: Range }) {   // Show
   return (
     <div className="diagnostics-grid">
       <section className="diagnostics-panel" aria-labelledby="failed-sessions-title">
-        <h3 id="failed-sessions-title">Sessions that didn't connect</h3>
-        <p className="hint">{formatNumber(counts.tag_failed)} ended sessions tried to connect but never logged pipeline.connect.success. One category per session.</p>
+        <h3 id="failed-sessions-title">Sessions without recorded success</h3>
+        <p className="hint">{formatNumber(counts.tag_failed)} ended sessions logged an attempt but no pipeline.connect.success. One category per session.</p>
         {reasons.length === 0 ? <p className="hint">No sessions in this outcome.</p> : (
           <div className="diagnostic-list">
             {reasons.map((row) => (

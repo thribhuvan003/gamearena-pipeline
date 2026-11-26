@@ -11,10 +11,10 @@ export default async function TopErrors({ range }: { range: Range }) {   // List
   return (
     <section className="top-errors" aria-labelledby="top-errors-title">
       <div className="section-line">
-        <h2 id="top-errors-title">Pre-connect errors with no client ID</h2>
+        <h2 id="top-errors-title">Session-level errors (no client ID)</h2>
       </div>
-      <p className="hint">Logged in phase pre-connect with no client ID; usually before any client connected, but not always. Sessions = app sessions that logged it; times logged = how often it was logged in total (a session can log it more than once). In brackets: the payload’s most common values.</p>
-      {errors.length === 0 ? <p className="hint">No pre-connect errors without a client ID in this period.</p> : (
+      <p className="hint">These errors have no connection ID, so they cannot be assigned to a specific client. Sessions counts affected app sessions; times logged counts repeated events. The recorded phase and details are shown when available.</p>
+      {errors.length === 0 ? <p className="hint">No session-level errors without a client ID in this period.</p> : (
         <div className="list overview-errors">
           <div className="overview-error-row overview-error-labels" aria-hidden="true">
             <span>Error</span>

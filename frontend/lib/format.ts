@@ -22,8 +22,8 @@ export function percent(part: string, whole: string): string {   // part as a sh
 
 const TAG_LABELS: Record<string, string> = {
   connected: "Connected",
-  not_connected: "Didn't connect",
-  failed: "Didn't connect",
+  not_connected: "No success recorded",
+  failed: "No success recorded",
   no_attempt: "No attempt",
   unknown: "Unknown",
 };
@@ -74,8 +74,8 @@ const REASON_EXPLAINED: Record<string, string> = {
 export function reasonExplanation(reason: string, unit: "sessions" | "clients"): string | null {   // The one-line meaning of a category, for the line under its name. Called by ReasonsTable (clients) and Attention (sessions)
   if (reason === "no_video") {
     return unit === "sessions"
-      ? "Host and client joined and it tried, but no failure or failed video state was logged."
-      : "It tried, but no failure or failed video state was logged.";
+      ? "The available events do not identify a specific failure reason."
+      : "The available events do not identify a specific failure reason.";
   }
   return REASON_EXPLAINED[reason] ?? null;
 }
@@ -100,7 +100,7 @@ const COHORT_EXPLAINED: Record<string, string> = {
   clients_not_connected: "The app logged events for this client, but never pipeline.connect.success.",
   clients_alone: "Clients that didn't connect, in sessions where no client connected.",
   clients_unknown: "Only server events exist for this client; the app logged nothing, so the outcome is unknown.",
-  untied_error: "Sessions that logged this error with no client ID, in phase pre-connect. In some, a client had already connected.",
+  untied_error: "Sessions that logged this error without a connection ID; it cannot be assigned to a specific client.",
   client_error: "Clients that logged this error at least once. Some of them may still have connected.",
 };
 

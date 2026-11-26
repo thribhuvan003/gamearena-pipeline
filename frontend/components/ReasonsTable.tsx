@@ -10,10 +10,10 @@ export default async function ReasonsTable({ range, sheet }: { range: Range; she
 
   return (
     <section className="overview-panel" aria-labelledby="reasons-title">
-      <h2 id="reasons-title">Why clients didn't connect</h2>
-      <p className="hint">One category per client that didn't connect, from its logged failure phase or video state. A clue, not a proven cause.</p>
+      <h2 id="reasons-title">No recorded success: categories</h2>
+      <p className="hint">One category per client without a recorded success event. These are clues from the logs, not confirmed root causes.</p>
       {rows.length === 0 ? (
-        <p className="hint">No clients that didn't connect in this period.</p>
+        <p className="hint">No clients without recorded success in this period.</p>
       ) : (
         <ul className="list reason-list">
           {rows.map((row) => (

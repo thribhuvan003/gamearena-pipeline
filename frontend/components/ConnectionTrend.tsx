@@ -12,7 +12,7 @@ export default async function ConnectionTrend({ range }: { range: Range }) {
 
   return (
     <section className="overview-panel" aria-labelledby="trend-title">
-      <h2 id="trend-title">Clients that didn't connect, per day</h2>
+      <h2 id="trend-title">No recorded success, per day</h2>
       <p className="hint">By each client's first event day (UTC).</p>
       {days.length === 0 ? (
         <p className="hint">No measured connections in this period.</p>
