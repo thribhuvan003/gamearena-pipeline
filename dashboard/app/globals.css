@@ -96,7 +96,8 @@ a {
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -901,15 +902,22 @@ details.more > summary::-webkit-details-marker {
   font-size: var(--fs-small);
 }
 
+/* Same look as the date and search boxes; the browser's own arrow is replaced by a grey chevron that reads in both themes. */
 .trend-picker select {
   min-width: 0;
   max-width: 100%;
   font: inherit;
   color: var(--text);
-  background: var(--surface-2);
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238e8e93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right var(--s2) center;
   border: 1px solid var(--separator);
   border-radius: var(--radius-sm);
-  padding: 4px var(--s2);
+  padding: var(--s1) calc(var(--s2) * 2 + 10px) var(--s1) var(--s2);
+  appearance: none;
+  cursor: pointer;
+}
+
+.trend-picker select:hover {
+  border-color: var(--accent);
 }
 
 .daily-values {
