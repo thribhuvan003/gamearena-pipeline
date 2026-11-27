@@ -5,7 +5,10 @@ import psycopg
 from pipeline import config
 
 
-def connect():                                               # Opens a database connection
+def connect():                                               # Opens a database connection (TLS and query timeout from config)
+    extra = {"sslrootcert": config.DB_SSLROOTCERT} if config.DB_SSLROOTCERT else {}
+    if config.STATEMENT_TIMEOUT_SECONDS:
+        extra["options"] = f"-c statement_timeout={config.STATEMENT_TIMEOUT_SECONDS}s"
     return psycopg.connect(
         host=config.DB_HOST,
         port=config.DB_PORT,
@@ -14,4 +17,5 @@ def connect():                                               # Opens a database 
         password=config.DB_PASSWORD,
         sslmode=config.DB_SSLMODE,
         connect_timeout=5,
+        **extra,
     )

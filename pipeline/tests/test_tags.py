@@ -103,6 +103,11 @@ class ClientLabels(unittest.TestCase):   # Device, OS, browser and access from m
         ua = "Linux; Android 13; SM-S911B; wv) AppleWebKit Chrome/120 Mobile Safari"
         self.assertEqual(tags.client_labels(True, ua, "share")[2], "Android WebView (in-app)")
 
+    def test_ios_webview_has_no_browser_name(self):
+        webview = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+        self.assertEqual(tags.client_labels(True, webview, "external")[:3], ("Phone", "iOS", "iOS WebView (in-app)"))
+        self.assertEqual(tags.client_labels(True, webview.replace("Mobile/15E148", "Version/17.0 Mobile/15E148 Safari/604.1"), "external")[2], "Safari")
+
     def test_tv_before_everything(self):
         self.assertEqual(tags.client_labels(True, "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) Chrome", "external")[:2], ("TV", "Tizen (Samsung TV)"))
 

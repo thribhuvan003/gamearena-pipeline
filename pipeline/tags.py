@@ -107,4 +107,6 @@ def browser_label(has):                                      # The browser named
                          ("Safari", ("safari",))):
         if has(*tokens):
             return name
+    if has("iphone", "ipad", "ipod") and has("applewebkit"):     # iOS WebKit with no browser name at all: an app's built-in web view
+        return "iOS WebView (in-app)"
     return "Unknown"

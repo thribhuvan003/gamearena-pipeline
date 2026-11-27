@@ -1,0 +1,6 @@
+# Only pipeline/ goes into the image.
+*
+!pipeline/
+pipeline/tests/
+**/__pycache__/
+**/*.pyc

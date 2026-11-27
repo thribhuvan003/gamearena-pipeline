@@ -16,23 +16,24 @@ def start_run(conn):                                         # Adds a 'running' 
     return conn.execute(START_RUN_SQL).fetchone()[0]
 
 
-# The newest raw event, and the newest event already counted in session_facts (both read from an index).
-NEWEST_EVENT_SQL = "SELECT max(recorded_at) FROM session_telemetry_events"
-NEWEST_PROCESSED_SQL = "SELECT max(last_event_at) FROM session_facts"
+# The newest raw event, and the newest event already counted in session_facts (both read from an index). Events dated in the
+# future are left out, so one wrong clock can't push "newest processed" ahead and stop new events being picked up.
+NEWEST_EVENT_SQL = f"SELECT max(recorded_at) FROM {config.EVENTS_TABLE} WHERE recorded_at <= now()"
+NEWEST_PROCESSED_SQL = "SELECT max(last_event_at) FROM session_facts WHERE last_event_at <= now()"
 
 # Sessions with events after a given time (by the recorded_at index), oldest first.
-CHANGED_SESSIONS_SQL = """
+CHANGED_SESSIONS_SQL = f"""
 SELECT session_id
-FROM session_telemetry_events
+FROM {config.EVENTS_TABLE}
 WHERE recorded_at > %(since)s
 GROUP BY session_id
 ORDER BY max(recorded_at)
 """
 
 # Every session with events, for the first run and a full rebuild.
-ALL_SESSIONS_SQL = """
+ALL_SESSIONS_SQL = f"""
 SELECT session_id
-FROM session_telemetry_events
+FROM {config.EVENTS_TABLE}
 GROUP BY session_id
 ORDER BY max(recorded_at)
 """
@@ -50,7 +51,7 @@ def changed_sessions(conn, everything=False):                # Ids to process, o
 
 
 # Count the facts of these sessions again from all their events and save them.
-SAVE_FACTS_SQL = """
+SAVE_FACTS_SQL = f"""
 UPSERT INTO session_facts (session_id, events, has_end, attempts, reconnects,
                            first_failure, last_failure, first_success, last_success, last_event_at)
 SELECT e.session_id,
@@ -63,7 +64,7 @@ SELECT e.session_id,
        min(e.recorded_at) FILTER (WHERE coalesce(e.payload->>'event', e.event_type::STRING) = 'pipeline.connect.success'),
        max(e.recorded_at) FILTER (WHERE coalesce(e.payload->>'event', e.event_type::STRING) = 'pipeline.connect.success'),
        max(e.recorded_at)
-FROM session_telemetry_events e
+FROM {config.EVENTS_TABLE} e
 WHERE e.session_id = ANY(%(ids)s::UUID[])
 GROUP BY e.session_id
 """
@@ -74,13 +75,13 @@ DELETE FROM error_events WHERE session_id = ANY(%(ids)s::UUID[])
 """
 
 # Copy these sessions' error-level events.
-SAVE_ERRORS_SQL = """
+SAVE_ERRORS_SQL = f"""
 UPSERT INTO error_events (id, session_id, connection_id, recorded_at, event, code, error_code, phase, stage, message, detail)
 SELECT e.id, e.session_id, e.connection_id, e.recorded_at,
        coalesce(e.payload->>'event', e.event_type::STRING),
        e.payload->>'code', e.payload->>'errorCode', e.payload->>'phase', e.payload->>'stage',
        e.message, coalesce(e.payload->>'reason', e.payload->>'errorText')
-FROM session_telemetry_events e
+FROM {config.EVENTS_TABLE} e
 WHERE e.session_id = ANY(%(ids)s::UUID[]) AND e.level = 'error'
 """
 
@@ -94,8 +95,8 @@ def refresh_facts(conn, session_ids):                        # Recounts session_
 
 # On a full rebuild, drop facts and copied errors of sessions that no longer have any raw events.
 DELETE_GONE_SQL = [
-    "DELETE FROM session_facts f WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = f.session_id)",
-    "DELETE FROM error_events x WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = x.session_id)",
+    f"DELETE FROM session_facts f WHERE NOT EXISTS (SELECT 1 FROM {config.EVENTS_TABLE} e WHERE e.session_id = f.session_id)",
+    f"DELETE FROM error_events x WHERE NOT EXISTS (SELECT 1 FROM {config.EVENTS_TABLE} e WHERE e.session_id = x.session_id)",
 ]
 
 

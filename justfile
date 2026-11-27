@@ -30,6 +30,10 @@ rebuild:
 status:
     {{python}} -m pipeline status
 
+# Create the pipeline's own database user: reads the app's tables, writes only its own (run once, as admin)
+grants:
+    {{db}} < database/grants.sql
+
 # Validate the results
 check:
     {{db}} < database/check.sql

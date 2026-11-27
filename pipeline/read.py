@@ -1,10 +1,12 @@
 # read.py: reads the events of given sessions and of their client connections, for tagging. It only reads, never changes anything.
 
+from pipeline import config
+
 # Each given session that sent session_ended, with its events up to that end (by the session index, never the whole table).
-EVENTS_SQL = """
+EVENTS_SQL = f"""
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
-    FROM session_telemetry_events
+    FROM {config.EVENTS_TABLE}
     WHERE session_id = ANY(%(ids)s::UUID[])
       AND event_type = 'session_ended'
     GROUP BY session_id
@@ -14,7 +16,7 @@ SELECT e.session_id,
        array_agg(coalesce(e.payload->>'event', e.event_type::STRING) ORDER BY e.recorded_at, e.id) AS event_names,
        array_agg(e.payload->>'phase' ORDER BY e.recorded_at, e.id) AS phases,
        array_agg(e.payload->>'state' ORDER BY e.recorded_at, e.id) AS states
-FROM session_telemetry_events e
+FROM {config.EVENTS_TABLE} e
 JOIN ended d ON d.session_id = e.session_id
 WHERE e.recorded_at <= d.ended_at
 GROUP BY e.session_id
@@ -39,10 +41,10 @@ def read_sessions(conn, session_ids):                        # The ended ones am
 
 # The client connections of these ended sessions: their events up to the end, two milestones from all their events,
 # and the app's own record of the client (only the labels are kept, never the user agent).
-CONNECTIONS_SQL = """
+CONNECTIONS_SQL = f"""
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
-    FROM session_telemetry_events
+    FROM {config.EVENTS_TABLE}
     WHERE session_id = ANY(%(ids)s::UUID[])
       AND event_type = 'session_ended'
     GROUP BY session_id
@@ -56,7 +58,7 @@ clients AS (
            array_agg(coalesce(e.payload->>'event', e.event_type::STRING) ORDER BY e.recorded_at, e.id) AS event_names,
            array_agg(e.payload->>'phase' ORDER BY e.recorded_at, e.id) AS phases,
            array_agg(e.payload->>'state' ORDER BY e.recorded_at, e.id) AS states
-    FROM session_telemetry_events e
+    FROM {config.EVENTS_TABLE} e
     JOIN ended d ON d.session_id = e.session_id
     WHERE e.connection_role = 'client'
       AND e.connection_id IS NOT NULL
@@ -71,7 +73,7 @@ milestones AS (
                 WHEN bool_or(coalesce(payload->>'event', event_type::STRING) = 'ice.candidate.error') THEN 'ice_warning'
                 WHEN bool_or(level = 'warn') THEN 'warning'
                 ELSE 'nothing' END AS logged
-    FROM session_telemetry_events
+    FROM {config.EVENTS_TABLE}
     WHERE session_id = ANY(%(ids)s::UUID[])
       AND connection_id IS NOT NULL
     GROUP BY connection_id
@@ -81,7 +83,7 @@ SELECT c.connection_id, c.session_id, c.started_at, c.app_events, c.connected_at
        x.id IS NOT NULL AS in_app, x.user_agent, x.auth_type::STRING
 FROM clients c
 LEFT JOIN milestones m ON m.connection_id = c.connection_id
-LEFT JOIN gamearena_source.session_client_connections x ON x.id = c.connection_id
+LEFT JOIN {config.CLIENTS_TABLE} x ON x.id = c.connection_id
 """
 
 

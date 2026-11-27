@@ -1,0 +1,58 @@
+# pipeline.yaml: the pipeline in Kubernetes: exactly one copy, checking for new events every 30 s, restarted if it stops.
+# Before applying: set the image, the namespace, the database host and table names (marked CHANGE), and create the secret:
+#   kubectl -n <namespace> create secret generic gamearena-pipeline-db --from-literal=DB_PASSWORD='...' --from-file=ca.crt=<cluster CA>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gamearena-pipeline
+  namespace: gamearena            # CHANGE
+  labels: { app: gamearena-pipeline }
+spec:
+  replicas: 1                     # one copy only: two would process the same sessions at once
+  strategy:
+    type: Recreate                # the old pod stops before the new one starts, so there are never two
+  selector:
+    matchLabels: { app: gamearena-pipeline }
+  template:
+    metadata:
+      labels: { app: gamearena-pipeline }
+    spec:
+      terminationGracePeriodSeconds: 60   # SIGTERM first: the pipeline stops like Ctrl+C and marks its run as failed
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: pipeline
+          image: REGISTRY/gamearena-pipeline:TAG   # CHANGE
+          args: ["python", "-m", "pipeline", "run"]
+          env:
+            - { name: DB_HOST, value: "cockroachdb-public" }   # CHANGE: the cluster's internal service name
+            - { name: DB_PORT, value: "26257" }
+            - { name: DB_NAME, value: "gamearena_analytics" }  # where the pipeline's 5 tables live
+            - { name: DB_USER, value: "gamearena_pipeline" }   # the user from database/grants.sql
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: gamearena-pipeline-db, key: DB_PASSWORD } }
+            - { name: DB_SSLMODE, value: "verify-full" }
+            - { name: DB_SSLROOTCERT, value: "/certs/ca.crt" }
+            - { name: EVENTS_TABLE, value: "gamearena_analytics.public.session_telemetry_events" }          # CHANGE
+            - { name: CLIENTS_TABLE, value: "gamearena_source.public.session_client_connections" }         # CHANGE
+            - { name: WAIT_SECONDS, value: "30" }
+            - { name: BATCH_SIZE, value: "200" }
+            - { name: LATE_EVENTS_MINUTES, value: "60" }
+            - { name: REBUILD_HOURS, value: "24" }
+            - { name: STATEMENT_TIMEOUT_SECONDS, value: "600" }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: db-certs, mountPath: /certs, readOnly: true }
+      volumes:
+        - name: db-certs
+          secret:
+            secretName: gamearena-pipeline-db
+            items: [{ key: ca.crt, path: ca.crt }]

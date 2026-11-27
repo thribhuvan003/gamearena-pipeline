@@ -1,6 +1,7 @@
 # __main__.py: the program's start: main -> run_command -> run_one_round -> process_batch, or the status command.
 
 import argparse
+import signal
 import time
 
 import psycopg
@@ -35,15 +36,23 @@ def main():                                                  # Reads the command
         status_command()
 
 
-def run_command(args):                                       # Runs one round, or a round every WAIT_SECONDS until Ctrl+C
+def run_command(args):                                       # Runs one round, or a round every WAIT_SECONDS (a full rebuild every REBUILD_HOURS) until stopped
     print(f"Pipeline started: database {config.DB_NAME} on {config.DB_HOST}:{config.DB_PORT}, batch size {config.BATCH_SIZE}")
     once = args.once or args.all or args.limit is not None
+    signal.signal(signal.SIGTERM, signal.default_int_handler)   # Kubernetes stops a pod with SIGTERM: stop like Ctrl+C, the run marked failed
+    rebuild_every = config.REBUILD_HOURS * 3600
+    next_rebuild = time.monotonic() + rebuild_every
 
     try:
         while True:
+            rebuild = args.all or (not once and rebuild_every > 0 and time.monotonic() >= next_rebuild)
             try:
                 with db.connect() as conn:
-                    run_one_round(conn, args.limit, args.all)
+                    if rebuild and not args.all:
+                        print("Scheduled full rebuild (REBUILD_HOURS)")
+                    run_one_round(conn, args.limit, rebuild)
+                if rebuild:
+                    next_rebuild = time.monotonic() + rebuild_every
 
             except psycopg.OperationalError as error:
                 if once:
@@ -57,7 +66,7 @@ def run_command(args):                                       # Runs one round, o
             time.sleep(config.WAIT_SECONDS)
 
     except KeyboardInterrupt:
-        print("Stopped with Ctrl+C. Finished batches are kept; an unfinished batch was not saved.")
+        print("Stopped (Ctrl+C or SIGTERM). Finished batches are kept; an unfinished batch was not saved.")
 
     print("Pipeline stopped")
 

@@ -190,6 +190,7 @@ WITH expected AS (
                 WHEN u ILIKE '%firefox%' OR u ILIKE '%fxios%' THEN 'Firefox'
                 WHEN u ILIKE '%crios%' OR u ILIKE '%chrome%' THEN 'Chrome'
                 WHEN u ILIKE '%safari%' THEN 'Safari'
+                WHEN (u ILIKE '%iphone%' OR u ILIKE '%ipad%' OR u ILIKE '%ipod%') AND u ILIKE '%applewebkit%' THEN 'iOS WebView (in-app)'
                 ELSE 'Unknown' END AS browser,
            CASE WHEN x.id IS NULL THEN 'No app record' ELSE coalesce(x.auth_type::STRING, 'Unknown') END AS access,
            EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id
