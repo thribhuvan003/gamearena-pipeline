@@ -74,7 +74,7 @@ function details(row: TimelineRow): string {   // The known payload fields as on
     redact(row.error_text),
     row.phase && `phase ${row.phase}`,
     row.stage && `stage ${row.stage}`,
-    row.state && (row.prev ? `${row.prev} → ${row.state}` : `state: ${row.state}`),
+    row.prev && row.state && `${row.prev} → ${row.state}`,
     row.attempt && `attempt ${row.attempt}`,
     row.auth_type && `access ${row.auth_type}`,
     row.mode && `join mode ${row.mode}`,

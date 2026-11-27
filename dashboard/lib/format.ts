@@ -52,17 +52,17 @@ const TAG_LABELS: Record<string, string> = {
 const REASON_LABELS: Record<string, string> = {
   no_video: "No failure rule matched",
   "no_video:nothing": "No failure rule matched · no warnings or errors",
-  "no_video:ice_warning": "No matching rule · ice.candidate.error logged",
+  "no_video:ice_warning": "No failure rule matched · network candidate warning",
   "no_video:warning": "No failure rule matched · other warnings",
-  "no_video:error": "No matching rule · error logged",
-  setup_error: "pipeline.connect.failure · phase pre-connect",
-  video_connection_failed: "webrtc.connection.state · state: failed",
-  network_connection_failed: "ice.connection.state · state: failed",
-  video_decode_error: "media.decode.error",
-  connection_dropped: "pipeline.connection.dropped · no recorded success",
-  someone_never_joined: "host_connected or client_connected missing",
-  error_while_connecting: "pipeline.connect.failure · phase connecting",
-  error_other: "pipeline.connect.failure · other phase",
+  "no_video:error": "No failure rule matched · an error no rule uses",
+  setup_error: "Setup failed",
+  video_connection_failed: "WebRTC reported failed",
+  network_connection_failed: "ICE reported failed",
+  video_decode_error: "Video decoding error",
+  connection_dropped: "Drop logged, never connected",
+  someone_never_joined: "Host or client join missing",
+  error_while_connecting: "Error while connecting",
+  error_other: "Other connection error",
 };
 
 // What put a session or client in each category, from the rules in pipeline/tags.py (checked in this order; first match wins).
@@ -111,15 +111,7 @@ const COHORT_EXPLAINED: Record<string, string> = {
   clients: "Client connections that logged events, one row per connection ID.",
   clients_connected: "The app logged pipeline.connect.success for this client.",
   clients_not_connected: "The app logged events for this client, but never pipeline.connect.success.",
-  clients_unknown: "Only system events were recorded for this client up to session_ended; later events or errors may still exist.",
-  no_outcome: "No connected or failed session tag. Inspect the recorded events separately.",
-  no_outcome_with_errors: "Unclassified sessions with at least one raw error-level event, including events with a client ID.",
-  no_end_event: "Processed telemetry exists, but no session_ended event has been processed.",
-  awaiting_tag: "A session_ended event was processed, but no outcome tag exists.",
-  tag_no_attempt: "No pipeline.connect.attempt or pipeline.connect.success was found up to session_ended.",
-  no_outcome_no_facts: "No processed session facts or tag. Raw events may still be awaiting processing.",
-  session_no_diagnostic: "Failed-tagged sessions with no error- or warn-level event without a client ID. They may have client-specific events.",
-  client_no_diagnostic: "Not-connected tagged clients with no error- or warn-level event under their own connection ID.",
+  clients_unknown: "Only server (system) events exist for this client; the app logged none.",
   no_client_error: "Sessions that logged this error with no client ID.",
   client_error: "Clients that logged this error at least once, any outcome.",
   session_end_reason: "App sessions with this end reason in the app's own record.",
@@ -129,25 +121,29 @@ const COHORT_EXPLAINED: Record<string, string> = {
 export function cohortExplanation(key: string, arg: string | null): string | null {   // A list's one-line logic, under its row and at the top of its sheet
   if (key === "session_reason" && arg) return reasonExplanation(arg, "sessions");
   if (key === "client_reason" && arg) return reasonExplanation(arg, "clients");
-  if (key.includes("_recorded_")) return "Distinct records with the exact event, severity, code, state, phase and stage shown. The selected outcome or timing is applied to the same records as the dashboard count.";
   return COHORT_EXPLAINED[key] ?? null;
 }
 
 // ---------- Event names ----------
 
-export function eventLabel(signature: string): string {
-  const [name, code] = signature.split(" ", 2);
-  return code ? `${name} · code ${code}` : name;
-}
+const EVENT_LABELS: Record<string, string> = {
+  "pipeline.connect.attempt": "Connection attempt",
+  "pipeline.connect.success": "Connection succeeded",
+  "pipeline.connect.failure": "Connection failed",
+  "pipeline.connection.dropped": "Connection dropped",
+  "ice.candidate.error": "Network candidate warning",
+  "ice.connection.state": "Network connection state",
+  "webrtc.connection.state": "WebRTC connection state",
+  "media.decode.error": "Video decoding error",
+  "media.first_decode": "First video frame decoded",
+  "ws.reconnect.exhausted": "WebSocket retries exhausted",
+  ws_error: "WebSocket warning",
+};
 
-// The exact event fields used by the new diagnostics queries.
-export function recordedEventLabel(signature: string): string {
-  try {
-    const [event, level, code, errorCode, state, phase, stage] = JSON.parse(signature);
-    return [event, level, code && `code ${code}`, errorCode && `errorCode ${errorCode}`, state && `state: ${state}`, phase && `phase: ${phase}`, stage && `stage: ${stage}`].filter(Boolean).join(" · ");
-  } catch {
-    return "Invalid event signature";
-  }
+export function eventLabel(signature: string): string {   // "pipeline.connect.failure 500" -> "Connection failed · Code 500"
+  const [name, code] = signature.split(" ", 2);
+  const label = EVENT_LABELS[name] ?? name.replaceAll(/[._]/g, " ").replace(/^./, (first) => first.toUpperCase());
+  return code ? `${label} · Code ${code}` : label;
 }
 
 export function labelText(arg: string): string {   // A client label list's "kind|value" -> "Browser: Chrome"

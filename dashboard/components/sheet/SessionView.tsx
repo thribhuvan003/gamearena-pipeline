@@ -65,8 +65,7 @@ function ClientDetails({ row, index, selected }: { row: ClientConnectionRow; ind
       </summary>
       <div className="disclosure-body">
         <dl className="compact-facts">
-          {row.reason && <div><dt>Matched rule</dt><dd>{reasonLabel(row.reason)}</dd></div>}
-          {(!row.tag || row.tag === "unknown") && <div><dt>Recorded evidence</dt><dd>{clientEvidence(row) || "No success, failure or error-level event recorded"}</dd></div>}
+          {row.reason && <div><dt>Reason</dt><dd>{reasonLabel(row.reason)}</dd></div>}
           <div><dt>Connection ID</dt><dd className="id">{row.connection_id}</dd></div>
           <div><dt>Access</dt><dd>{row.auth_type}</dd></div>
           <div><dt>App record start</dt><dd>{formatTime(row.connected_at)}</dd></div>
@@ -88,19 +87,11 @@ const PHASE_REASONS = ["setup_error", "error_while_connecting", "error_other"];
 
 type Headline = { title: string; note?: string; status?: string };
 
-function clientEvidence(client: ClientConnectionRow): string {
-  return [
-    client.recorded_success && "pipeline.connect.success recorded",
-    client.recorded_failure && "pipeline.connect.failure recorded",
-    client.has_logged_error && "error-level event logged",
-  ].filter(Boolean).join(" · ");
-}
-
 function clientOutcome(client: ClientConnectionRow, number: number, session: SessionDetail): Headline {   // The headline for the client the viewer opened, with the session's outcome underneath
   const own = client.tag ? tagText(client.tag, null) : "Outcome not recorded";
   const reason = client.reason ? `${reasonLabel(client.reason)} · ` : "";
-  const evidence = !client.tag || client.tag === "unknown" ? clientEvidence(client) : "";
-  return { title: `Client ${number}: ${own}`, note: [reason + "Session: " + outcome(session).title, evidence].filter(Boolean).join(" · "), status: client.tag === "not_connected" ? "failed" : undefined };
+  const other = session.tag === "connected" && client.tag !== "connected" ? " (another client logged pipeline.connect.success)" : "";
+  return { title: `Client ${number}: ${own}`, note: `${reason}Session: ${outcome(session).title}${other}`, status: client.tag === "not_connected" ? "failed" : undefined };
 }
 
 function outcome(session: SessionDetail): Headline {   // The session's outcome with a short note, or why there is none
@@ -108,14 +99,10 @@ function outcome(session: SessionDetail): Headline {   // The session's outcome 
   if (session.reason && PHASE_REASONS.includes(session.reason) && session.failure_no_client) {
     return { title: tagText(session.tag!, null), note: `${reasonLabel(session.reason)} · from an error logged with no client ID; each client below shows its own evidence.`, status: session.tag! };
   }
-  if (session.tag === "failed") return { title: tagText(session.tag, null), note: session.reason ? reasonLabel(session.reason) : undefined, status: session.tag };
-  if (Number(session.events) === 0) return { title: "No telemetry recorded" };
-  const why = session.tag === "no_attempt" ? "No attempt or success up to session_ended." : session.has_end_event ? "Telemetry has yet to be tagged." : "No session_ended recorded.";
-  const evidence = [
-    session.recorded_success && "pipeline.connect.success recorded",
-    session.recorded_failure && "pipeline.connect.failure recorded",
-    Number(session.error_events) > 0 && `${formatNumber(session.error_events)} errors`,
-    Number(session.warn_events) > 0 && `${formatNumber(session.warn_events)} warnings`,
-  ].filter(Boolean).join(" · ");
-  return { title: "Session not classified", note: [why, evidence].filter(Boolean).join(" ") };
+  if (session.tag) return { title: tagText(session.tag, null), note: session.reason ? reasonLabel(session.reason) : undefined, status: session.tag };
+  if (Number(session.events) === 0) return { title: "Session outcome unavailable", note: "No telemetry was recorded." };
+  return {
+    title: "Session outcome unavailable",
+    note: session.has_end_event ? "Telemetry has yet to be tagged." : "No session end event was recorded.",
+  };
 }
