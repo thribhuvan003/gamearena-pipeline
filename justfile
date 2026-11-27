@@ -22,7 +22,7 @@ run n="":
 live:
     {{python}} -m pipeline run
 
-# Process every session again: facts, error copies and tags (after a rules change, or to catch very late events)
+# Process every session again: facts, error copies and tags. Run it nightly: it also catches events stored over LATE_EVENTS_MINUTES late
 rebuild:
     {{python}} -m pipeline run --all
 

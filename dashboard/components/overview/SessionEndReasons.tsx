@@ -12,7 +12,7 @@ export default async function SessionEndReasons({ range }: { range: Range }) {  
   return (
     <section className="overview-panel" aria-labelledby="end-reasons-title">
       <h3 id="end-reasons-title">Sessions by end reason</h3>
-      <p className="hint">From the app&apos;s own session record; the rows add up to {formatNumber(String(total))}.</p>
+      <p className="hint">From the app&apos;s own session record; the rows add up to {formatNumber(String(total))}. No outcome = no telemetry, or not tagged.</p>
       <div className="card-body">
         <ul className="list reason-list">
           {rows.map((row) => (
@@ -20,7 +20,7 @@ export default async function SessionEndReasons({ range }: { range: Range }) {  
               <Link href={link(range, { list: "session_end_reason", arg: row.end_reason })} scroll={false} className="list-row">
                 <span className="row-main">
                   <strong>{row.end_reason === "(none)" ? "No end reason recorded" : redact(row.end_reason)}</strong>
-                  <span className="row-meta">{formatNumber(row.connected)} connected · {formatNumber(row.not_connected)} didn&apos;t connect</span>
+                  <span className="row-meta">{formatNumber(row.connected)} connected · {formatNumber(row.not_connected)} didn&apos;t connect · {formatNumber(row.no_outcome)} no outcome</span>
                 </span>
                 <span className="row-end"><strong>{formatNumber(row.sessions)}</strong></span>
                 <span className="chevron" aria-hidden="true">›</span>

@@ -24,6 +24,7 @@ export default async function SummaryCards({ range, unit }: { range: Range; unit
   return (
     <section className="metric-groups" aria-labelledby="clients-title">
       <h2 id="clients-title">Clients</h2>
+      <p className="hint">Didn&apos;t connect = no pipeline.connect.success recorded for the client.</p>
       <p className="headline-share"><strong>{percent(clients.clients_connected, clients.clients)}%</strong> of tracked client connections connected ({formatNumber(clients.clients_connected)} of {formatNumber(clients.clients)}).</p>
       <div className="metric-strip client-metrics">
         <Metric range={range} list="clients" label="Total tracked" value={clients.clients} />

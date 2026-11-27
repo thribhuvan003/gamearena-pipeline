@@ -188,9 +188,11 @@ h3 {
   cursor: pointer;
 }
 
+/* The date notes sit on their own lines and wrap to the date row's width, so they never push the search box down. */
 .filter .hint {
   flex-basis: 100%;
   margin: 0;
+  contain: inline-size;
 }
 
 .search {

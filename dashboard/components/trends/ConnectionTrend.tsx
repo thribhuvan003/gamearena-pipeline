@@ -20,7 +20,7 @@ export default async function ConnectionTrend({ range }: { range: Range }) {   /
     title: "All clients that didn't connect",
     warning: false,
     total: String(daily.reduce((sum, row) => sum + Number(row.not_connected), 0)),
-    points: daily.map((row) => ({ day: toDay(row.day), count: Number(row.not_connected) })),
+    points: daily.map((row) => ({ day: toDay(row.day), count: Number(row.not_connected), of: Number(row.clients) })),
     details: null,
   };
 

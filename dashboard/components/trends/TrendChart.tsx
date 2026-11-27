@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import DailyBarChart from "@/components/shared/DailyBarChart";
 import { dayLabel, formatNumber, isoDay } from "@/lib/format";
 
-export type Series = { id: string; title: string; warning: boolean; total: string; points: { day: number; count: number }[]; details: ReactNode };
+export type Series = { id: string; title: string; warning: boolean; total: string; points: { day: number; count: number; of?: number }[]; details: ReactNode };
 
 export const ALL = "All";
 
@@ -33,8 +33,8 @@ export default function TrendChart({ series }: { series: Series[] }) {   // The 
         <details className="disclosure" key={shown.id + "-days"}>
           <summary>Daily counts</summary>
           <ul className="daily-values">
-            {shown.points.filter(({ count }) => count > 0).map(({ day, count }) => (
-              <li key={day}><time dateTime={isoDay(day)}>{dayLabel(isoDay(day))}</time><span>{formatNumber(String(count))}</span></li>
+            {shown.points.filter(({ count }) => count > 0).map(({ day, count, of }) => (
+              <li key={day}><time dateTime={isoDay(day)}>{dayLabel(isoDay(day))}</time><span>{formatNumber(String(count))}{of !== undefined && ` of ${formatNumber(String(of))} tracked`}</span></li>
             ))}
           </ul>
         </details>

@@ -41,8 +41,8 @@ function ClientError({ row, range }: { row: ErrorRow; range: Range }) {   // One
   const stats = [
     ["Times recorded", formatNumber(row.events)],
     ["Didn't connect", formatNumber(row.not_connected_clients)],
-    ["Connected, then this error", formatNumber(row.connected_then_error)],
-    ["This error, then connected", formatNumber(row.error_then_connected)],
+    ["Connected, logged it only after", formatNumber(row.connected_then_error)],
+    ["Logged it before connecting (some also after)", formatNumber(row.error_then_connected)],
     ["Outcome not recorded", formatNumber(String(unknown))],
     ["Connections without telemetry tags", formatNumber(row.not_tagged_clients)],
     ["Didn't connect, of known outcomes", row.not_connected_percent === null ? "Unavailable" : `${formatNumber(row.not_connected_clients)} of ${formatNumber(String(Number(row.not_connected_clients) + Number(row.connected_clients)))} (${row.not_connected_percent}%)`],

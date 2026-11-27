@@ -26,8 +26,8 @@ async function query<Row extends QueryResultRow>(sql: string, params: unknown[] 
 // A date range picked on the page: "YYYY-MM-DD" days in UTC, both included; null = no limit on that side.
 export type Range = { from: string | null; to: string | null };
 
-type DailyConnectionRow = { day: string; not_connected: string };
-type EndReasonRow = { end_reason: string; sessions: string; connected: string; not_connected: string };
+type DailyConnectionRow = { day: string; clients: string; not_connected: string };
+type EndReasonRow = { end_reason: string; sessions: string; connected: string; not_connected: string; no_outcome: string };
 export type ClientLabelRow = { kind: "device" | "os" | "browser" | "access"; value: string; clients: string; connected: string; not_connected: string };
 type NoReasonBreakdown = { no_error: string; only_warning: string; other_error: string };
 type ClientReasonRow = { reason: string; clients: string; percent: string };
@@ -277,10 +277,11 @@ export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {   /
     ORDER BY warning, not_connected_percent DESC NULLS LAST, not_connected_clients DESC`, [range.from, range.to]);
 }
 
-export async function getSessionsByEndReason(range: Range): Promise<EndReasonRow[]> {   // App sessions per end reason in their own record, with how many connected or didn't
+export async function getSessionsByEndReason(range: Range): Promise<EndReasonRow[]> {   // App sessions per end reason in their own record: connected, didn't connect, no outcome
   return query<EndReasonRow>(`
     SELECT coalesce(s.end_reason, '(none)') AS end_reason, count(*) AS sessions,
-           count(*) FILTER (WHERE s.tag = 'connected') AS connected, count(*) FILTER (WHERE s.tag = 'failed') AS not_connected
+           count(*) FILTER (WHERE s.tag = 'connected') AS connected, count(*) FILTER (WHERE s.tag = 'failed') AS not_connected,
+           count(*) FILTER (WHERE s.tag IS NULL OR s.tag NOT IN ('connected', 'failed')) AS no_outcome
     FROM ${SESSIONS}
     WHERE ${STARTED_IN_RANGE}
     GROUP BY 1
@@ -300,9 +301,9 @@ export const getClientsByLabel = cache(async (range: Range): Promise<ClientLabel
 
 // ---------- Trends ----------
 
-export async function getDailyConnections(range: Range): Promise<DailyConnectionRow[]> {   // Per day (UTC, client's first event), how many clients didn't connect
+export async function getDailyConnections(range: Range): Promise<DailyConnectionRow[]> {   // Per day (UTC, client's first event): tracked clients and how many didn't connect
   return query<DailyConnectionRow>(`
-    SELECT (s.started_at AT TIME ZONE 'UTC')::DATE::STRING AS day,
+    SELECT (s.started_at AT TIME ZONE 'UTC')::DATE::STRING AS day, count(*) AS clients,
            count(*) FILTER (WHERE ${COHORTS.clients_not_connected.where}) AS not_connected
     FROM ${CLIENTS}
     WHERE ${COHORTS.clients.where}

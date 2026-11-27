@@ -16,6 +16,7 @@ export default async function DateFilter({ range }: { range: Range }) {   // The
       <button type="submit">Apply dates</button>
       {(range.from || range.to) && <Link href={link({ from: null, to: null })}>All dates</Link>}
       <span className="hint">{first && last ? `Available: ${dayLabel(first, first.slice(0, 4) !== last.slice(0, 4))} to ${dayLabel(last)} · UTC` : "No data yet."}</span>
+      <span className="hint filter-clocks">Sessions by start · clients by first event · errors by the day logged</span>
     </form>
   );
 }
