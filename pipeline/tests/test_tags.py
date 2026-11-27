@@ -89,5 +89,29 @@ class ConnectionRules(unittest.TestCase):   # Client connection tag and reason
         self.assertEqual(tags.failure_reason(connection, "not_connected"), "no_video")
 
 
+
+class ClientLabels(unittest.TestCase):   # Device, OS, browser and access from made-up user agents, in the same order as pipeline/tags.py
+    def test_edge_on_windows_desktop(self):
+        ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36 Edg/120.0"
+        self.assertEqual(tags.client_labels(True, ua, "external"), ("Desktop", "Windows", "Edge", "external"))
+
+    def test_android_phone_vs_tablet(self):
+        self.assertEqual(tags.client_labels(True, "Linux; Android 13; Pixel Mobile Chrome/120", "regular")[0], "Phone")
+        self.assertEqual(tags.client_labels(True, "Linux; Android 13; Tab Chrome/120", "regular")[0], "Tablet")
+
+    def test_in_app_webview_before_chrome(self):
+        ua = "Linux; Android 13; SM-S911B; wv) AppleWebKit Chrome/120 Mobile Safari"
+        self.assertEqual(tags.client_labels(True, ua, "share")[2], "Android WebView (in-app)")
+
+    def test_tv_before_everything(self):
+        self.assertEqual(tags.client_labels(True, "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) Chrome", "external")[:2], ("TV", "Tizen (Samsung TV)"))
+
+    def test_missing_user_agent_is_unknown(self):
+        self.assertEqual(tags.client_labels(True, None, None), ("Unknown", "Unknown", "Unknown", "Unknown"))
+
+    def test_no_app_record(self):
+        self.assertEqual(tags.client_labels(False, None, None), ("No app record",) * 4)
+
+
 if __name__ == "__main__":
     unittest.main()

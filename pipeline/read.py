@@ -1,18 +1,13 @@
-# read.py: asks the database for the next batch of sessions to tag, and their client connections. It only reads, never changes anything.
+# read.py: reads the events of given sessions and of their client connections, for tagging. It only reads, never changes anything.
 
-# Read the next batch of untagged ended sessions.
+# Each given session that sent session_ended, with its events up to that end (by the session index, never the whole table).
 EVENTS_SQL = """
-WITH batch AS (
-    SELECT e.session_id,
-           min(e.recorded_at) AS ended_at
-    FROM session_telemetry_events e
-    WHERE e.event_type = 'session_ended'
-      AND NOT EXISTS (
-          SELECT 1 FROM session_tags t WHERE t.session_id = e.session_id
-      )
-    GROUP BY e.session_id
-    ORDER BY e.session_id
-    LIMIT %(limit)s
+WITH ended AS (
+    SELECT session_id, min(recorded_at) AS ended_at
+    FROM session_telemetry_events
+    WHERE session_id = ANY(%(ids)s::UUID[])
+      AND event_type = 'session_ended'
+    GROUP BY session_id
 )
 SELECT e.session_id,
        min(e.recorded_at) AS started_at,
@@ -20,15 +15,15 @@ SELECT e.session_id,
        array_agg(e.payload->>'phase' ORDER BY e.recorded_at, e.id) AS phases,
        array_agg(e.payload->>'state' ORDER BY e.recorded_at, e.id) AS states
 FROM session_telemetry_events e
-JOIN batch b ON b.session_id = e.session_id
-WHERE e.recorded_at <= b.ended_at
+JOIN ended d ON d.session_id = e.session_id
+WHERE e.recorded_at <= d.ended_at
 GROUP BY e.session_id
 """
 
 
-def read_sessions(conn, limit):                              # Reads the next batch of ended, untagged sessions with their events
+def read_sessions(conn, session_ids):                        # The ended ones among these sessions, with their events up to the end
     with conn.cursor() as cursor:
-        cursor.execute(EVENTS_SQL, {"limit": limit})
+        cursor.execute(EVENTS_SQL, {"ids": session_ids})
         rows = cursor.fetchall()
 
     sessions = {}
@@ -42,39 +37,58 @@ def read_sessions(conn, limit):                              # Reads the next ba
     return sessions
 
 
-# Read client connections for the selected sessions.
+# The client connections of these ended sessions: their events up to the end, two milestones from all their events,
+# and the app's own record of the client (only the labels are kept, never the user agent).
 CONNECTIONS_SQL = """
 WITH ended AS (
     SELECT session_id, min(recorded_at) AS ended_at
     FROM session_telemetry_events
-    WHERE event_type = 'session_ended'
-      AND session_id = ANY(%(ids)s::UUID[])
+    WHERE session_id = ANY(%(ids)s::UUID[])
+      AND event_type = 'session_ended'
     GROUP BY session_id
+),
+clients AS (
+    SELECT e.connection_id,
+           e.session_id,
+           min(e.recorded_at) AS started_at,
+           count(*) FILTER (WHERE e.source <> 'system') AS app_events,
+           min(e.recorded_at) FILTER (WHERE coalesce(e.payload->>'event', e.event_type::STRING) = 'pipeline.connect.success') AS connected_at,
+           array_agg(coalesce(e.payload->>'event', e.event_type::STRING) ORDER BY e.recorded_at, e.id) AS event_names,
+           array_agg(e.payload->>'phase' ORDER BY e.recorded_at, e.id) AS phases,
+           array_agg(e.payload->>'state' ORDER BY e.recorded_at, e.id) AS states
+    FROM session_telemetry_events e
+    JOIN ended d ON d.session_id = e.session_id
+    WHERE e.connection_role = 'client'
+      AND e.connection_id IS NOT NULL
+      AND e.recorded_at <= d.ended_at
+    GROUP BY e.connection_id, e.session_id
+),
+milestones AS (
+    SELECT connection_id,
+           bool_or(coalesce(payload->>'event', event_type::STRING) = 'ice.gathering.complete') AS gathered,
+           bool_or(coalesce(payload->>'event', event_type::STRING) = 'media.first_decode') AS decoded
+    FROM session_telemetry_events
+    WHERE session_id = ANY(%(ids)s::UUID[])
+      AND connection_id IS NOT NULL
+    GROUP BY connection_id
 )
-SELECT e.connection_id,
-       e.session_id,
-       min(e.recorded_at) AS started_at,
-       count(*) FILTER (WHERE e.source <> 'system') AS app_events,
-       min(e.recorded_at) FILTER (WHERE coalesce(e.payload->>'event', e.event_type::STRING) = 'pipeline.connect.success') AS connected_at,
-       array_agg(coalesce(e.payload->>'event', e.event_type::STRING) ORDER BY e.recorded_at, e.id) AS event_names,
-       array_agg(e.payload->>'phase' ORDER BY e.recorded_at, e.id) AS phases,
-       array_agg(e.payload->>'state' ORDER BY e.recorded_at, e.id) AS states
-FROM session_telemetry_events e
-JOIN ended d ON d.session_id = e.session_id
-WHERE e.connection_role = 'client'
-  AND e.connection_id IS NOT NULL
-  AND e.recorded_at <= d.ended_at
-GROUP BY e.connection_id, e.session_id
+SELECT c.connection_id, c.session_id, c.started_at, c.app_events, c.connected_at, c.event_names, c.phases, c.states,
+       coalesce(m.gathered, false), coalesce(m.decoded, false),
+       x.id IS NOT NULL AS in_app, x.user_agent, x.auth_type::STRING
+FROM clients c
+LEFT JOIN milestones m ON m.connection_id = c.connection_id
+LEFT JOIN gamearena_source.session_client_connections x ON x.id = c.connection_id
 """
 
 
-def read_connections(conn, session_ids):                     # Reads the client connections of those sessions with their events
+def read_connections(conn, session_ids):                     # The client connections of those sessions, with their events and app record
     with conn.cursor() as cursor:
         cursor.execute(CONNECTIONS_SQL, {"ids": session_ids})
         rows = cursor.fetchall()
 
     connections = {}
-    for connection_id, session_id, started_at, app_events, connected_at, event_names, phases, states in rows:
+    for (connection_id, session_id, started_at, app_events, connected_at, event_names, phases, states,
+         gathered, decoded, in_app, user_agent, access) in rows:
         connections[connection_id] = {
             "session_id": session_id,
             "started_at": started_at,
@@ -83,5 +97,10 @@ def read_connections(conn, session_ids):                     # Reads the client 
             "event_names": event_names,
             "phases": phases,
             "states": states,
+            "gathered": gathered,
+            "decoded": decoded,
+            "in_app": in_app,
+            "user_agent": user_agent,
+            "access": access,
         }
     return connections

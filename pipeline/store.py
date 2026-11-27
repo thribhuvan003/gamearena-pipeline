@@ -1,4 +1,8 @@
-# store.py: writes our 5 tables: run history, session and client tags, and the session facts and error copies the dashboard reads.
+# store.py: finds the sessions with new events and writes our 5 tables: run history, session facts, error copies, session and client tags.
+
+from datetime import timedelta
+
+from pipeline import config
 
 # Add a 'running' row to the run history and return its ID.
 START_RUN_SQL = """
@@ -12,72 +16,38 @@ def start_run(conn):                                         # Adds a 'running' 
     return conn.execute(START_RUN_SQL).fetchone()[0]
 
 
-# Save session tags in one database call.
-SAVE_SQL = """
-UPSERT INTO session_tags (session_id, tag, reason, started_at, run_id)
-SELECT session_id, tag, reason, started_at, %(run_id)s::UUID
-FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[])
-     AS t(session_id, tag, reason, started_at)
-"""
+# The newest raw event, and the newest event already counted in session_facts (both read from an index).
+NEWEST_EVENT_SQL = "SELECT max(recorded_at) FROM session_telemetry_events"
+NEWEST_PROCESSED_SQL = "SELECT max(last_event_at) FROM session_facts"
 
-
-def save_tags(conn, sessions, run_id):                       # Saves a batch of sessions to session_tags in one call
-    parameters = {
-        "ids": list(sessions.keys()),
-        "tags": [session["tag"] for session in sessions.values()],
-        "reasons": [session["reason"] for session in sessions.values()],
-        "started": [session["started_at"] for session in sessions.values()],
-        "run_id": run_id,
-    }
-    conn.execute(SAVE_SQL, parameters)
-
-
-# Save client connection tags in one database call.
-SAVE_CONNECTIONS_SQL = """
-UPSERT INTO connection_tags (connection_id, session_id, tag, reason, started_at, connected_at, run_id)
-SELECT connection_id, session_id, tag, reason, started_at, connected_at, %(run_id)s::UUID
-FROM unnest(%(ids)s::UUID[], %(sessions)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[], %(connected)s::TIMESTAMPTZ[])
-     AS t(connection_id, session_id, tag, reason, started_at, connected_at)
-"""
-
-
-def save_connection_tags(conn, connections, run_id):         # Saves a batch of client connections to connection_tags in one call
-    parameters = {
-        "ids": list(connections.keys()),
-        "sessions": [connection["session_id"] for connection in connections.values()],
-        "tags": [connection["tag"] for connection in connections.values()],
-        "reasons": [connection["reason"] for connection in connections.values()],
-        "started": [connection["started_at"] for connection in connections.values()],
-        "connected": [connection["connected_at"] for connection in connections.values()],
-        "run_id": run_id,
-    }
-    conn.execute(SAVE_CONNECTIONS_SQL, parameters)
-
-
-# Sessions with events newer than the newest in session_facts, minus 1 day for late-stored events; oldest first.
+# Sessions with events after a given time (by the recorded_at index), oldest first.
 CHANGED_SESSIONS_SQL = """
 SELECT session_id
 FROM session_telemetry_events
-WHERE recorded_at > (SELECT coalesce(max(last_event_at) - INTERVAL '1 day', '-infinity'::TIMESTAMPTZ) FROM session_facts)
+WHERE recorded_at > %(since)s
 GROUP BY session_id
 ORDER BY max(recorded_at)
 """
 
-# Drop these sessions' copied errors before copying them again, so an error removed from the raw events disappears here too.
-DELETE_ERRORS_SQL = """
-DELETE FROM error_events WHERE session_id = ANY(%(ids)s::UUID[])
-"""
-
-# On a full rebuild, drop facts and copied errors of sessions that no longer have any raw events.
-DELETE_GONE_SQL = [
-    "DELETE FROM session_facts f WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = f.session_id)",
-    "DELETE FROM error_events x WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = x.session_id)",
-]
-
-# Every session with events, for a full rebuild.
+# Every session with events, for the first run and a full rebuild.
 ALL_SESSIONS_SQL = """
-SELECT DISTINCT session_id FROM session_telemetry_events
+SELECT session_id
+FROM session_telemetry_events
+GROUP BY session_id
+ORDER BY max(recorded_at)
 """
+
+
+def changed_sessions(conn, everything=False):                # Session ids to process, oldest first: all on a rebuild or first run, else those with events after the last processed one minus the late window; [] if nothing is new
+    newest_processed = conn.execute(NEWEST_PROCESSED_SQL).fetchone()[0]
+    if everything or newest_processed is None:
+        return [row[0] for row in conn.execute(ALL_SESSIONS_SQL).fetchall()]
+    newest_event = conn.execute(NEWEST_EVENT_SQL).fetchone()[0]
+    if newest_event is None or newest_event <= newest_processed:
+        return []
+    since = newest_processed - timedelta(minutes=config.LATE_EVENTS_MINUTES)
+    return [row[0] for row in conn.execute(CHANGED_SESSIONS_SQL, {"since": since}).fetchall()]
+
 
 # Count the facts of these sessions again from all their events and save them.
 SAVE_FACTS_SQL = """
@@ -98,6 +68,11 @@ WHERE e.session_id = ANY(%(ids)s::UUID[])
 GROUP BY e.session_id
 """
 
+# Drop these sessions' copied errors before copying them again, so an error removed from the raw events disappears here too.
+DELETE_ERRORS_SQL = """
+DELETE FROM error_events WHERE session_id = ANY(%(ids)s::UUID[])
+"""
+
 # Copy these sessions' error-level events.
 SAVE_ERRORS_SQL = """
 UPSERT INTO error_events (id, session_id, connection_id, recorded_at, event, code, error_code, phase, stage, message, detail)
@@ -109,39 +84,85 @@ FROM session_telemetry_events e
 WHERE e.session_id = ANY(%(ids)s::UUID[]) AND e.level = 'error'
 """
 
-FACTS_BATCH = 1000
+
+def refresh_facts(conn, session_ids):                        # Recounts session_facts and recopies error_events for these sessions (the caller commits)
+    batch = {"ids": session_ids}
+    conn.execute(SAVE_FACTS_SQL, batch)
+    conn.execute(DELETE_ERRORS_SQL, batch)
+    conn.execute(SAVE_ERRORS_SQL, batch)
 
 
-def refresh_facts(conn, everything=False):                   # Recounts facts and recopies errors for sessions with new events (all if everything); returns how many
-    sql = ALL_SESSIONS_SQL if everything else CHANGED_SESSIONS_SQL
-    ids = [row[0] for row in conn.execute(sql).fetchall()]
-    for start in range(0, len(ids), FACTS_BATCH):
-        batch = {"ids": ids[start:start + FACTS_BATCH]}
-        conn.execute(SAVE_FACTS_SQL, batch)
-        conn.execute(DELETE_ERRORS_SQL, batch)
-        conn.execute(SAVE_ERRORS_SQL, batch)
-    if everything:
-        for delete in DELETE_GONE_SQL:
-            conn.execute(delete)
-    conn.commit()
-    return len(ids)
+# On a full rebuild, drop facts and copied errors of sessions that no longer have any raw events.
+DELETE_GONE_SQL = [
+    "DELETE FROM session_facts f WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = f.session_id)",
+    "DELETE FROM error_events x WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = x.session_id)",
+]
 
 
-# Close the run: finish time, status, sessions saved and error.
+def delete_gone(conn):                                       # Drops facts and error copies of sessions whose raw events are gone (full rebuild only)
+    for delete in DELETE_GONE_SQL:
+        conn.execute(delete)
+
+
+# Save session tags in one database call; a session tagged again is overwritten, never duplicated.
+SAVE_SQL = """
+UPSERT INTO session_tags (session_id, tag, reason, started_at, run_id)
+SELECT session_id, tag, reason, started_at, %(run_id)s::UUID
+FROM unnest(%(ids)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[])
+     AS t(session_id, tag, reason, started_at)
+"""
+
+
+def save_tags(conn, sessions, run_id):                       # Saves a batch of sessions to session_tags in one call
+    parameters = {
+        "ids": list(sessions.keys()),
+        "tags": [session["tag"] for session in sessions.values()],
+        "reasons": [session["reason"] for session in sessions.values()],
+        "started": [session["started_at"] for session in sessions.values()],
+        "run_id": run_id,
+    }
+    conn.execute(SAVE_SQL, parameters)
+
+
+# Save client connection tags, labels and milestones in one database call; a client saved again is overwritten.
+SAVE_CONNECTIONS_SQL = """
+UPSERT INTO connection_tags (connection_id, session_id, tag, reason, started_at, connected_at,
+                             device, os, browser, access, gathered, decoded, run_id)
+SELECT connection_id, session_id, tag, reason, started_at, connected_at, device, os, browser, access, gathered, decoded, %(run_id)s::UUID
+FROM unnest(%(ids)s::UUID[], %(sessions)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[],
+            %(connected)s::TIMESTAMPTZ[], %(devices)s::STRING[], %(oses)s::STRING[], %(browsers)s::STRING[], %(accesses)s::STRING[],
+            %(gathered)s::BOOL[], %(decoded)s::BOOL[])
+     AS t(connection_id, session_id, tag, reason, started_at, connected_at, device, os, browser, access, gathered, decoded)
+"""
+
+
+def save_connection_tags(conn, connections, run_id):         # Saves a batch of client connections to connection_tags in one call
+    rows = connections.values()
+    parameters = {
+        "ids": list(connections.keys()),
+        "sessions": [row["session_id"] for row in rows],
+        "tags": [row["tag"] for row in rows],
+        "reasons": [row["reason"] for row in rows],
+        "started": [row["started_at"] for row in rows],
+        "connected": [row["connected_at"] for row in rows],
+        "devices": [row["device"] for row in rows],
+        "oses": [row["os"] for row in rows],
+        "browsers": [row["browser"] for row in rows],
+        "accesses": [row["access"] for row in rows],
+        "gathered": [row["gathered"] for row in rows],
+        "decoded": [row["decoded"] for row in rows],
+        "run_id": run_id,
+    }
+    conn.execute(SAVE_CONNECTIONS_SQL, parameters)
+
+
+# Close the run: finish time, status, sessions tagged and error.
 FINISH_RUN_SQL = """
 UPDATE pipeline_runs
-SET finished_at = now(),
-    status = %(status)s,
-    sessions_tagged = (SELECT count(*) FROM session_tags WHERE run_id = %(run_id)s),
-    error = %(error)s
+SET finished_at = now(), status = %(status)s, sessions_tagged = %(tagged)s, error = %(error)s
 WHERE run_id = %(run_id)s
 """
 
 
-def finish_run(conn, run_id, status, error=None):            # Marks the run ok or failed, with its count and error
-    parameters = {
-        "run_id": run_id,
-        "status": status,
-        "error": error,
-    }
-    conn.execute(FINISH_RUN_SQL, parameters)
+def finish_run(conn, run_id, status, tagged, error=None):    # Marks the run ok or failed, with how many sessions it tagged and the error
+    conn.execute(FINISH_RUN_SQL, {"run_id": run_id, "status": status, "tagged": tagged, "error": error})

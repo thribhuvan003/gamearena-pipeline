@@ -34,6 +34,14 @@ CREATE TABLE IF NOT EXISTS connection_tags (
     started_at TIMESTAMPTZ NOT NULL,
     -- Its first pipeline.connect.success (up to session_ended); NULL = never connected. Tells an error before connecting from one after.
     connected_at TIMESTAMPTZ NULL,
+    -- Device, OS, browser and access type from the app's own client record (pipeline/tags.py client_labels); "No app record" if it has none.
+    device STRING NULL,
+    os STRING NULL,
+    browser STRING NULL,
+    access STRING NULL,
+    -- Whether any of its events was ice.gathering.complete / media.first_decode (all its events, not only up to session_ended).
+    gathered BOOL NULL,
+    decoded BOOL NULL,
     -- The run that wrote this tag, as in session_tags.
     run_id UUID NULL
 );
@@ -102,6 +110,16 @@ CREATE TABLE IF NOT EXISTS error_events (
 
 -- Columns added after the first release, so tables created earlier get them too.
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS connected_at TIMESTAMPTZ NULL;
+ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS device STRING NULL;
+ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS os STRING NULL;
+ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS browser STRING NULL;
+ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS access STRING NULL;
+ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS gathered BOOL NULL;
+ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS decoded BOOL NULL;
+
+-- The dashboard filters clients by their first event's day: this index lets a date range read only its own clients.
+CREATE INDEX IF NOT EXISTS connection_tags_started_at ON connection_tags (started_at)
+    STORING (session_id, tag, reason, connected_at, device, os, browser, access, gathered, decoded);
 
 -- The reasons each tag table allows, set here (dropped and added again) so a new reason also reaches tables created earlier.
 ALTER TABLE session_tags DROP CONSTRAINT IF EXISTS check_reason;

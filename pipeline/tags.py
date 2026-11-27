@@ -64,3 +64,47 @@ def state_failed(item, event):                               # True if this stat
         if name == event and state == "failed":
             return True
     return False
+
+
+# A client's device, OS and browser, from well-known tokens in its user agent (checked in this order; first match wins).
+TV_TOKENS = ("smart-tv", "smarttv", "tizen", "web0s", "webos", "crkey", "googletv", "android tv", "bravia", " aft")
+NO_APP_RECORD = "No app record"
+
+
+def client_labels(in_app, user_agent, access):                # (device, os, browser, access) for one client; only these labels are stored, never the user agent
+    if not in_app:
+        return NO_APP_RECORD, NO_APP_RECORD, NO_APP_RECORD, NO_APP_RECORD
+    ua = (user_agent or "").lower()
+    has = lambda *tokens: any(token in ua for token in tokens)
+    return device_label(has), os_label(has), browser_label(has), access or "Unknown"
+
+
+def device_label(has):                                       # TV, Phone, Tablet, Samsung desktop mode, Desktop or Unknown
+    if has(*TV_TOKENS):
+        return "TV"
+    if has("iphone", "ipod") or (has("android") and has("mobile")):
+        return "Phone"
+    if has("ipad", "android"):
+        return "Tablet"
+    if has("samsungbrowser") and has("x11"):
+        return "Samsung desktop mode (phone, tablet or DeX: unconfirmed)"
+    if has("windows", "macintosh", "cros", "x11"):
+        return "Desktop"
+    return "Unknown"
+
+
+def os_label(has):                                           # The operating system named in the user agent, or Unknown
+    for name, tokens in (("Tizen (Samsung TV)", ("tizen",)), ("Android", ("android",)), ("iOS", ("iphone", "ipad", "ipod")),
+                         ("Windows", ("windows",)), ("ChromeOS", ("cros",)), ("macOS", ("macintosh",)), ("Linux", ("linux",))):
+        if has(*tokens):
+            return name
+    return "Unknown"
+
+
+def browser_label(has):                                      # The browser named in the user agent, or Unknown
+    for name, tokens in (("Edge", ("edg/", "edga/", "edgios/")), ("Android WebView (in-app)", ("; wv)",)), ("Opera", ("opr/",)),
+                         ("Samsung Internet", ("samsungbrowser",)), ("Firefox", ("firefox", "fxios")), ("Chrome", ("crios", "chrome")),
+                         ("Safari", ("safari",))):
+        if has(*tokens):
+            return name
+    return "Unknown"

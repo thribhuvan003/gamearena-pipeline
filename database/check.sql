@@ -132,7 +132,7 @@ SELECT count(*) AS client_connections,
 FROM expected x
 LEFT JOIN connection_tags t USING (connection_id);
 
--- Check 3, facts: session_facts and error_events recounted from the raw events. sessions_missing is 0 after just facts.
+-- Check 3, facts: session_facts and error_events recounted from the raw events. sessions_missing is 0 after a run.
 WITH raw AS (
     SELECT session_id,
            count(*) AS events,
@@ -161,3 +161,47 @@ SELECT count(*) AS sessions_with_events,
 FROM raw r
 LEFT JOIN session_facts f USING (session_id)
 LEFT JOIN copied c USING (session_id);
+
+-- Check 4, client details: device, OS, browser, access and the two milestones recomputed in SQL, the same token rules as tags.py client_labels.
+WITH expected AS (
+    SELECT t.connection_id,
+           CASE WHEN x.id IS NULL THEN 'No app record'
+                WHEN u ILIKE '%smart-tv%' OR u ILIKE '%smarttv%' OR u ILIKE '%tizen%' OR u ILIKE '%web0s%' OR u ILIKE '%webos%'
+                  OR u ILIKE '%crkey%' OR u ILIKE '%googletv%' OR u ILIKE '%android tv%' OR u ILIKE '%bravia%' OR u ILIKE '% aft%' THEN 'TV'
+                WHEN u ILIKE '%iphone%' OR u ILIKE '%ipod%' OR (u ILIKE '%android%' AND u ILIKE '%mobile%') THEN 'Phone'
+                WHEN u ILIKE '%ipad%' OR u ILIKE '%android%' THEN 'Tablet'
+                WHEN u ILIKE '%samsungbrowser%' AND u ILIKE '%x11%' THEN 'Samsung desktop mode (phone, tablet or DeX: unconfirmed)'
+                WHEN u ILIKE '%windows%' OR u ILIKE '%macintosh%' OR u ILIKE '%cros%' OR u ILIKE '%x11%' THEN 'Desktop'
+                ELSE 'Unknown' END AS device,
+           CASE WHEN x.id IS NULL THEN 'No app record'
+                WHEN u ILIKE '%tizen%' THEN 'Tizen (Samsung TV)'
+                WHEN u ILIKE '%android%' THEN 'Android'
+                WHEN u ILIKE '%iphone%' OR u ILIKE '%ipad%' OR u ILIKE '%ipod%' THEN 'iOS'
+                WHEN u ILIKE '%windows%' THEN 'Windows'
+                WHEN u ILIKE '%cros%' THEN 'ChromeOS'
+                WHEN u ILIKE '%macintosh%' THEN 'macOS'
+                WHEN u ILIKE '%linux%' THEN 'Linux'
+                ELSE 'Unknown' END AS os,
+           CASE WHEN x.id IS NULL THEN 'No app record'
+                WHEN u ILIKE '%edg/%' OR u ILIKE '%edga/%' OR u ILIKE '%edgios/%' THEN 'Edge'
+                WHEN u ILIKE '%; wv)%' THEN 'Android WebView (in-app)'
+                WHEN u ILIKE '%opr/%' THEN 'Opera'
+                WHEN u ILIKE '%samsungbrowser%' THEN 'Samsung Internet'
+                WHEN u ILIKE '%firefox%' OR u ILIKE '%fxios%' THEN 'Firefox'
+                WHEN u ILIKE '%crios%' OR u ILIKE '%chrome%' THEN 'Chrome'
+                WHEN u ILIKE '%safari%' THEN 'Safari'
+                ELSE 'Unknown' END AS browser,
+           CASE WHEN x.id IS NULL THEN 'No app record' ELSE coalesce(x.auth_type::STRING, 'Unknown') END AS access,
+           EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id
+                     AND coalesce(e.payload->>'event', e.event_type::STRING) = 'ice.gathering.complete') AS gathered,
+           EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id
+                     AND coalesce(e.payload->>'event', e.event_type::STRING) = 'media.first_decode') AS decoded
+    FROM connection_tags t
+    LEFT JOIN (SELECT id, user_agent AS u, auth_type FROM gamearena_source.session_client_connections) x ON x.id = t.connection_id
+)
+SELECT count(*) AS client_connections,
+       count(*) FILTER (WHERE t.device IS DISTINCT FROM x.device OR t.os IS DISTINCT FROM x.os
+                          OR t.browser IS DISTINCT FROM x.browser OR t.access IS DISTINCT FROM x.access) AS labels_wrong,
+       count(*) FILTER (WHERE t.gathered IS DISTINCT FROM x.gathered OR t.decoded IS DISTINCT FROM x.decoded) AS milestones_wrong
+FROM expected x
+JOIN connection_tags t USING (connection_id);

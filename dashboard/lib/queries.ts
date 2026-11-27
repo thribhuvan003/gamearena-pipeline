@@ -89,39 +89,10 @@ const SESSIONS = `(
   LEFT JOIN session_tags t ON t.session_id = h.id) s`;
 
 // Every tagged client connection, as alias s.
-const CLIENTS = `(SELECT connection_id, session_id, started_at, tag, reason FROM connection_tags) s`;
+const CLIENTS = `(SELECT connection_id, session_id, started_at, tag, reason, device, os, browser, access, gathered, decoded FROM connection_tags) s`;
 
-// Device, OS and browser from a client's user agent (column u), by well-known tokens; only these labels leave the database.
-const DEVICE = `CASE
-    WHEN u ILIKE '%smart-tv%' OR u ILIKE '%smarttv%' OR u ILIKE '%tizen%' OR u ILIKE '%web0s%' OR u ILIKE '%webos%'
-      OR u ILIKE '%crkey%' OR u ILIKE '%googletv%' OR u ILIKE '%android tv%' OR u ILIKE '%bravia%' OR u ILIKE '% aft%' THEN 'TV'
-    WHEN u ILIKE '%iphone%' OR u ILIKE '%ipod%' OR (u ILIKE '%android%' AND u ILIKE '%mobile%') THEN 'Phone'
-    WHEN u ILIKE '%ipad%' OR u ILIKE '%android%' THEN 'Tablet'
-    WHEN u ILIKE '%samsungbrowser%' AND u ILIKE '%x11%' THEN 'Samsung desktop mode (phone, tablet or DeX: unconfirmed)'
-    WHEN u ILIKE '%windows%' OR u ILIKE '%macintosh%' OR u ILIKE '%cros%' OR u ILIKE '%x11%' THEN 'Desktop'
-    ELSE 'Unknown' END`;
-const OS = `CASE
-    WHEN u ILIKE '%tizen%' THEN 'Tizen (Samsung TV)'
-    WHEN u ILIKE '%android%' THEN 'Android'
-    WHEN u ILIKE '%iphone%' OR u ILIKE '%ipad%' OR u ILIKE '%ipod%' THEN 'iOS'
-    WHEN u ILIKE '%windows%' THEN 'Windows'
-    WHEN u ILIKE '%cros%' THEN 'ChromeOS'
-    WHEN u ILIKE '%macintosh%' THEN 'macOS'
-    WHEN u ILIKE '%linux%' THEN 'Linux'
-    ELSE 'Unknown' END`;
-const BROWSER = `CASE
-    WHEN u ILIKE '%edg/%' OR u ILIKE '%edga/%' OR u ILIKE '%edgios/%' THEN 'Edge'
-    WHEN u ILIKE '%; wv)%' THEN 'Android WebView (in-app)'
-    WHEN u ILIKE '%opr/%' THEN 'Opera'
-    WHEN u ILIKE '%samsungbrowser%' THEN 'Samsung Internet'
-    WHEN u ILIKE '%firefox%' OR u ILIKE '%fxios%' THEN 'Firefox'
-    WHEN u ILIKE '%crios%' OR u ILIKE '%chrome%' THEN 'Chrome'
-    WHEN u ILIKE '%safari%' THEN 'Safari'
-    ELSE 'Unknown' END`;
-
-// One client's label of a kind, from its app record: $3 = "kind|value" (kind = device, os, browser or access); no app record = "No app record".
-const CLIENT_LABEL = `coalesce((SELECT CASE split_part($3, '|', 1) WHEN 'device' THEN ${DEVICE} WHEN 'os' THEN ${OS} WHEN 'browser' THEN ${BROWSER} ELSE x.access END
-    FROM (SELECT user_agent AS u, auth_type::STRING AS access FROM gamearena_source.session_client_connections WHERE id = s.connection_id) x), 'No app record')`;
+// One client's stored label of a kind ($3 = "kind|value", kind = device, os, browser or access).
+const CLIENT_LABEL = `CASE split_part($3, '|', 1) WHEN 'device' THEN s.device WHEN 'os' THEN s.os WHEN 'browser' THEN s.browser ELSE s.access END`;
 
 // An error with this error + code ($3), recorded in the range, on this session with no client named (tied false) or on this client (tied true).
 const ERROR_ON = (link: string, tied: boolean) =>
@@ -317,17 +288,9 @@ export async function getSessionsByEndReason(range: Range): Promise<EndReasonRow
 }
 
 // cache(): the device and browser cards share one query per page load.
-export const getClientsByLabel = cache(async (range: Range): Promise<ClientLabelRow[]> => {   // Tagged clients per device, OS, browser and access type (app record), with how many connected or didn't
+export const getClientsByLabel = cache(async (range: Range): Promise<ClientLabelRow[]> => {   // Tagged clients per stored device, OS, browser and access type, with how many connected or didn't
   return query<ClientLabelRow>(`
-    WITH j AS (
-      SELECT s.tag, x.id IS NOT NULL AS in_app, x.user_agent AS u, x.auth_type::STRING AS access
-      FROM ${CLIENTS}
-      LEFT JOIN gamearena_source.session_client_connections x ON x.id = s.connection_id
-      WHERE ${STARTED_IN_RANGE}),
-    c AS (
-      SELECT tag, CASE WHEN NOT in_app THEN 'No app record' ELSE ${DEVICE} END AS device, CASE WHEN NOT in_app THEN 'No app record' ELSE ${OS} END AS os,
-             CASE WHEN NOT in_app THEN 'No app record' ELSE ${BROWSER} END AS browser, CASE WHEN NOT in_app THEN 'No app record' ELSE access END AS access
-      FROM j)
+    WITH c AS (SELECT s.tag, s.device, s.os, s.browser, s.access FROM ${CLIENTS} WHERE ${STARTED_IN_RANGE})
     SELECT kind, value, count(*) AS clients, count(*) FILTER (WHERE tag = 'connected') AS connected, count(*) FILTER (WHERE tag = 'not_connected') AS not_connected
     FROM (SELECT 'device' AS kind, device AS value, tag FROM c UNION ALL SELECT 'os', os, tag FROM c
           UNION ALL SELECT 'browser', browser, tag FROM c UNION ALL SELECT 'access', access, tag FROM c) k
@@ -405,14 +368,11 @@ export async function getReasonErrors(reason: string, range: Range): Promise<Rea
     ORDER BY warning, error IS NULL, clients DESC, error`, [range.from, range.to, reason]);
 }
 
-export async function getReasonProgress(reason: string, range: Range): Promise<ReasonProgress> {   // How far a reason's clients got (network discovery, first video frame); reads raw events, only when opened
+export async function getReasonProgress(reason: string, range: Range): Promise<ReasonProgress> {   // How far a reason's clients got: network discovery done, first video frame decoded (stored by the pipeline)
   const rows = await query<ReasonProgress>(`
-    SELECT count(DISTINCT t.connection_id) AS clients,
-           count(DISTINCT CASE WHEN ${RAW_EVENT} = 'ice.gathering.complete' THEN t.connection_id END) AS gathered,
-           count(DISTINCT CASE WHEN ${RAW_EVENT} = 'media.first_decode' THEN t.connection_id END) AS decoded
-    FROM connection_tags t
-    LEFT JOIN session_telemetry_events e ON e.connection_id = t.connection_id
-    WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")}`, [range.from, range.to, reason]);
+    SELECT count(*) AS clients, count(*) FILTER (WHERE s.gathered) AS gathered, count(*) FILTER (WHERE s.decoded) AS decoded
+    FROM ${CLIENTS}
+    WHERE ${STARTED_IN_RANGE} AND s.tag = 'not_connected' AND s.reason = $3`, [range.from, range.to, reason]);
   return rows[0];
 }
 
@@ -455,12 +415,13 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
   return rows[0];
 }
 
-export async function getClientConnections(sessionId: string): Promise<ClientConnectionRow[]> {   // A session's client connections in connect order, with device, OS, browser and tag
+export async function getClientConnections(sessionId: string): Promise<ClientConnectionRow[]> {   // A session's client connections in connect order, with their stored device, OS, browser and tag
   return query<ClientConnectionRow>(`
     SELECT c.id AS connection_id, c.connected_at, c.disconnected_at, c.auth_type::STRING AS auth_type,
-           ${DEVICE} AS device, ${OS} AS os, ${BROWSER} AS browser, t.tag, t.reason
-    FROM (SELECT *, user_agent AS u FROM gamearena_source.session_client_connections WHERE session_id = $1) c
+           coalesce(t.device, 'Unknown') AS device, coalesce(t.os, 'Unknown') AS os, coalesce(t.browser, 'Unknown') AS browser, t.tag, t.reason
+    FROM gamearena_source.session_client_connections c
     LEFT JOIN connection_tags t ON t.connection_id = c.id
+    WHERE c.session_id = $1
     ORDER BY c.connected_at, c.id`, [sessionId]);
 }
 

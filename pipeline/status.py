@@ -16,12 +16,12 @@ GROUP BY tag
 ORDER BY connections DESC
 """
 
-# Ended sessions with no tag yet.
+# Ended sessions with no tag yet (from session_facts, one row per session, not the raw events).
 WAITING_SQL = """
-SELECT count(DISTINCT e.session_id)
-FROM session_telemetry_events e
-WHERE e.event_type = 'session_ended'
-  AND NOT EXISTS (SELECT 1 FROM session_tags t WHERE t.session_id = e.session_id)
+SELECT count(*)
+FROM session_facts f
+WHERE f.has_end
+  AND NOT EXISTS (SELECT 1 FROM session_tags t WHERE t.session_id = f.session_id)
 """
 
 # The last 5 runs that tagged something or failed, with how long each took.

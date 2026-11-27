@@ -14,7 +14,7 @@ default:
 setup:
     {{db}} < database/setup.sql
 
-# Process pending sessions (just run 20 = at most 20)
+# Process sessions with new events once (just run 20 = at most 20)
 run n="":
     {{python}} -m pipeline run --once {{ if n == "" { "" } else { "--limit " + n } }}
 
@@ -22,9 +22,9 @@ run n="":
 live:
     {{python}} -m pipeline run
 
-# Refresh session_facts and error_events (just facts all = recount every session)
-facts mode="":
-    {{python}} -m pipeline facts {{ if mode == "all" { "--all" } else { "" } }}
+# Process every session again: facts, error copies and tags (after a rules change, or to catch very late events)
+rebuild:
+    {{python}} -m pipeline run --all
 
 # Show processing status
 status:

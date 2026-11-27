@@ -11,6 +11,8 @@ DB_SSLMODE = os.environ.get("DB_SSLMODE", "disable")
 
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "200"))
 WAIT_SECONDS = int(os.environ.get("WAIT_SECONDS", "30"))
+# How far back each round looks again for events stored later than their recorded time (a full rebuild catches anything older).
+LATE_EVENTS_MINUTES = int(os.environ.get("LATE_EVENTS_MINUTES", "60"))
 
-if BATCH_SIZE < 1 or WAIT_SECONDS < 1:
-    raise SystemExit("BATCH_SIZE and WAIT_SECONDS must be 1 or more")
+if BATCH_SIZE < 1 or WAIT_SECONDS < 1 or LATE_EVENTS_MINUTES < 0:
+    raise SystemExit("BATCH_SIZE and WAIT_SECONDS must be 1 or more, LATE_EVENTS_MINUTES 0 or more")
