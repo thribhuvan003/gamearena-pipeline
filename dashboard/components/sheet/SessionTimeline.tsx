@@ -1,4 +1,4 @@
-// SessionTimeline.tsx: a session's errors, its warnings per event name, then all its events page by page.
+// SessionTimeline.tsx: a session's errors, its warnings per event name and client, then all its events page by page (whole session, every client).
 
 import Pager from "./Pager";
 import { eventLabel, formatClock, formatNumber, redact } from "@/lib/format";
@@ -15,7 +15,8 @@ export default async function SessionTimeline({ sessionId, detail, eventPage, pa
 
   return (
     <section className="session-group" aria-labelledby="events-heading">
-      <h3 id="events-heading">Recorded evidence</h3>
+      <h3 id="events-heading">Whole session, all clients</h3>
+      <p className="hint">Every event in this session, from every client and the host; each row says whose it is.</p>
       {total === 0 ? <p className="hint">No telemetry events recorded.</p> : (
         <div className="diagnostic-list">
           <details className="disclosure">
@@ -33,8 +34,8 @@ export default async function SessionTimeline({ sessionId, detail, eventPage, pa
             <summary>Warnings <span className="disclosure-value">{formatNumber(detail.warn_events)}</span></summary>
             <div className="disclosure-body">
               {warnings.length === 0 ? <p className="hint">No warnings recorded.</p> : warnings.map((row) => (
-                <div key={row.event} className="evidence-row">
-                  <div className="section-line"><strong>{eventLabel(row.event)}</strong><span>{formatNumber(row.events)}</span></div>
+                <div key={`${row.event}|${row.connection}`} className="evidence-row">
+                  <div className="section-line"><strong>{eventLabel(row.event)}</strong><span>{row.connection === "-" ? "Session" : row.connection} · {formatNumber(row.events)}</span></div>
                   <div className="id">{row.event}{row.warning && " · App logged as an error"}</div>
                   <div className="row-meta">{formatClock(row.first_at)}{+row.last_at !== +row.first_at && ` → ${formatClock(row.last_at)}`} UTC</div>
                 </div>

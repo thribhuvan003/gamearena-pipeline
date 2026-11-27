@@ -11,7 +11,6 @@ import DateFilter from "@/components/header/DateFilter";
 import NoClientErrors from "@/components/overview/NoClientErrors";
 import SearchBox from "@/components/header/SearchBox";
 import SessionEndReasons from "@/components/overview/SessionEndReasons";
-import SessionPatterns from "@/components/overview/SessionPatterns";
 import SessionReasons from "@/components/overview/SessionReasons";
 import Sheet from "@/components/sheet/Sheet";
 import SignOut from "@/components/auth/SignOut";
@@ -65,10 +64,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
         <SessionReasons range={range} sheet={sheet} />
         <NoClientErrors range={range} />
       </div>
-      <div className="card-grid">
-        <SessionEndReasons range={range} />
-        <SessionPatterns range={range} />
-      </div>
+      <SessionEndReasons range={range} />
       <SummaryCards range={range} unit="clients" />
       <div className="card-grid">
         <ClientReasons range={range} sheet={sheet} />

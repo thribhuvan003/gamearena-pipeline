@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS connection_tags (
     -- Whether any of its events was ice.gathering.complete / media.first_decode (all its events, not only up to session_ended).
     gathered BOOL NULL,
     decoded BOOL NULL,
+    -- The strongest thing it logged itself, over all its events: error (an error other than ice.candidate.error),
+    -- ice_warning (ice.candidate.error), warning (a warn-level event), else nothing. Splits "no failure logged" by what was there.
+    logged STRING NULL,
     -- The run that wrote this tag, as in session_tags.
     run_id UUID NULL
 );
@@ -116,6 +119,7 @@ ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS browser STRING NULL;
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS access STRING NULL;
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS gathered BOOL NULL;
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS decoded BOOL NULL;
+ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS logged STRING NULL;
 
 -- The dashboard filters clients by their first event's day: this index lets a date range read only its own clients.
 CREATE INDEX IF NOT EXISTS connection_tags_started_at ON connection_tags (started_at)

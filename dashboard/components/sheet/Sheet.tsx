@@ -8,7 +8,7 @@ import SheetFrame from "./SheetFrame";
 import { cohortExplanation, eventLabel, labelText, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
 import { isUuid, link, linkString, searchPrefix, type Sheet as SheetState } from "@/lib/links";
 import {
-  COHORTS, getClientPage, getCohortCount, getNoReasonBreakdown, getReasonErrors, getReasonProgress, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
+  COHORTS, getClientPage, getCohortCount, getReasonErrors, getReasonProgress, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
   type ClientListRow, type Range, type ReasonErrorRow, type SearchRow, type SessionListRow,
 } from "@/lib/queries";
 
@@ -65,14 +65,13 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
     : key === "session_end_reason" ? (arg === "(none)" ? "No end reason recorded" : arg)
     : key === "client_label" ? labelText(arg)
     : eventLabel(arg);
-  const [total, rows, steps, errors, noReason] = await Promise.all([
+  const [total, rows, steps, errors] = await Promise.all([
     getCohortCount(key, arg, range, prefix),
     cohort.unit === "sessions"
       ? getSessionPage(key, arg, range, page, prefix).then((list) => list.map((row) => sessionRow(row, range, sheet)))
       : getClientPage(key, arg, range, page, prefix).then((list) => list.map((row) => clientRow(row, range, sheet))),
     key === "client_reason" && !prefix ? getReasonProgress(arg!, range) : null,
     key === "client_reason" && !prefix ? getReasonErrors(arg!, range) : null,
-    key === "client_reason" && arg === "no_video" && !prefix ? getNoReasonBreakdown(range) : null,
   ]);
   const unit = cohort.unit === "sessions" ? "sessions" : "client connections";
 
@@ -89,9 +88,6 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
           <div className="stat-value">{formatNumber(total)}</div>
           <div className="stat-sub">{prefix ? "Matching " : ""}{unit}</div>
           {cohortExplanation(key, arg) && <p className="row-meta">{cohortExplanation(key, arg)}</p>}
-          {noReason && (
-            <p className="row-meta">{formatNumber(noReason.no_error)} logged no error event · {formatNumber(noReason.only_warning)} logged only ice.candidate.error · {formatNumber(noReason.other_error)} logged another error after session_ended or as a state other than failed.</p>
-          )}
         </div>
         <div className="sheet-section">
           <form className="search sheet-list-filter" action="/" method="get">

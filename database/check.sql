@@ -162,7 +162,7 @@ FROM raw r
 LEFT JOIN session_facts f USING (session_id)
 LEFT JOIN copied c USING (session_id);
 
--- Check 4, client details: device, OS, browser, access and the two milestones recomputed in SQL, the same token rules as tags.py client_labels.
+-- Check 4, client details: device, OS, browser, access, the two milestones and what it logged, recomputed in SQL (token rules as tags.py client_labels).
 WITH expected AS (
     SELECT t.connection_id,
            CASE WHEN x.id IS NULL THEN 'No app record'
@@ -195,13 +195,21 @@ WITH expected AS (
            EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id
                      AND coalesce(e.payload->>'event', e.event_type::STRING) = 'ice.gathering.complete') AS gathered,
            EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id
-                     AND coalesce(e.payload->>'event', e.event_type::STRING) = 'media.first_decode') AS decoded
+                     AND coalesce(e.payload->>'event', e.event_type::STRING) = 'media.first_decode') AS decoded,
+           CASE WHEN EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id
+                               AND e.level = 'error' AND coalesce(e.payload->>'event', e.event_type::STRING) <> 'ice.candidate.error') THEN 'error'
+                WHEN EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id
+                               AND coalesce(e.payload->>'event', e.event_type::STRING) = 'ice.candidate.error') THEN 'ice_warning'
+                WHEN EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id
+                               AND e.level = 'warn') THEN 'warning'
+                ELSE 'nothing' END AS logged
     FROM connection_tags t
     LEFT JOIN (SELECT id, user_agent AS u, auth_type FROM gamearena_source.session_client_connections) x ON x.id = t.connection_id
 )
 SELECT count(*) AS client_connections,
        count(*) FILTER (WHERE t.device IS DISTINCT FROM x.device OR t.os IS DISTINCT FROM x.os
                           OR t.browser IS DISTINCT FROM x.browser OR t.access IS DISTINCT FROM x.access) AS labels_wrong,
-       count(*) FILTER (WHERE t.gathered IS DISTINCT FROM x.gathered OR t.decoded IS DISTINCT FROM x.decoded) AS milestones_wrong
+       count(*) FILTER (WHERE t.gathered IS DISTINCT FROM x.gathered OR t.decoded IS DISTINCT FROM x.decoded) AS milestones_wrong,
+       count(*) FILTER (WHERE t.logged IS DISTINCT FROM x.logged) AS logged_wrong
 FROM expected x
 JOIN connection_tags t USING (connection_id);

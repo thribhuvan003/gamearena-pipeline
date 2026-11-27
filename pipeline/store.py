@@ -127,12 +127,12 @@ def save_tags(conn, sessions, run_id):                       # Saves a batch of 
 # Save client connection tags, labels and milestones in one database call; a client saved again is overwritten.
 SAVE_CONNECTIONS_SQL = """
 UPSERT INTO connection_tags (connection_id, session_id, tag, reason, started_at, connected_at,
-                             device, os, browser, access, gathered, decoded, run_id)
-SELECT connection_id, session_id, tag, reason, started_at, connected_at, device, os, browser, access, gathered, decoded, %(run_id)s::UUID
+                             device, os, browser, access, gathered, decoded, logged, run_id)
+SELECT connection_id, session_id, tag, reason, started_at, connected_at, device, os, browser, access, gathered, decoded, logged, %(run_id)s::UUID
 FROM unnest(%(ids)s::UUID[], %(sessions)s::UUID[], %(tags)s::STRING[], %(reasons)s::STRING[], %(started)s::TIMESTAMPTZ[],
             %(connected)s::TIMESTAMPTZ[], %(devices)s::STRING[], %(oses)s::STRING[], %(browsers)s::STRING[], %(accesses)s::STRING[],
-            %(gathered)s::BOOL[], %(decoded)s::BOOL[])
-     AS t(connection_id, session_id, tag, reason, started_at, connected_at, device, os, browser, access, gathered, decoded)
+            %(gathered)s::BOOL[], %(decoded)s::BOOL[], %(logged)s::STRING[])
+     AS t(connection_id, session_id, tag, reason, started_at, connected_at, device, os, browser, access, gathered, decoded, logged)
 """
 
 
@@ -151,6 +151,7 @@ def save_connection_tags(conn, connections, run_id):         # Saves a batch of 
         "accesses": [row["access"] for row in rows],
         "gathered": [row["gathered"] for row in rows],
         "decoded": [row["decoded"] for row in rows],
+        "logged": [row["logged"] for row in rows],
         "run_id": run_id,
     }
     conn.execute(SAVE_CONNECTIONS_SQL, parameters)

@@ -66,14 +66,18 @@ clients AS (
 milestones AS (
     SELECT connection_id,
            bool_or(coalesce(payload->>'event', event_type::STRING) = 'ice.gathering.complete') AS gathered,
-           bool_or(coalesce(payload->>'event', event_type::STRING) = 'media.first_decode') AS decoded
+           bool_or(coalesce(payload->>'event', event_type::STRING) = 'media.first_decode') AS decoded,
+           CASE WHEN bool_or(level = 'error' AND coalesce(payload->>'event', event_type::STRING) <> 'ice.candidate.error') THEN 'error'
+                WHEN bool_or(coalesce(payload->>'event', event_type::STRING) = 'ice.candidate.error') THEN 'ice_warning'
+                WHEN bool_or(level = 'warn') THEN 'warning'
+                ELSE 'nothing' END AS logged
     FROM session_telemetry_events
     WHERE session_id = ANY(%(ids)s::UUID[])
       AND connection_id IS NOT NULL
     GROUP BY connection_id
 )
 SELECT c.connection_id, c.session_id, c.started_at, c.app_events, c.connected_at, c.event_names, c.phases, c.states,
-       coalesce(m.gathered, false), coalesce(m.decoded, false),
+       coalesce(m.gathered, false), coalesce(m.decoded, false), coalesce(m.logged, 'nothing'),
        x.id IS NOT NULL AS in_app, x.user_agent, x.auth_type::STRING
 FROM clients c
 LEFT JOIN milestones m ON m.connection_id = c.connection_id
@@ -88,7 +92,7 @@ def read_connections(conn, session_ids):                     # The client connec
 
     connections = {}
     for (connection_id, session_id, started_at, app_events, connected_at, event_names, phases, states,
-         gathered, decoded, in_app, user_agent, access) in rows:
+         gathered, decoded, logged, in_app, user_agent, access) in rows:
         connections[connection_id] = {
             "session_id": session_id,
             "started_at": started_at,
@@ -99,6 +103,7 @@ def read_connections(conn, session_ids):                     # The client connec
             "states": states,
             "gathered": gathered,
             "decoded": decoded,
+            "logged": logged,
             "in_app": in_app,
             "user_agent": user_agent,
             "access": access,

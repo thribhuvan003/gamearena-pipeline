@@ -50,7 +50,11 @@ const TAG_LABELS: Record<string, string> = {
 };
 
 const REASON_LABELS: Record<string, string> = {
-  no_video: "No failure reason recorded",
+  no_video: "No failure rule matched",
+  "no_video:nothing": "No failure rule matched · no warnings or errors",
+  "no_video:ice_warning": "No failure rule matched · network candidate warning",
+  "no_video:warning": "No failure rule matched · other warnings",
+  "no_video:error": "No failure rule matched · an error no rule uses",
   setup_error: "Setup failed",
   video_connection_failed: "WebRTC reported failed",
   network_connection_failed: "ICE reported failed",
@@ -71,9 +75,13 @@ const REASON_EXPLAINED: Record<string, string> = {
   video_decode_error: "None of the above, but media.decode.error was logged.",
   connection_dropped: "None of the above, but pipeline.connection.dropped was logged.",
   someone_never_joined: "No failure logged, and host_connected or client_connected never arrived.",
+  "no_video:nothing": "No failure rule matched, and none of its own events was a warning or an error.",
+  "no_video:ice_warning": "No failure rule matched; it logged ice.candidate.error (a network candidate warning), maybe other warnings too.",
+  "no_video:warning": "No failure rule matched; it logged warnings (e.g. ws_error, ws.disconnect, a state that never reached failed), no errors.",
+  "no_video:error": "No failure rule matched, but it logged an error: after session_ended, or one no rule uses.",
 };
 
-export function reasonLabel(reason: string): string {   // A category's screen name, e.g. no_video -> "No failure reason recorded"
+export function reasonLabel(reason: string): string {   // A category's screen name, e.g. no_video -> "No failure rule matched"
   return REASON_LABELS[reason] ?? reason.replaceAll("_", " ");
 }
 
@@ -98,13 +106,6 @@ const COHORT_EXPLAINED: Record<string, string> = {
   app_sessions: "Every session in the app's own records, by its start time.",
   with_telemetry: "App sessions that logged at least one event.",
   no_telemetry: "App sessions that never logged an event.",
-  no_end_event: "It has events, but session_ended was never logged.",
-  several_attempts: "pipeline.connect.attempt was logged more than once in the session.",
-  failure: "At least one pipeline.connect.failure was logged.",
-  failure_then_success: "A pipeline.connect.failure came before its last pipeline.connect.success.",
-  success_then_failure: "A pipeline.connect.failure came after its first pipeline.connect.success.",
-  reconnected: "At least one client_reconnected was logged.",
-  reconnected_10: "client_reconnected was logged 10 or more times.",
   tag_failed: "Ended sessions that logged pipeline.connect.attempt but never pipeline.connect.success.",
   failed_other: "Ended sessions with no pipeline.connect.success, and a reason other than setup failed or a missing join.",
   clients: "Client connections that logged events, one row per connection ID.",
