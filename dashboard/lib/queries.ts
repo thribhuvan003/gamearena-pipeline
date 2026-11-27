@@ -27,7 +27,7 @@ async function query<Row extends QueryResultRow>(sql: string, params: unknown[] 
 export type Range = { from: string | null; to: string | null };
 
 type DailyConnectionRow = { day: string; not_connected: string };
-export type EndReasonRow = { end_reason: string; sessions: string; connected: string; not_connected: string };
+type EndReasonRow = { end_reason: string; sessions: string; connected: string; not_connected: string };
 export type ClientLabelRow = { kind: "device" | "os" | "browser" | "access"; value: string; clients: string; connected: string; not_connected: string };
 type NoReasonBreakdown = { no_error: string; only_warning: string; other_error: string };
 type ClientReasonRow = { reason: string; clients: string; percent: string };

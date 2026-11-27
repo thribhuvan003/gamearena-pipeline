@@ -38,7 +38,7 @@ ORDER BY max(recorded_at)
 """
 
 
-def changed_sessions(conn, everything=False):                # Session ids to process, oldest first: all on a rebuild or first run, else those with events after the last processed one minus the late window; [] if nothing is new
+def changed_sessions(conn, everything=False):                # Ids to process, oldest first: all on a rebuild or first run, else sessions with events since the last processed minus the late window
     newest_processed = conn.execute(NEWEST_PROCESSED_SQL).fetchone()[0]
     if everything or newest_processed is None:
         return [row[0] for row in conn.execute(ALL_SESSIONS_SQL).fetchall()]
