@@ -59,7 +59,9 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     status STRING NOT NULL CHECK (status IN ('running', 'ok', 'failed')),
     sessions_tagged INT8 NOT NULL DEFAULT 0,
     -- The error text when status is failed, else NULL.
-    error STRING NULL
+    error STRING NULL,
+    -- true = every session was processed again (first build or daily rebuild); the next one is due REBUILD_HOURS after the last ok one.
+    full_rebuild BOOL NOT NULL DEFAULT false
 );
 
 -- session_facts: one row per session with events: counts and first/last failure and success, refreshed as events arrive.
@@ -120,6 +122,7 @@ ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS access STRING NULL;
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS gathered BOOL NULL;
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS decoded BOOL NULL;
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS logged STRING NULL;
+ALTER TABLE pipeline_runs ADD COLUMN IF NOT EXISTS full_rebuild BOOL NOT NULL DEFAULT false;
 
 -- The dashboard filters clients by their first event's day: this index lets a date range read only its own clients.
 CREATE INDEX IF NOT EXISTS connection_tags_started_at ON connection_tags (started_at)

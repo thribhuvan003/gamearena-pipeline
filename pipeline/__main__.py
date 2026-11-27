@@ -40,19 +40,16 @@ def run_command(args):                                       # Runs one round, o
     print(f"Pipeline started: database {config.DB_NAME} on {config.DB_HOST}:{config.DB_PORT}, batch size {config.BATCH_SIZE}")
     once = args.once or args.all or args.limit is not None
     signal.signal(signal.SIGTERM, signal.default_int_handler)   # Kubernetes stops a pod with SIGTERM: stop like Ctrl+C, the run marked failed
-    rebuild_every = config.REBUILD_HOURS * 3600
-    next_rebuild = time.monotonic() + rebuild_every
+    window = {}                                              # the late window's last event count, carried between rounds
 
     try:
         while True:
-            rebuild = args.all or (not once and rebuild_every > 0 and time.monotonic() >= next_rebuild)
             try:
                 with db.connect() as conn:
-                    if rebuild and not args.all:
+                    scheduled = not once and config.REBUILD_HOURS > 0 and store.rebuild_due(conn)
+                    if scheduled:
                         print("Scheduled full rebuild (REBUILD_HOURS)")
-                    run_one_round(conn, args.limit, rebuild)
-                if rebuild:
-                    next_rebuild = time.monotonic() + rebuild_every
+                    run_one_round(conn, args.limit, args.all or scheduled, window)
 
             except psycopg.OperationalError as error:
                 if once:
@@ -71,13 +68,15 @@ def run_command(args):                                       # Runs one round, o
     print("Pipeline stopped")
 
 
-def run_one_round(conn, limit, everything=False):            # Processes the sessions with new events (all if everything) batch by batch, and records the run; no new events = no writes
-    session_ids = store.changed_sessions(conn, everything)[:limit]
-    if not session_ids:
+def run_one_round(conn, limit, everything=False, window=None):   # Processes the sessions with new events (all on a full rebuild) batch by batch, and records the run; nothing new = no writes
+    session_ids, full = store.changed_sessions(conn, everything, window)
+    full = full and limit is None                            # a limited run is never a full rebuild
+    session_ids = session_ids[:limit]
+    if not session_ids and not full:
         print("No new events")
         return 0
 
-    run_id = store.start_run(conn)
+    run_id = store.start_run(conn, full)
     conn.commit()
     tagged = 0
 
@@ -85,7 +84,7 @@ def run_one_round(conn, limit, everything=False):            # Processes the ses
         for start in range(0, len(session_ids), config.BATCH_SIZE):
             tagged += process_batch(conn, session_ids[start:start + config.BATCH_SIZE], run_id)
             conn.commit()
-        if everything:
+        if full:                                             # even with no sessions left, so an emptied source empties our tables
             store.delete_gone(conn)
             conn.commit()
     except BaseException as error:

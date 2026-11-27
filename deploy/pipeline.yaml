@@ -17,7 +17,8 @@ spec:
     metadata:
       labels: { app: gamearena-pipeline }
     spec:
-      terminationGracePeriodSeconds: 60   # SIGTERM first: the pipeline stops like Ctrl+C and marks its run as failed
+      terminationGracePeriodSeconds: 120  # SIGTERM first: the pipeline cancels its query, stops like Ctrl+C and marks its run failed;
+                                          # if it is killed anyway, the next run closes the run left 'running'
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

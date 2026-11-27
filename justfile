@@ -58,6 +58,10 @@ profile:
 test:
     {{python}} -m unittest discover -s pipeline/tests
 
+# Test the pipeline's production behaviour (late events, restarts, rebuilds, permissions) in a throwaway database
+integration:
+    {{python}} pipeline/tests/integration.py
+
 # Preview ten rows from each generated table
 tables:
     {{db}} < database/reports/tables.sql

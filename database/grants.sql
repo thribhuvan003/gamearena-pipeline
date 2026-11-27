@@ -6,9 +6,8 @@
 
 CREATE USER IF NOT EXISTS gamearena_pipeline;
 
--- CockroachDB lets every user create tables in a database's public schema by default; not in the pipeline's database.
--- (Check before doing the same in the app's database: the app itself may rely on it.)
-REVOKE CREATE ON SCHEMA gamearena_analytics.public FROM public;
+-- Shared permissions are left alone: CockroachDB lets every user create tables in a public schema by default, and changing
+-- that affects every user, so it's the database owner's call. Best: give the pipeline's 5 tables their own database.
 
 -- The app's tables: read only.
 GRANT CONNECT ON DATABASE gamearena_source TO gamearena_pipeline;
@@ -24,3 +23,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
     gamearena_analytics.public.error_events,
     gamearena_analytics.public.pipeline_runs
 TO gamearena_pipeline;
+
+-- Check what it can do, including grants it inherits through roles.
+SHOW GRANTS FOR gamearena_pipeline;

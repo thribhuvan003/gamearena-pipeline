@@ -4,16 +4,35 @@ from datetime import timedelta
 
 from pipeline import config
 
-# Add a 'running' row to the run history and return its ID.
+# Add a 'running' row to the run history and return its ID; full_rebuild = every session was processed again.
 START_RUN_SQL = """
-INSERT INTO pipeline_runs (status)
-VALUES ('running')
+INSERT INTO pipeline_runs (status, full_rebuild)
+VALUES ('running', %(full)s)
 RETURNING run_id
 """
 
+# Runs still marked running belong to a process that was stopped hard (only one pipeline runs at a time).
+CLOSE_STALE_RUNS_SQL = """
+UPDATE pipeline_runs
+SET status = 'failed', finished_at = now(), error = 'Stopped before finishing (the process ended)'
+WHERE status = 'running'
+"""
 
-def start_run(conn):                                         # Adds a 'running' row to pipeline_runs and returns its run_id
-    return conn.execute(START_RUN_SQL).fetchone()[0]
+# When the last full rebuild finished well; kept in the database so a restart doesn't reset the schedule.
+LAST_FULL_REBUILD_SQL = "SELECT max(started_at) FROM pipeline_runs WHERE full_rebuild AND status = 'ok'"
+
+
+def start_run(conn, full=False):                             # Closes runs left running, adds a 'running' row to pipeline_runs and returns its run_id
+    conn.execute(CLOSE_STALE_RUNS_SQL)
+    return conn.execute(START_RUN_SQL, {"full": full}).fetchone()[0]
+
+
+def rebuild_due(conn):                                       # True if no full rebuild has finished well in the last REBUILD_HOURS
+    last = conn.execute(LAST_FULL_REBUILD_SQL).fetchone()[0]
+    if last is None:
+        return True
+    age = conn.execute("SELECT now() - %(last)s::TIMESTAMPTZ", {"last": last}).fetchone()[0]
+    return age >= timedelta(hours=config.REBUILD_HOURS)
 
 
 # The newest raw event, and the newest event already counted in session_facts (both read from an index). Events dated in the
@@ -39,15 +58,26 @@ ORDER BY max(recorded_at)
 """
 
 
-def changed_sessions(conn, everything=False):                # Ids to process, oldest first: all on a rebuild or first run, else sessions with events since the last processed minus the late window
+# How many events the late window holds: if it changes, an event arrived (or went) without a newer timestamp.
+WINDOW_COUNT_SQL = f"SELECT count(*) FROM {config.EVENTS_TABLE} WHERE recorded_at > %(since)s AND recorded_at <= now()"
+
+
+def changed_sessions(conn, everything=False, window=None):   # (ids oldest first, full): all on a rebuild or first run, else sessions with events in the late window when something in it changed
     newest_processed = conn.execute(NEWEST_PROCESSED_SQL).fetchone()[0]
     if everything or newest_processed is None:
-        return [row[0] for row in conn.execute(ALL_SESSIONS_SQL).fetchall()]
-    newest_event = conn.execute(NEWEST_EVENT_SQL).fetchone()[0]
-    if newest_event is None or newest_event <= newest_processed:
-        return []
+        return [row[0] for row in conn.execute(ALL_SESSIONS_SQL).fetchall()], True
     since = newest_processed - timedelta(minutes=config.LATE_EVENTS_MINUTES)
-    return [row[0] for row in conn.execute(CHANGED_SESSIONS_SQL, {"since": since}).fetchall()]
+    newest_event = conn.execute(NEWEST_EVENT_SQL).fetchone()[0]
+    seen = (since, conn.execute(WINDOW_COUNT_SQL, {"since": since}).fetchone()[0])
+    nothing_newer = newest_event is None or newest_event <= newest_processed
+    if window is not None:                                   # window remembers the last count between rounds
+        unchanged = window.get("seen") == seen
+        window["seen"] = seen
+        if nothing_newer and unchanged:
+            return [], False
+    elif nothing_newer:
+        return [], False
+    return [row[0] for row in conn.execute(CHANGED_SESSIONS_SQL, {"since": since}).fetchall()], False
 
 
 # Count the facts of these sessions again from all their events and save them.
@@ -93,14 +123,19 @@ def refresh_facts(conn, session_ids):                        # Recounts session_
     conn.execute(SAVE_ERRORS_SQL, batch)
 
 
-# On a full rebuild, drop facts and copied errors of sessions that no longer have any raw events.
+# On a full rebuild, drop every row whose raw events are gone (e.g. telemetry deleted by a retention policy), in all four tables.
 DELETE_GONE_SQL = [
     f"DELETE FROM session_facts f WHERE NOT EXISTS (SELECT 1 FROM {config.EVENTS_TABLE} e WHERE e.session_id = f.session_id)",
-    f"DELETE FROM error_events x WHERE NOT EXISTS (SELECT 1 FROM {config.EVENTS_TABLE} e WHERE e.session_id = x.session_id)",
+    f"DELETE FROM error_events x WHERE NOT EXISTS (SELECT 1 FROM {config.EVENTS_TABLE} e WHERE e.id = x.id)",
+    f"""DELETE FROM session_tags t WHERE NOT EXISTS (SELECT 1 FROM {config.EVENTS_TABLE} e
+                                                     WHERE e.session_id = t.session_id AND e.event_type = 'session_ended')""",
+    f"""DELETE FROM connection_tags t WHERE NOT EXISTS (SELECT 1 FROM session_tags s WHERE s.session_id = t.session_id)
+                                       OR NOT EXISTS (SELECT 1 FROM {config.EVENTS_TABLE} e
+                                                      WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id)""",
 ]
 
 
-def delete_gone(conn):                                       # Drops facts and error copies of sessions whose raw events are gone (full rebuild only)
+def delete_gone(conn):                                       # Drops rows of all four tables whose raw events are gone (full rebuild only)
     for delete in DELETE_GONE_SQL:
         conn.execute(delete)
 

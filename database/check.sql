@@ -1,4 +1,6 @@
--- check.sql (just check): recomputes every tag, reason and time in plain SQL and compares with the pipeline. Every *_wrong must be 0.
+-- check.sql (just check): recomputes every tag, reason and time in plain SQL and compares with the pipeline. Every *_wrong and
+-- stale_* must be 0. It names this laptop's tables; elsewhere, replace session_telemetry_events and
+-- gamearena_source.session_client_connections with EVENTS_TABLE and CLIENTS_TABLE.
 
 -- Check 1, sessions: the tags.py rules in SQL vs session_tags. no_end_event = never sent session_ended, so not tagged.
 WITH ended AS (
@@ -214,3 +216,15 @@ SELECT count(*) AS client_connections,
        count(*) FILTER (WHERE t.logged IS DISTINCT FROM x.logged) AS logged_wrong
 FROM expected x
 JOIN connection_tags t USING (connection_id);
+
+-- Check 5, nothing extra: rows whose raw events are gone (a full rebuild removes them), the reverse of checks 1 to 4.
+SELECT
+    (SELECT count(*) FROM session_tags t
+     WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.event_type = 'session_ended')) AS stale_session_tags,
+    (SELECT count(*) FROM connection_tags t
+     WHERE NOT EXISTS (SELECT 1 FROM session_tags s WHERE s.session_id = t.session_id)
+        OR NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id)) AS stale_connection_tags,
+    (SELECT count(*) FROM session_facts f
+     WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = f.session_id)) AS stale_facts,
+    (SELECT count(*) FROM error_events x
+     WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.id = x.id)) AS stale_errors;
