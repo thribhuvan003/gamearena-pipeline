@@ -24,7 +24,7 @@ export default async function ClientLabels({ range, title, kinds }: { range: Ran
                   <>
                     <span className="row-main">
                       <strong>{row.value}</strong>
-                      <span className="row-meta">{formatNumber(row.connected)} connected · {formatNumber(row.not_connected)} didn&apos;t connect ({percent(row.not_connected, row.clients)}% of all){unknownOf(row) > 0 && ` · ${formatNumber(String(unknownOf(row)))} unknown`}</span>
+                      <span className="row-meta">{formatNumber(row.connected)} connected · {formatNumber(row.not_connected)} didn&apos;t connect ({percent(row.not_connected, row.clients)}% of all){unknownOf(row) > 0 && ` · ${formatNumber(String(unknownOf(row)))} no app events`}</span>
                     </span>
                     <span className="row-end"><strong>{formatNumber(row.clients)}</strong></span>
                   </>

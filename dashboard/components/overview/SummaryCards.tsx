@@ -14,9 +14,9 @@ export default async function SummaryCards({ range, unit }: { range: Range; unit
         <p className="hint">Connected = a client in it logged pipeline.connect.success; didn&apos;t connect = an attempt logged, no success.</p>
         <p className="headline-share"><strong>{percent(sessions.with_telemetry, sessions.app_sessions)}%</strong> of app sessions have telemetry ({formatNumber(sessions.with_telemetry)} of {formatNumber(sessions.app_sessions)}).</p>
         <div className="metric-strip session-metrics">
-          <Metric range={range} list="app_sessions" label="Total" value={sessions.app_sessions} />
-          <Metric range={range} list="tag_connected" label="Connected" value={sessions.tag_connected} />
-          <Metric range={range} list="tag_failed" label="Didn't connect" value={sessions.tag_failed} />
+          <Metric range={range} list="app_sessions" label="Sessions" value={sessions.app_sessions} />
+          <Metric range={range} list="tag_connected" label="Sessions connected" value={sessions.tag_connected} />
+          <Metric range={range} list="tag_failed" label="Sessions didn't connect" value={sessions.tag_failed} />
         </div>
         <p className="hint secondary-counts">
           Neither: <Link href={link(range, { list: "no_telemetry" })} scroll={false}>{formatNumber(sessions.no_telemetry)} without telemetry</Link>
@@ -30,15 +30,15 @@ export default async function SummaryCards({ range, unit }: { range: Range; unit
   return (
     <section className="metric-groups" aria-labelledby="clients-title">
       <h2 id="clients-title">Clients</h2>
-      <p className="hint">Counted per client connection ID, events up to session_ended. Didn&apos;t connect = it logged app events but no pipeline.connect.success. System events only = no app events in that span.</p>
+      <p className="hint">Counted per client connection ID, events up to session_ended. Didn&apos;t connect = it logged app events but no pipeline.connect.success. Neither = no app events before session_ended.</p>
       <p className="headline-share"><strong>{percent(clients.clients_connected, clients.clients)}%</strong> of tracked client connections connected ({formatNumber(clients.clients_connected)} of {formatNumber(clients.clients)}).</p>
       <div className="metric-strip client-metrics">
-        <Metric range={range} list="clients" label="Tracked" value={clients.clients} />
-        <Metric range={range} list="clients_connected" label="Connected" value={clients.clients_connected} />
-        <Metric range={range} list="clients_not_connected" label="Didn't connect" value={clients.clients_not_connected} />
+        <Metric range={range} list="clients" label="Clients tracked" value={clients.clients} />
+        <Metric range={range} list="clients_connected" label="Clients connected" value={clients.clients_connected} />
+        <Metric range={range} list="clients_not_connected" label="Clients didn't connect" value={clients.clients_not_connected} />
       </div>
       <p className="hint secondary-counts">
-        Neither: <Link href={link(range, { list: "clients_unknown" })} scroll={false}>{formatNumber(clients.clients_unknown)} with system events only</Link>
+        Neither: <Link href={link(range, { list: "clients_unknown" })} scroll={false}>{formatNumber(clients.clients_unknown)} with no app events before session_ended</Link>
       </p>
     </section>
   );

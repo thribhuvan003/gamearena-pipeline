@@ -15,7 +15,7 @@ export default async function SessionFailures({ range }: { range: Range }) {   /
       return {
         key: row.combo, to: { list: "failed_session_errors" as const, arg: row.combo }, count: row.sessions,
         label: (parts.length > 1 ? "Both " : "") + parts.map(eventLabel).join(" and "),
-        meta: parts.map((part) => message.get(part) && `${eventLabel(part)}: ${redact(message.get(part)!)}`).filter(Boolean).join(" · "),
+        meta: parts.length === 1 && message.get(parts[0]) ? `most common message: ${redact(message.get(parts[0])!)}` : "",
       };
     }),
     { key: "client", to: { list: "failed_client_error_only" as const, arg: undefined }, count: counts.failed_client_error_only, label: "Errors only with a client ID (see Clients)", meta: "" },
@@ -25,14 +25,14 @@ export default async function SessionFailures({ range }: { range: Range }) {   /
   return (
     <section className="overview-panel" aria-labelledby="session-failures-title">
       <h3 id="session-failures-title">{formatNumber(counts.tag_failed)} sessions didn&apos;t connect</h3>
-      <p className="hint">Each session once, by the errors it logged; the rows add up to {formatNumber(counts.tag_failed)}.</p>
+      <p className="hint">Each session once, by the errors it logged with no client ID; the rows add up to {formatNumber(counts.tag_failed)}.</p>
       <ul className="list reason-list">
         {rows.map((row) => (
           <li key={row.key}>
             <Link href={link(range, row.to)} scroll={false} className="list-row">
               <span className="row-main">
                 <strong>{row.label}</strong>
-                {row.meta && <span className="row-meta">most common message · {row.meta}</span>}
+                {row.meta && <span className="row-meta">{row.meta}</span>}
               </span>
               <span className="row-end"><strong>{formatNumber(row.count)}</strong></span>
               <span className="chevron" aria-hidden="true">›</span>

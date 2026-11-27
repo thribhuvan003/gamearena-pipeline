@@ -46,7 +46,7 @@ const TAG_LABELS: Record<string, string> = {
   not_connected: "Didn't connect",
   failed: "Didn't connect",
   no_attempt: "No attempt",
-  unknown: "System events only",
+  unknown: "No app events before session_ended",
 };
 
 const REASON_LABELS: Record<string, string> = {
@@ -102,14 +102,12 @@ const COHORT_EXPLAINED: Record<string, string> = {
   clients: "Client connections that logged events, one row per connection ID.",
   clients_connected: "The app logged pipeline.connect.success for this client.",
   clients_not_connected: "The app logged events for this client, but never pipeline.connect.success.",
-  clients_unknown: "Only server (system) events exist for this client; the app logged none.",
+  clients_unknown: "Up to session_ended, only server (system) events exist for this client; the app logged none.",
   failed_client_error_only: "Sessions that didn't connect, logged no error without a client ID, but logged errors with one.",
   failed_no_error: "Sessions that didn't connect and logged no error-level event.",
+  client_logged: "Clients that logged this error.",
+  client_warning: "Clients that had this warning on their own connection.",
   failed_session_errors: "Sessions that didn't connect whose errors with no client ID were exactly these.",
-  client_logged_not_connected: "Clients that didn't connect (no pipeline.connect.success) and logged this error.",
-  client_warning_not_connected: "Clients that didn't connect and had this warning on their own connection.",
-  client_warning_after: "Clients that connected and had this warning on their own connection at or after pipeline.connect.success.",
-  client_error_after: "Clients that logged pipeline.connect.success, and logged this error at or after it (some also before).",
   tag_connected: "Ended sessions in which some client logged pipeline.connect.success.",
   no_end_event: "It has events, but session_ended was never logged, so it has no outcome.",
   tag_no_attempt: "Ended sessions that logged neither pipeline.connect.attempt nor pipeline.connect.success.",
