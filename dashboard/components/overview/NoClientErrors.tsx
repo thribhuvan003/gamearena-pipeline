@@ -14,17 +14,19 @@ export default async function NoClientErrors({ range }: { range: Range }) {   //
         <h3 id="top-errors-title">Errors logged by sessions</h3>
       </div>
       <p className="hint">Errors with no client ID, counted by sessions. In brackets: what the payload says most often.</p>
-      {errors.length === 0 ? <p className="hint">No errors without a client ID in this period.</p> : (
-        <div className="list overview-errors">
-          <div className="overview-error-row overview-error-labels" aria-hidden="true">
-            <span>Error</span>
-            <span>Sessions</span>
-            <span>Times logged</span>
-            <span />
+      <div className="card-body">
+        {errors.length === 0 ? <p className="hint">No errors without a client ID in this period.</p> : (
+          <div className="list overview-errors">
+            <div className="overview-error-row overview-error-labels" aria-hidden="true">
+              <span>Error</span>
+              <span>Sessions</span>
+              <span>Times logged</span>
+              <span />
+            </div>
+            {errors.map((row) => <ErrorRow key={row.error} row={row} range={range} />)}
           </div>
-          {errors.map((row) => <ErrorRow key={row.error} row={row} range={range} />)}
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }

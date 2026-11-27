@@ -27,11 +27,13 @@ export default async function SessionPatterns({ range }: { range: Range }) {   /
     <section className="overview-panel" aria-labelledby="activity-title">
       <h3 id="activity-title">Session activity</h3>
       <p className="hint">A session can be in several rows.</p>
-      <div className="diagnostic-list">{MAIN.map(row)}</div>
-      <details className="disclosure nested-disclosure">
-        <summary>More activity</summary>
-        <div className="diagnostic-list">{EXTRA.map(row)}</div>
-      </details>
+      <div className="card-body">
+        <div className="diagnostic-list">{MAIN.map(row)}</div>
+        <details className="disclosure nested-disclosure">
+          <summary>More activity</summary>
+          <div className="diagnostic-list">{EXTRA.map(row)}</div>
+        </details>
+      </div>
     </section>
   );
 }

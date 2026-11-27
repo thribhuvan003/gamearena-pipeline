@@ -11,10 +11,10 @@ export default async function ClientErrors({ range }: { range: Range }) {   // L
   const warnings = rows.filter((row) => row.warning);
 
   return (
-    <section className="overview-panel diagnostics-errors" aria-labelledby="logged-errors-title">
+    <section className="overview-panel" aria-labelledby="logged-errors-title">
       <h3 id="logged-errors-title">Errors logged by clients</h3>
-      <div className="diagnostics-error-list">
-        <p className="hint">Clients that logged each error; a client can be under several.</p>
+      <p className="hint">Clients that logged each error; a client can be under several.</p>
+      <div className="card-body">
         {errors.length === 0 && <p className="hint">No client errors recorded.</p>}
         <div className="diagnostic-list">
           {errors.slice(0, 5).map((row) => <ClientError key={row.error} row={row} range={range} />)}

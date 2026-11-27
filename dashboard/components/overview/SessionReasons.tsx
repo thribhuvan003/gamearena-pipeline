@@ -20,17 +20,19 @@ export default async function SessionReasons({ range, sheet }: { range: Range; s
     <section className="overview-panel" aria-labelledby="session-reasons-title">
       <h3 id="session-reasons-title">{formatNumber(total)} sessions didn&apos;t connect</h3>
       <p className="hint">One reason per session; the rows add up to {formatNumber(total)}.</p>
-      <ul className="list reason-list">
-        {rows.map((row) => (
-          <li key={row.key}>
-            <Link href={link(range, row.to)} scroll={false} className={sheet.list === row.to.list && sheet.arg === row.to.arg ? "list-row selected" : "list-row"}>
-              <span className="row-main"><strong>{row.label}</strong></span>
-              <span className="row-end"><strong>{formatNumber(row.count)}</strong><small>{percent(row.count, total)}%</small></span>
-              <span className="chevron" aria-hidden="true">›</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <div className="card-body">
+        <ul className="list reason-list">
+          {rows.map((row) => (
+            <li key={row.key}>
+              <Link href={link(range, row.to)} scroll={false} className={sheet.list === row.to.list && sheet.arg === row.to.arg ? "list-row selected" : "list-row"}>
+                <span className="row-main"><strong>{row.label}</strong></span>
+                <span className="row-end"><strong>{formatNumber(row.count)}</strong><small>{percent(row.count, total)}%</small></span>
+                <span className="chevron" aria-hidden="true">›</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
