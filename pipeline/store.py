@@ -20,6 +20,7 @@ WHERE status = 'running'
 
 # When the last full rebuild finished well; kept in the database so a restart doesn't reset the schedule.
 LAST_FULL_REBUILD_SQL = "SELECT max(started_at) FROM pipeline_runs WHERE full_rebuild AND status = 'ok'"
+LAST_RUN_STATUS_SQL = "SELECT status FROM pipeline_runs ORDER BY started_at DESC, run_id DESC LIMIT 1"
 
 
 def start_run(conn, full=False):                             # Closes runs left running, adds a 'running' row to pipeline_runs and returns its run_id
@@ -44,7 +45,7 @@ NEWEST_PROCESSED_SQL = "SELECT max(last_event_at) FROM session_facts WHERE last_
 CHANGED_SESSIONS_SQL = f"""
 SELECT session_id
 FROM {config.EVENTS_TABLE}
-WHERE recorded_at > %(since)s
+WHERE recorded_at > %(since)s AND recorded_at <= now()
 GROUP BY session_id
 ORDER BY max(recorded_at)
 """
@@ -64,7 +65,9 @@ WINDOW_COUNT_SQL = f"SELECT count(*) FROM {config.EVENTS_TABLE} WHERE recorded_a
 
 def changed_sessions(conn, everything=False, window=None):   # (ids oldest first, full): all on a rebuild or first run, else sessions with events in the late window when something in it changed
     newest_processed = conn.execute(NEWEST_PROCESSED_SQL).fetchone()[0]
-    if everything or newest_processed is None:
+    last_run = conn.execute(LAST_RUN_STATUS_SQL).fetchone()
+    incomplete = last_run is not None and last_run[0] != "ok"
+    if everything or newest_processed is None or incomplete or conn.execute(LAST_FULL_REBUILD_SQL).fetchone()[0] is None:
         return [row[0] for row in conn.execute(ALL_SESSIONS_SQL).fetchall()], True
     since = newest_processed - timedelta(minutes=config.LATE_EVENTS_MINUTES)
     newest_event = conn.execute(NEWEST_EVENT_SQL).fetchone()[0]
@@ -93,7 +96,7 @@ SELECT e.session_id,
        max(e.recorded_at) FILTER (WHERE coalesce(e.payload->>'event', e.event_type::STRING) = 'pipeline.connect.failure'),
        min(e.recorded_at) FILTER (WHERE coalesce(e.payload->>'event', e.event_type::STRING) = 'pipeline.connect.success'),
        max(e.recorded_at) FILTER (WHERE coalesce(e.payload->>'event', e.event_type::STRING) = 'pipeline.connect.success'),
-       max(e.recorded_at)
+       coalesce(max(e.recorded_at) FILTER (WHERE e.recorded_at <= now()), min(e.recorded_at))
 FROM {config.EVENTS_TABLE} e
 WHERE e.session_id = ANY(%(ids)s::UUID[])
 GROUP BY e.session_id

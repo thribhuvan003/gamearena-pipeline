@@ -31,10 +31,11 @@ Leave it running. It checks for new telemetry every 30 seconds and schedules a f
 ### 3. Open the dashboard (terminal 2)
 
 ```bash
+just dashboard-install
 just dashboard
 ```
 
-Open **[http://localhost:3000](http://localhost:3000)**. This installs the dashboard dependencies and starts the local development server. With the default local preview configuration, Google sign-in is not required.
+Open **[http://localhost:3000](http://localhost:3000)**. The first command installs locked dependencies; the second starts the local development server. With the default local preview configuration, Google sign-in is not required.
 
 ### 4. Check the pipeline
 
@@ -55,6 +56,7 @@ just check
 | `just rebuild` | Reprocess all telemetry |
 | `just status` | Show tag counts and recent runs |
 | `just check` | Compare derived data against raw telemetry |
+| `just dashboard-install` | Install locked dashboard dependencies |
 | `just dashboard` | Start the dashboard at localhost:3000 |
 | `just test` | Run the tagging and browser classification unit tests |
 
@@ -75,7 +77,7 @@ Do not run `just run` or `just rebuild` alongside another running pipeline. Stop
 | `just integration` | Run integration tests on a disposable local cluster only |
 | `just reset` | Delete all rows in the five derived tables (local only) |
 
-**Safety:** `just integration` drops and recreates a test database and removes a test user. Never run it against a shared or production cluster, including through port forwarding. `just reset` deletes derived data. The SQL shortcuts in `justfile` target the local insecure Docker container, not production.
+**Safety:** `just integration` requires `TEST_DB_PORT` (a non-default port on a disposable local cluster) and `ALLOW_DISPOSABLE_TEST_DB=1`. It creates a uniquely named test database and user, then removes only those. Never use a shared cluster or a port forward. `just reset` deletes derived data. The SQL shortcuts in `justfile` target the local insecure Docker container, not production.
 
 ## Database settings
 
@@ -95,6 +97,7 @@ Local defaults:
 | `WAIT_SECONDS` | `30` |
 | `LATE_EVENTS_MINUTES` | `60` |
 | `REBUILD_HOURS` | `24` |
+| `PRUNE_EXPIRED_TELEMETRY` | `0` (enable only after owner confirms retention) |
 
 The Python pipeline reads environment variables from the shell. Dashboard database settings (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) can be set in `dashboard/.env.local`. The dashboard SQL currently assumes the local source table names. Use separate restricted credentials for production; see the deployment guide.
 

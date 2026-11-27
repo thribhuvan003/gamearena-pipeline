@@ -69,10 +69,13 @@ def run_command(args):                                       # Runs one round, o
 
 
 def run_one_round(conn, limit, everything=False, window=None):   # Processes the sessions with new events (all on a full rebuild) batch by batch, and records the run; nothing new = no writes
-    session_ids, full = store.changed_sessions(conn, everything, window)
+    next_window = dict(window) if window is not None else None
+    session_ids, full = store.changed_sessions(conn, everything, next_window)
     full = full and limit is None                            # a limited run is never a full rebuild
     session_ids = session_ids[:limit]
     if not session_ids and not full:
+        if window is not None:
+            window.update(next_window)
         print("No new events")
         return 0
 
@@ -84,17 +87,22 @@ def run_one_round(conn, limit, everything=False, window=None):   # Processes the
         for start in range(0, len(session_ids), config.BATCH_SIZE):
             tagged += process_batch(conn, session_ids[start:start + config.BATCH_SIZE], run_id)
             conn.commit()
-        if full:                                             # even with no sessions left, so an emptied source empties our tables
+        if full and config.PRUNE_EXPIRED_TELEMETRY:
             store.delete_gone(conn)
             conn.commit()
     except BaseException as error:
-        conn.rollback()
-        store.finish_run(conn, run_id, "failed", tagged, f"{type(error).__name__}: {error}")
-        conn.commit()
+        try:
+            conn.rollback()
+            store.finish_run(conn, run_id, "failed", tagged, f"{type(error).__name__}: {error}")
+            conn.commit()
+        except psycopg.Error as status_error:
+            print(f"Could not record the failed run: {status_error}")
         raise
 
     store.finish_run(conn, run_id, "ok", tagged)
     conn.commit()
+    if window is not None and limit is None:
+        window.update(next_window)
     print(f"Done: {len(session_ids)} sessions with new events, {tagged} ended sessions tagged")
     return tagged
 

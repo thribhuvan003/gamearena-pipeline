@@ -1,5 +1,5 @@
 -- grants.sql (just grants): the pipeline's own database user. Run once by an admin, after setup.sql.
--- It can only READ the app's tables and only WRITE the pipeline's 5 tables; it can't create, change or drop any table.
+-- Direct grants allow reads of the app's tables and writes of the 5 derived tables. Verify inherited privileges before deployment.
 -- The names below are this laptop's. In production, replace gamearena_source / gamearena_analytics with the real databases
 -- (EVENTS_TABLE and CLIENTS_TABLE in the pipeline's settings must name the same tables). Set the password separately:
 --   ALTER USER gamearena_pipeline WITH PASSWORD '...';   (never in this file)

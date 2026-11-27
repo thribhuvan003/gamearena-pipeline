@@ -1,4 +1,4 @@
-# integration.py (just integration): the pipeline's production behaviour against a throwaway database, gamearena_test, with
+# integration.py (just integration): the pipeline's behaviour against a uniquely named throwaway database, with
 # made-up events in its own small copies of the app's tables. The real telemetry is never touched. Needs the local CockroachDB.
 import contextlib
 import io
@@ -7,9 +7,17 @@ import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 
-# Point the pipeline at the test database before it reads its settings.
-os.environ.update(DB_NAME="gamearena_test", EVENTS_TABLE="session_telemetry_events",
-                  CLIENTS_TABLE="gamearena_test.public.session_client_connections", REBUILD_HOURS="24", LATE_EVENTS_MINUTES="60")
+# Require an explicitly selected disposable local cluster, never the configured application DB.
+port = os.environ.get("TEST_DB_PORT", "")
+if os.environ.get("ALLOW_DISPOSABLE_TEST_DB") != "1" or not port.isdecimal() or not 1 <= int(port) <= 65535 or int(port) == 26257:
+    raise SystemExit("Use a disposable local CockroachDB on a separate port; set TEST_DB_PORT and ALLOW_DISPOSABLE_TEST_DB=1. Never use a port forward.")
+suffix = uuid.uuid4().hex[:12]
+TEST_DATABASE = f"gamearena_test_{suffix}"
+TEST_USER = f"gamearena_test_user_{suffix}"
+os.environ.update(DB_HOST="127.0.0.1", DB_PORT=port, DB_NAME=TEST_DATABASE, DB_USER="root",
+                  DB_PASSWORD="", DB_SSLMODE="disable", DB_SSLROOTCERT="", EVENTS_TABLE="session_telemetry_events",
+                  CLIENTS_TABLE=f"{TEST_DATABASE}.public.session_client_connections", REBUILD_HOURS="24",
+                  LATE_EVENTS_MINUTES="60", PRUNE_EXPIRED_TELEMETRY="1")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import psycopg                                                # noqa: E402
@@ -83,10 +91,9 @@ def round_(conn, window, limit=None, everything=False):       # One pipeline rou
 
 def main():
     with admin("defaultdb") as root:
-        root.execute("DROP DATABASE IF EXISTS gamearena_test CASCADE")
-        root.execute("CREATE DATABASE gamearena_test")
+        root.execute(f"CREATE DATABASE {TEST_DATABASE}")
     try:
-        with admin("gamearena_test") as root:
+        with admin(TEST_DATABASE) as root:
             root.execute(APP_TABLES)
             root.execute(io.open(os.path.join(ROOT, "database", "setup.sql"), encoding="utf-8").read())
             base = NOW - timedelta(hours=3)
@@ -120,16 +127,16 @@ def main():
 
             print("A late event with no newer timestamp")
             round_(conn, window)
-            with admin("gamearena_test") as root:
+            with admin(TEST_DATABASE) as root:
                 event(root, s2, base + timedelta(minutes=1, seconds=3), "pipeline.connect.success", c2, app_event=True)
             round_(conn, window)
             check("the session it belongs to was tagged again", one(conn, "SELECT tag FROM session_tags WHERE session_id = %s", (s2,)) == "connected")
 
             print("An event dated in the future")
-            with admin("gamearena_test") as root:
+            with admin(TEST_DATABASE) as root:
                 event(root, s1, NOW + timedelta(days=1), "ws_error", source="system", level="warn")
             round_(conn, window)
-            with admin("gamearena_test") as root:
+            with admin(TEST_DATABASE) as root:
                 s4, _ = add_session(root, NOW - timedelta(minutes=5), connects=False)
             round_(conn, window)
             check("a newer session is still picked up", one(conn, "SELECT count(*) FROM session_tags WHERE session_id = %s", (s4,)) == 1)
@@ -153,11 +160,11 @@ def main():
             check("closed as failed by the next run", one(conn, "SELECT count(*) FROM pipeline_runs WHERE status = 'running'") == 0)
 
             print("The restricted user")
-            with admin("gamearena_test") as root:
-                root.execute("CREATE USER IF NOT EXISTS gamearena_test_user")
-                root.execute("GRANT SELECT ON TABLE session_telemetry_events, session_client_connections TO gamearena_test_user")
-                root.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE {', '.join(OURS)} TO gamearena_test_user")
-            with psycopg.connect(host=config.DB_HOST, port=config.DB_PORT, dbname="gamearena_test", user="gamearena_test_user", sslmode=config.DB_SSLMODE) as limited:
+            with admin(TEST_DATABASE) as root:
+                root.execute(f"CREATE USER {TEST_USER}")
+                root.execute(f"GRANT SELECT ON TABLE session_telemetry_events, session_client_connections TO {TEST_USER}")
+                root.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE {', '.join(OURS)} TO {TEST_USER}")
+            with psycopg.connect(host=config.DB_HOST, port=config.DB_PORT, dbname=TEST_DATABASE, user=TEST_USER, sslmode=config.DB_SSLMODE) as limited:
                 for name, sql in (("delete app events", "DELETE FROM session_telemetry_events WHERE true"),
                                   ("change client records", "UPDATE session_client_connections SET auth_type = auth_type WHERE true"),
                                   ("drop a pipeline table", "DROP TABLE session_tags")):
@@ -172,20 +179,20 @@ def main():
                 check("can still do a full rebuild", one(limited, "SELECT count(*) FROM session_tags") == 4)
 
             print("Raw events deleted (retention)")
-            with admin("gamearena_test") as root:
+            with admin(TEST_DATABASE) as root:
                 root.execute("DELETE FROM session_telemetry_events WHERE session_id = %s", (s3,))
             round_(conn, window, everything=True)
             left = sum(one(conn, f"SELECT count(*) FROM {t} WHERE session_id = %s", (s3,)) for t in OURS[:4])
             check("a full rebuild removes its rows from all four tables", left == 0)
-            with admin("gamearena_test") as root:
+            with admin(TEST_DATABASE) as root:
                 root.execute("DELETE FROM session_telemetry_events WHERE true")
             round_(conn, window, everything=True)
             left = sum(one(conn, f"SELECT count(*) FROM {t}") for t in OURS[:4])
             check("an emptied source empties the four tables", left == 0)
     finally:
         with admin("defaultdb") as root:
-            root.execute("DROP DATABASE IF EXISTS gamearena_test CASCADE")
-            root.execute("DROP USER IF EXISTS gamearena_test_user")
+            root.execute(f"DROP DATABASE IF EXISTS {TEST_DATABASE} CASCADE")
+            root.execute(f"DROP USER IF EXISTS {TEST_USER}")
 
     print(f"{'All passed' if not failures else f'{len(failures)} failed'}")
     sys.exit(1 if failures else 0)

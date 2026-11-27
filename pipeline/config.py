@@ -24,6 +24,8 @@ WAIT_SECONDS = int(os.environ.get("WAIT_SECONDS", "30"))
 LATE_EVENTS_MINUTES = int(os.environ.get("LATE_EVENTS_MINUTES", "60"))
 # While running, process every session again this often, in the same process (catches events stored very late); 0 = never.
 REBUILD_HOURS = float(os.environ.get("REBUILD_HOURS", "24"))
+# Enable only after the database owner confirms that derived data should follow source retention.
+PRUNE_EXPIRED_TELEMETRY = os.environ.get("PRUNE_EXPIRED_TELEMETRY", "0") == "1"
 
 if BATCH_SIZE < 1 or WAIT_SECONDS < 1 or LATE_EVENTS_MINUTES < 0 or REBUILD_HOURS < 0 or STATEMENT_TIMEOUT_SECONDS < 0:
     raise SystemExit("BATCH_SIZE and WAIT_SECONDS must be 1 or more; LATE_EVENTS_MINUTES, REBUILD_HOURS and STATEMENT_TIMEOUT_SECONDS 0 or more")

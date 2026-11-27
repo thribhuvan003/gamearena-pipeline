@@ -74,9 +74,13 @@ explore:
 sql:
     docker exec -it cockroachdb ./cockroach sql --insecure -d gamearena_analytics
 
+# Install the locked dashboard dependencies once, or when the lockfile changes
+dashboard-install:
+    cd dashboard && npm ci
+
 # Start the dashboard at http://localhost:3000 (Ctrl+C stops it)
 dashboard:
-    cd dashboard && npm install && npm run dev
+    cd dashboard && npm run dev
 
 # Clear the generated tables (raw telemetry is not touched)
 [confirm("Delete every row in session_tags, connection_tags, pipeline_runs, session_facts and error_events?")]

@@ -145,7 +145,7 @@ WITH raw AS (
            max(recorded_at) FILTER (WHERE coalesce(payload->>'event', event_type::STRING) = 'pipeline.connect.failure') AS last_failure,
            min(recorded_at) FILTER (WHERE coalesce(payload->>'event', event_type::STRING) = 'pipeline.connect.success') AS first_success,
            max(recorded_at) FILTER (WHERE coalesce(payload->>'event', event_type::STRING) = 'pipeline.connect.success') AS last_success,
-           max(recorded_at) AS last_event_at,
+           coalesce(max(recorded_at) FILTER (WHERE recorded_at <= now()), min(recorded_at)) AS last_event_at,
            count(*) FILTER (WHERE level = 'error') AS errors
     FROM session_telemetry_events
     GROUP BY session_id

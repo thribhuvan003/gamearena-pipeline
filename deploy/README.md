@@ -26,13 +26,13 @@ Every write is an `UPSERT` by key or a `DELETE` of its own rows, so a restart or
 - **Stopping:** on SIGTERM it stops like Ctrl+C. An unfinished batch is rolled back, finished batches are kept, and the run is marked failed in `pipeline_runs`. If it's killed before that, the next run marks the leftover `running` row as failed.
 - **Database down:** it logs `Database not reachable, will try again` and retries every 30 s. Any other error exits, and Kubernetes restarts it.
 - **Late events:** each round counts the events of the last 60 minutes (`LATE_EVENTS_MINUTES`). If that count changes, the sessions in that window are processed again, even when no newer timestamp arrived. Anything older is caught by the full rebuild, which the same process runs once a day (`REBUILD_HOURS`). Its last run is stored in `pipeline_runs`, so a restart doesn't reset the schedule. No separate CronJob is needed.
-- **Deleted telemetry:** a full rebuild removes rows of all four result tables whose raw events are gone, so the results follow whatever the app keeps.
-- **Clock errors:** events dated in the future can't push the pipeline's "newest processed" mark ahead.
+- **Deleted telemetry:** by default, a rebuild does not prune result rows for missing source events. After the owner confirms retention, set `PRUNE_EXPIRED_TELEMETRY=1` to enable that cleanup. Stale-row checks report retained rows while pruning is disabled.
+- **Clock errors:** future timestamps do not hide a session's latest non-future event from the watermark. Interrupted or failed rounds retry with a full rebuild.
 - **Stuck queries** are cancelled after 10 minutes (`STATEMENT_TIMEOUT_SECONDS`), and the round is retried.
 
 ## Checking it
 
-`database/check.sql` works out every result again in plain SQL. Every `*_wrong` and `stale_*` must be 0. It names this laptop's tables; replace them with `EVENTS_TABLE` and `CLIENTS_TABLE` before running it elsewhere. `just integration` tests late events, restarts, rebuilds, deleted telemetry and the restricted user in a throwaway database.
+`database/check.sql` works out every result again in plain SQL. Every `*_wrong` and `stale_*` must be 0. It names this laptop's tables; replace them with `EVENTS_TABLE` and `CLIENTS_TABLE` before running it elsewhere. `just integration` requires a separate disposable local CockroachDB port (`TEST_DB_PORT`, not 26257) and `ALLOW_DISPOSABLE_TEST_DB=1`; never point it at a shared cluster or a port forward. It tests late events, restarts, rebuilds, deleted telemetry and the restricted user.
 
 ## Questions for the cluster owner
 
@@ -41,5 +41,5 @@ Every write is an `UPSERT` by key or a `DELETE` of its own rows, so a restart or
 - Is `recorded_at` set by the server or by the client's clock?
 - Does `session_telemetry_events` have indexes on `recorded_at` and on `session_id`? Each round reads by both.
 - Is there an insert-time column or other ingestion cursor on the events? It would replace the 60-minute window and the daily rebuild.
-- Does the app delete old telemetry? If so, should the pipeline's results follow it (today they do, after each full rebuild)?
+- Does the app delete old telemetry? If so, should the pipeline's results follow it (enable `PRUNE_EXPIRED_TELEMETRY` only if confirmed)?
 - CockroachDB lets every user create tables in a `public` schema by default. `grants.sql` leaves that alone. Does the database owner want it changed?

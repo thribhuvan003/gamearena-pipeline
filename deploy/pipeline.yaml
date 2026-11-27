@@ -42,6 +42,7 @@ spec:
             - { name: BATCH_SIZE, value: "200" }
             - { name: LATE_EVENTS_MINUTES, value: "60" }
             - { name: REBUILD_HOURS, value: "24" }
+            - { name: PRUNE_EXPIRED_TELEMETRY, value: "0" }  # enable after owner confirms retention
             - { name: STATEMENT_TIMEOUT_SECONDS, value: "600" }
           resources:
             requests: { cpu: 50m, memory: 128Mi }
