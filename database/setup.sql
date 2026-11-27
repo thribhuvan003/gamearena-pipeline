@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS error_events (
     -- payload.phase and payload.stage: where in connecting the app says it was.
     phase STRING NULL,
     stage STRING NULL,
+    -- payload.state on state-change events (e.g. failed on webrtc.connection.state); NULL when the event has none.
+    state STRING NULL,
     -- The event's free-text message; the dashboard hides addresses, links, IDs and tokens in it before showing it.
     message STRING NULL,
     -- payload.reason, else payload.errorText.
@@ -122,6 +124,7 @@ ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS access STRING NULL;
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS gathered BOOL NULL;
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS decoded BOOL NULL;
 ALTER TABLE connection_tags ADD COLUMN IF NOT EXISTS logged STRING NULL;
+ALTER TABLE error_events ADD COLUMN IF NOT EXISTS state STRING NULL;
 ALTER TABLE pipeline_runs ADD COLUMN IF NOT EXISTS full_rebuild BOOL NOT NULL DEFAULT false;
 
 -- The dashboard filters clients by their first event's day: this index lets a date range read only its own clients.

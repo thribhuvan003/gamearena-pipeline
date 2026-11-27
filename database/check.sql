@@ -227,4 +227,6 @@ SELECT
     (SELECT count(*) FROM session_facts f
      WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = f.session_id)) AS stale_facts,
     (SELECT count(*) FROM error_events x
-     WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.id = x.id)) AS stale_errors;
+     WHERE NOT EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.id = x.id)) AS stale_errors,
+    (SELECT count(*) FROM error_events x JOIN session_telemetry_events e ON e.id = x.id
+     WHERE x.state IS DISTINCT FROM e.payload->>'state') AS error_states_wrong;

@@ -3,14 +3,12 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { connection } from "next/server";
-import ClientErrors from "@/components/overview/ClientErrors";
+import ClientConnectionErrors from "@/components/overview/ClientConnectionErrors";
 import ClientLabels from "@/components/overview/ClientLabels";
-import ClientReasons from "@/components/overview/ClientReasons";
 import ConnectionTrend from "@/components/trends/ConnectionTrend";
 import DateFilter from "@/components/header/DateFilter";
-import NoClientErrors from "@/components/overview/NoClientErrors";
 import SearchBox from "@/components/header/SearchBox";
-import SessionReasons from "@/components/overview/SessionReasons";
+import SessionFailures from "@/components/overview/SessionFailures";
 import Sheet from "@/components/sheet/Sheet";
 import SignOut from "@/components/auth/SignOut";
 import SummaryCards from "@/components/overview/SummaryCards";
@@ -59,15 +57,9 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
         </div>
       </header>
       <SummaryCards range={range} unit="sessions" />
-      <div className="card-grid">
-        <SessionReasons range={range} sheet={sheet} />
-        <NoClientErrors range={range} />
-      </div>
+      <SessionFailures range={range} />
       <SummaryCards range={range} unit="clients" />
-      <div className="card-grid">
-        <ClientReasons range={range} sheet={sheet} />
-        <ClientErrors range={range} />
-      </div>
+      <ClientConnectionErrors range={range} />
       <div className="card-grid">
         <ClientLabels range={range} title="Clients by device and OS" kinds={["device", "os"]} />
         <ClientLabels range={range} title="Clients by browser and access" kinds={["browser", "access"]} />

@@ -106,10 +106,10 @@ DELETE FROM error_events WHERE session_id = ANY(%(ids)s::UUID[])
 
 # Copy these sessions' error-level events.
 SAVE_ERRORS_SQL = f"""
-UPSERT INTO error_events (id, session_id, connection_id, recorded_at, event, code, error_code, phase, stage, message, detail)
+UPSERT INTO error_events (id, session_id, connection_id, recorded_at, event, code, error_code, phase, stage, state, message, detail)
 SELECT e.id, e.session_id, e.connection_id, e.recorded_at,
        coalesce(e.payload->>'event', e.event_type::STRING),
-       e.payload->>'code', e.payload->>'errorCode', e.payload->>'phase', e.payload->>'stage',
+       e.payload->>'code', e.payload->>'errorCode', e.payload->>'phase', e.payload->>'stage', e.payload->>'state',
        e.message, coalesce(e.payload->>'reason', e.payload->>'errorText')
 FROM {config.EVENTS_TABLE} e
 WHERE e.session_id = ANY(%(ids)s::UUID[]) AND e.level = 'error'

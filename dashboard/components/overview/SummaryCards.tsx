@@ -17,12 +17,11 @@ export default async function SummaryCards({ range, unit }: { range: Range; unit
           <Metric range={range} list="app_sessions" label="Total" value={sessions.app_sessions} />
           <Metric range={range} list="tag_connected" label="Connected" value={sessions.tag_connected} />
           <Metric range={range} list="tag_failed" label="Didn't connect" value={sessions.tag_failed} />
-          <Metric range={range} list="no_outcome" label="No outcome" value={sessions.no_outcome} />
         </div>
-        <p className="hint outcome-split">
-          No outcome: <Link href={link(range, { list: "no_telemetry" })} scroll={false}>{formatNumber(sessions.no_telemetry)} no telemetry</Link>
-          {" · "}<Link href={link(range, { list: "no_end_event" })} scroll={false}>{formatNumber(sessions.no_end_event)} no session_ended yet</Link>
-          {" · "}<Link href={link(range, { list: "tag_no_attempt" })} scroll={false}>{formatNumber(sessions.tag_no_attempt)} no attempt logged</Link>
+        <p className="hint secondary-counts">
+          Neither: <Link href={link(range, { list: "no_telemetry" })} scroll={false}>{formatNumber(sessions.no_telemetry)} without telemetry</Link>
+          {" · "}<Link href={link(range, { list: "no_end_event" })} scroll={false}>{formatNumber(sessions.no_end_event)} no session_ended recorded</Link>
+          {" · "}<Link href={link(range, { list: "tag_no_attempt" })} scroll={false}>{formatNumber(sessions.tag_no_attempt)} no attempt or success recorded</Link>
         </p>
       </section>
     );
@@ -31,14 +30,16 @@ export default async function SummaryCards({ range, unit }: { range: Range; unit
   return (
     <section className="metric-groups" aria-labelledby="clients-title">
       <h2 id="clients-title">Clients</h2>
-      <p className="hint">Didn&apos;t connect = no pipeline.connect.success recorded for the client.</p>
+      <p className="hint">Counted per client connection ID, events up to session_ended. Didn&apos;t connect = it logged app events but no pipeline.connect.success. System events only = no app events in that span.</p>
       <p className="headline-share"><strong>{percent(clients.clients_connected, clients.clients)}%</strong> of tracked client connections connected ({formatNumber(clients.clients_connected)} of {formatNumber(clients.clients)}).</p>
       <div className="metric-strip client-metrics">
-        <Metric range={range} list="clients" label="Total tracked" value={clients.clients} />
+        <Metric range={range} list="clients" label="Tracked" value={clients.clients} />
         <Metric range={range} list="clients_connected" label="Connected" value={clients.clients_connected} />
         <Metric range={range} list="clients_not_connected" label="Didn't connect" value={clients.clients_not_connected} />
-        <Metric range={range} list="clients_unknown" label="Unknown (no app events)" value={clients.clients_unknown} />
       </div>
+      <p className="hint secondary-counts">
+        Neither: <Link href={link(range, { list: "clients_unknown" })} scroll={false}>{formatNumber(clients.clients_unknown)} with system events only</Link>
+      </p>
     </section>
   );
 }

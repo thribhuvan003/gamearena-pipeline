@@ -46,22 +46,18 @@ const TAG_LABELS: Record<string, string> = {
   not_connected: "Didn't connect",
   failed: "Didn't connect",
   no_attempt: "No attempt",
-  unknown: "Unknown (no app events)",
+  unknown: "System events only",
 };
 
 const REASON_LABELS: Record<string, string> = {
   no_video: "Reason undetermined",
-  "no_video:nothing": "Reason undetermined · no warnings or errors logged",
-  "no_video:ice_warning": "Reason undetermined · ice.candidate.error logged",
-  "no_video:warning": "Reason undetermined · other warnings logged",
-  "no_video:error": "Reason undetermined · unclassified error",
   setup_error: "pipeline.connect.failure · phase pre-connect",
   error_while_connecting: "pipeline.connect.failure · phase connecting",
   error_other: "pipeline.connect.failure · other phase",
   video_connection_failed: "webrtc.connection.state → failed",
   network_connection_failed: "ice.connection.state → failed",
   video_decode_error: "media.decode.error",
-  connection_dropped: "pipeline.connection.dropped, no success",
+  connection_dropped: "pipeline.connection.dropped",
   someone_never_joined: "host_connected or client_connected missing",
 };
 
@@ -75,10 +71,6 @@ const REASON_EXPLAINED: Record<string, string> = {
   video_decode_error: "None of the above, but media.decode.error was logged.",
   connection_dropped: "None of the above, but pipeline.connection.dropped was logged.",
   someone_never_joined: "No failure logged, and host_connected or client_connected never arrived.",
-  "no_video:nothing": "No failure rule matched, and none of its own events was a warning or an error.",
-  "no_video:ice_warning": "No failure rule matched; it logged ice.candidate.error, maybe other warnings too.",
-  "no_video:warning": "No failure rule matched; it logged warnings (e.g. ws_error, ws.disconnect, a state that never reached failed), no errors.",
-  "no_video:error": "No failure rule matched, but it logged an error: after session_ended, or one no rule uses.",
 };
 
 export function reasonLabel(reason: string): string {   // A category's screen name, e.g. no_video -> "Reason undetermined"
@@ -111,14 +103,15 @@ const COHORT_EXPLAINED: Record<string, string> = {
   clients_connected: "The app logged pipeline.connect.success for this client.",
   clients_not_connected: "The app logged events for this client, but never pipeline.connect.success.",
   clients_unknown: "Only server (system) events exist for this client; the app logged none.",
-  no_client_error: "Sessions that logged this error with no client ID.",
-  client_error_after: "Clients that logged pipeline.connect.success, and logged this error only after that.",
-  no_client_error_failed: "Sessions that logged this error with no client ID, and didn't connect.",
-  no_client_error_connected: "Sessions that logged this error with no client ID, and still connected.",
-  no_client_error_no_outcome: "Sessions that logged this error with no client ID, with no outcome (no session_ended yet or no attempt).",
+  failed_client_error_only: "Sessions that didn't connect, logged no error without a client ID, but logged errors with one.",
+  failed_no_error: "Sessions that didn't connect and logged no error-level event.",
+  failed_session_errors: "Sessions that didn't connect whose errors with no client ID were exactly these.",
+  client_logged_not_connected: "Clients that didn't connect (no pipeline.connect.success) and logged this error.",
+  client_warning_not_connected: "Clients that didn't connect and had this warning on their own connection.",
+  client_warning_after: "Clients that connected and had this warning on their own connection at or after pipeline.connect.success.",
+  client_error_after: "Clients that logged pipeline.connect.success, and logged this error at or after it (some also before).",
   tag_connected: "Ended sessions in which some client logged pipeline.connect.success.",
-  no_outcome: "App sessions with no connected / didn't connect outcome: no telemetry, no session_ended yet, or no attempt logged.",
-  no_end_event: "It has events, but session_ended was never logged, so it has no outcome yet.",
+  no_end_event: "It has events, but session_ended was never logged, so it has no outcome.",
   tag_no_attempt: "Ended sessions that logged neither pipeline.connect.attempt nor pipeline.connect.success.",
   client_label: "Clients that didn't connect, whose app record has this device, OS, browser or access type.",
 };
@@ -131,10 +124,12 @@ export function cohortExplanation(key: string, arg: string | null): string | nul
 
 // ---------- Event names ----------
 
-export function eventLabel(signature: string): string {   // The event name as logged, with its code: "pipeline.connect.failure 500" -> "pipeline.connect.failure · code 500"
-  const [name, code] = signature.split(" ", 2);
-  if (!code) return name;
-  return `${name} · ${name === "ice.candidate.error" ? "errorCode" : "code"} ${code}`;   // only ice.candidate.error carries errorCode
+export function eventLabel(signature: string): string {   // A logged event as stored: "webrtc.connection.state → failed", "pipeline.connect.failure 500" -> "pipeline.connect.failure · code 500"
+  const [name, ...rest] = signature.split(" ");
+  const state = rest[0] === "→" ? rest[1] : null;
+  const tail = (state ? rest.slice(2) : rest).join(" ");
+  const code = /^\d+$/.test(tail) ? tail : null;   // anything else after the name (e.g. "(no client ID)") is shown as it is
+  return name + (state ? ` → ${state}` : "") + (code ? ` · ${name === "ice.candidate.error" ? "errorCode" : "code"} ${code}` : tail ? ` ${tail}` : "");
 }
 
 export function labelText(arg: string): string {   // A client label list's "kind|value" -> "Browser: Chrome"

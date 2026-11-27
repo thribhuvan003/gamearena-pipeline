@@ -8,8 +8,8 @@ import SheetFrame from "./SheetFrame";
 import { cohortExplanation, eventLabel, labelText, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
 import { isUuid, link, linkString, searchPrefix, type Sheet as SheetState } from "@/lib/links";
 import {
-  COHORTS, getClientPage, getCohortCount, getReasonErrors, getReasonProgress, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
-  type ClientListRow, type Range, type ReasonErrorRow, type SearchRow, type SessionListRow,
+  COHORTS, getClientPage, getCohortCount, getConnectionReasons, getReasonEvents, getReasonProgress, getSessionReasonEvents, getSessionReasons, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
+  type ClientListRow, type Range, type EvidenceRow, type SearchRow, type SessionListRow,
 } from "@/lib/queries";
 
 // What one step puts in the sheet: the dialog's label, the title (full = its hover text), where back goes, and the body.
@@ -64,19 +64,20 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
     : key === "session_reason" || key === "client_reason" ? reasonLabel(arg)
     : key === "client_label" ? labelText(arg)
     : eventLabel(arg);
-  const [total, rows, steps, errors] = await Promise.all([
+  const [total, rows, steps, errors, reasons, clientReasons] = await Promise.all([
     getCohortCount(key, arg, range, prefix),
     cohort.unit === "sessions"
       ? getSessionPage(key, arg, range, page, prefix).then((list) => list.map((row) => sessionRow(row, range, sheet)))
       : getClientPage(key, arg, range, page, prefix).then((list) => list.map((row) => clientRow(row, range, sheet))),
     key === "client_reason" && !prefix ? getReasonProgress(arg!, range) : null,
-    key === "client_reason" && !prefix ? getReasonErrors(arg!, range) : null,
+    key === "client_reason" && !prefix ? getReasonEvents(arg!, range)
+      : key === "session_reason" && !prefix ? getSessionReasonEvents(arg!, range) : null,
+    key === "tag_failed" && !prefix ? getSessionReasons(range) : null,
+    key === "clients_not_connected" && !prefix ? getConnectionReasons(range) : null,
   ]);
   const unit = cohort.unit === "sessions" ? "sessions" : "client connections";
 
-  const title = key === "no_client_error"
-    ? shownArg ?? cohort.title
-    : shownArg === null ? cohort.title : `${cohort.title} · ${shownArg}`;
+  const title = shownArg === null ? cohort.title : `${cohort.title} · ${shownArg}`;
 
   return {
     label: title,
@@ -88,6 +89,36 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
           <div className="stat-sub">{prefix ? "Matching " : ""}{unit}</div>
           {cohortExplanation(key, arg) && <p className="row-meta">{cohortExplanation(key, arg)}</p>}
         </div>
+        {clientReasons && (
+          <div className="sheet-section">
+            <h3>By classification</h3>
+            <p className="hint">One per client connection, the first rule that matched; they add up to {formatNumber(total)}.</p>
+            <div className="list">
+              {clientReasons.map((row) => (
+                <Link key={row.reason} href={link(range, { list: "client_reason", arg: row.reason })} scroll={false} className="list-row">
+                  <span className="row-main">{reasonLabel(row.reason)}</span>
+                  <span className="row-end">{formatNumber(row.clients)}</span>
+                  <span className="chevron" aria-hidden="true">›</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        {reasons && (
+          <div className="sheet-section">
+            <h3>By classification</h3>
+            <p className="hint">One per session, the first rule that matched; they add up to {formatNumber(total)}.</p>
+            <div className="list">
+              {reasons.map((row) => (
+                <Link key={row.reason} href={link(range, { list: "session_reason", arg: row.reason })} scroll={false} className="list-row">
+                  <span className="row-main">{reasonLabel(row.reason)}</span>
+                  <span className="row-end">{formatNumber(row.sessions)}</span>
+                  <span className="chevron" aria-hidden="true">›</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="sheet-section">
           <form className="search sheet-list-filter" action="/" method="get">
             {Object.entries(link(range, { list: key, arg: sheet.arg }).query).map(([name, value]) => (
@@ -103,14 +134,16 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
           {rows.length > 0 ? <div className="list">{rows}</div> : <p className="hint">No {unit} match this list.</p>}
           <Pager page={page} size={PAGE_SIZE} shown={rows.length} total={Number(total)} href={(to) => link(range, { list: key, arg: sheet.arg, filter: prefix, page: to })} />
         </div>
-        {errors && steps && (
-          <details className="sheet-section">
-            <summary>Connection evidence</summary>
-            <p className="row-meta">
-              ice.gathering.complete logged by {formatNumber(steps.gathered)} of {formatNumber(steps.clients)} connections;
-              media.first_decode by {formatNumber(steps.decoded)}.
-            </p>
-            <ReasonErrors errors={errors} />
+        {errors && (
+          <details className="sheet-section" open>
+            <summary>Recorded events</summary>
+            {steps && (
+              <p className="row-meta">
+                ice.gathering.complete logged by {formatNumber(steps.gathered)} of {formatNumber(steps.clients)} connections;
+                media.first_decode by {formatNumber(steps.decoded)}.
+              </p>
+            )}
+            <Evidence rows={errors} unit={cohort.unit === "sessions" ? "sessions" : "clients"} />
           </details>
         )}
       </>
@@ -118,36 +151,27 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   };
 }
 
-function ReasonErrors({ errors }: { errors: ReasonErrorRow[] }) {   // A reason's errors: six shown, the rest behind "Show all"
-  const shown = errors.filter((row) => row.error !== null || row.clients !== "0");
-  return (
-    <div className="sheet-section">
-      <h3>Errors</h3>
-      <p className="hint">A client connection with several errors is counted in each.</p>
-      <div className="list">{shown.slice(0, 6).map(errorRow)}</div>
-      {shown.length > 6 && (
-        <details className="more">
-          <summary>Show all {shown.length}</summary>
-          <div className="list">{shown.slice(6).map(errorRow)}</div>
-        </details>
-      )}
+function Evidence({ rows, unit }: { rows: EvidenceRow[]; unit: "sessions" | "clients" }) {   // Each logged event (as stored: name, state, code) with how many of the list logged it; then those that logged none
+  const shown = rows.filter((row) => row.event !== null || row.count !== "0");
+  const row = (item: EvidenceRow, i: number) => (
+    <div key={i} className={item.level === "warn" ? "list-row muted" : "list-row"}>
+      <div className="row-main">
+        {item.event === null ? (unit === "sessions" ? "No error logged" : "No warning or error logged") : <span className="mono">{eventLabel(item.event)}</span>}
+        {item.level === "warn" && <> <span className="badge badge-warning">warn</span></>}
+      </div>
+      <span className="row-end">{formatNumber(item.count)}</span>
     </div>
   );
-}
-
-function errorRow(row: ReasonErrorRow, i: number) {   // One error of the reason: name in mono (or "No error recorded"), its most common phase and stage, and its client connections. Called by ReasonErrors
   return (
-    <div key={i} className={row.warning ? "list-row muted" : "list-row"}>
-      <div className="row-main">
-        <div>
-          {row.error === null ? "No error recorded" : <span className="mono">{row.error}</span>}
-          {row.warning && <> <span className="badge badge-warning">warning</span></>}
-        </div>
-        {row.error !== null && (
-          <div className="row-meta">mostly phase {row.phase ?? "-"} · stage {row.stage ?? "-"} ({row.top_percent}% of times)</div>
-        )}
-      </div>
-      <span className="row-end">{formatNumber(row.clients)}</span>
+    <div className="sheet-section">
+      <p className="hint">{unit === "sessions" ? "Errors these sessions logged, any client or none" : "Warn and error events these clients logged themselves"}; one {unit === "sessions" ? "session" : "client"} can be under several.</p>
+      <div className="list">{shown.slice(0, 8).map(row)}</div>
+      {shown.length > 8 && (
+        <details className="more">
+          <summary>Show all {shown.length}</summary>
+          <div className="list">{shown.slice(8).map(row)}</div>
+        </details>
+      )}
     </div>
   );
 }

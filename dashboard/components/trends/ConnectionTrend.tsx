@@ -23,7 +23,7 @@ export default async function ConnectionTrend({ range }: { range: Range }) {   /
   return (
     <section className="overview-panel" aria-labelledby="trend-title">
       <h3 id="trend-title">Clients that didn&apos;t connect, per day</h3>
-      <p className="hint">Every series counts by each client&apos;s first event day (UTC), so they line up with the daily totals.</p>
+      <p className="hint">The series are the assigned reasons above, not every logged event; each counts by the client&apos;s first event day (UTC).</p>
       {daily.length === 0 ? <p className="hint">No measured connections in this period.</p> : <TrendChart series={[all, ...reasons]} />}
     </section>
   );

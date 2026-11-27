@@ -565,12 +565,8 @@ details.more > summary::-webkit-details-marker {
   overflow: hidden;
 }
 
-.session-metrics {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.client-metrics {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.session-metrics, .client-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .metric-cell {
@@ -630,9 +626,15 @@ details.more > summary::-webkit-details-marker {
   gap: var(--s2);
 }
 
-.session-error-row {
-  grid-template-columns: minmax(0, 1fr) repeat(3, clamp(52px, 13%, 96px));
+.secondary-counts a {
+  color: inherit;
+  text-decoration: underline;
 }
+
+.warnings-fold {
+  margin-top: var(--s3);
+}
+
 
 .overview-error-row > :first-child {
   overflow-wrap: anywhere;
@@ -671,32 +673,6 @@ details.more > summary::-webkit-details-marker {
 
 .reason-list .list-row:hover {
   background: var(--accent-bg);
-}
-
-/* Reason undetermined: its total, then its parts, set in. */
-.reason-group {
-  margin-top: var(--s3);
-  padding-top: var(--s3);
-  border-top: 1px solid var(--separator);
-}
-
-.reason-group .reason-list {
-  padding-left: var(--s3);
-}
-
-.outcome-split a {
-  color: inherit;
-  text-decoration: underline;
-}
-
-.reason-group > .section-line .row-end {
-  text-align: right;
-}
-
-.reason-group > .section-line small {
-  display: block;
-  font-size: var(--fs-small);
-  color: var(--text-2);
 }
 
 /* The client errors table: the event name in text colour, each number in the accent colour; underline on hover. */
