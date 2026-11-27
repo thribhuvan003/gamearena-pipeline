@@ -111,7 +111,15 @@ const COHORT_EXPLAINED: Record<string, string> = {
   clients: "Client connections that logged events, one row per connection ID.",
   clients_connected: "The app logged pipeline.connect.success for this client.",
   clients_not_connected: "The app logged events for this client, but never pipeline.connect.success.",
-  clients_unknown: "Only server (system) events exist for this client; the app logged none.",
+  clients_unknown: "Only system events were recorded for this client up to session_ended; later events or errors may still exist.",
+  no_outcome: "No connected or failed session tag. Inspect the recorded events separately.",
+  no_outcome_with_errors: "Unclassified sessions with at least one raw error-level event, including events with a client ID.",
+  no_end_event: "Processed telemetry exists, but no session_ended event has been processed.",
+  awaiting_tag: "A session_ended event was processed, but no outcome tag exists.",
+  tag_no_attempt: "No pipeline.connect.attempt or pipeline.connect.success was found up to session_ended.",
+  no_outcome_no_facts: "No processed session facts or tag. Raw events may still be awaiting processing.",
+  session_no_diagnostic: "Failed-tagged sessions with no error- or warn-level event without a client ID. They may have client-specific events.",
+  client_no_diagnostic: "Not-connected tagged clients with no error- or warn-level event under their own connection ID.",
   no_client_error: "Sessions that logged this error with no client ID.",
   client_error: "Clients that logged this error at least once, any outcome.",
   session_end_reason: "App sessions with this end reason in the app's own record.",
@@ -121,6 +129,7 @@ const COHORT_EXPLAINED: Record<string, string> = {
 export function cohortExplanation(key: string, arg: string | null): string | null {   // A list's one-line logic, under its row and at the top of its sheet
   if (key === "session_reason" && arg) return reasonExplanation(arg, "sessions");
   if (key === "client_reason" && arg) return reasonExplanation(arg, "clients");
+  if (key.includes("_recorded_")) return "Distinct records with the exact event, severity, code, state, phase and stage shown. The selected outcome or timing is applied to the same records as the dashboard count.";
   return COHORT_EXPLAINED[key] ?? null;
 }
 

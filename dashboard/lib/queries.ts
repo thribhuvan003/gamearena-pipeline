@@ -58,7 +58,7 @@ export type SessionDetail = {
 type WarningRow = { event: string; connection: string; warning: boolean; events: string; first_at: Date; last_at: Date };
 export type ClientConnectionRow = {
   connection_id: string; connected_at: Date; disconnected_at: Date | null; auth_type: string;
-  device: string; os: string; browser: string; tag: string | null; reason: string | null;
+  device: string; os: string; browser: string; tag: string | null; reason: string | null; recorded_success: boolean; recorded_failure: boolean; has_logged_error: boolean;
 };
 export type TimelineRow = {
   recorded_at: Date; sent_by: string; connection: string; level: string; event: string; category: string | null; phase: string | null;
@@ -470,9 +470,20 @@ export async function getSessionDetail(sessionId: string): Promise<SessionDetail
 export async function getClientConnections(sessionId: string): Promise<ClientConnectionRow[]> {   // A session's client connections in connect order, with their stored device, OS, browser and tag
   return query<ClientConnectionRow>(`
     SELECT c.id AS connection_id, c.connected_at, c.disconnected_at, c.auth_type::STRING AS auth_type,
-           coalesce(t.device, 'Unknown') AS device, coalesce(t.os, 'Unknown') AS os, coalesce(t.browser, 'Unknown') AS browser, t.tag, ${CLIENT_REASON("t")} AS reason
+           coalesce(t.device, 'Unknown') AS device, coalesce(t.os, 'Unknown') AS os, coalesce(t.browser, 'Unknown') AS browser, t.tag, ${CLIENT_REASON("t")} AS reason,
+           coalesce(ev.recorded_success, false) AS recorded_success, coalesce(ev.recorded_failure, false) AS recorded_failure,
+           coalesce(ev.has_logged_error, false) AS has_logged_error
     FROM gamearena_source.session_client_connections c
     LEFT JOIN connection_tags t ON t.connection_id = c.id
+    LEFT JOIN (
+      SELECT e.connection_id,
+             bool_or(${RAW_EVENT} = 'pipeline.connect.success') AS recorded_success,
+             bool_or(${RAW_EVENT} = 'pipeline.connect.failure') AS recorded_failure,
+             bool_or(e.level = 'error') AS has_logged_error
+      FROM session_telemetry_events e
+      WHERE e.session_id = $1 AND e.connection_id IS NOT NULL
+      GROUP BY e.connection_id
+    ) ev ON ev.connection_id = c.id
     WHERE c.session_id = $1
     ORDER BY c.connected_at, c.id`, [sessionId]);
 }

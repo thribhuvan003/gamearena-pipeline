@@ -160,7 +160,7 @@ function sessionRow(row: SessionListRow, range: Range, sheet: SheetState) {   //
       <div className="row-main">
         <div><span className="mono" title={row.session_id}>{shortId(row.session_id)}</span></div>
         <div className="row-meta">
-          {formatTime(row.started_at)} · {row.events === null ? "no telemetry events" : <>{row.tag ? <span>{tagText(row.tag, row.reason)}</span> : row.has_end ? "not tagged yet" : "not classified: no session_ended"} · {formatNumber(row.events)} events</>} · {formatNumber(row.clients)} client connections
+          {formatTime(row.started_at)} · {row.events === null ? "no processed telemetry" : <>{row.tag ? <span>{tagText(row.tag, row.reason)}</span> : row.has_end ? "not tagged yet" : "not classified: no session_ended"} · {formatNumber(row.events)} events</>} · {formatNumber(row.clients)} client connections
           {(!row.tag || row.tag === "no_attempt") && row.has_logged_error && " · error-level event logged"}
           {(!row.tag || row.tag === "no_attempt") && row.first_success && " · pipeline.connect.success recorded"}
           {(!row.tag || row.tag === "no_attempt") && row.last_failure && " · pipeline.connect.failure recorded"}
