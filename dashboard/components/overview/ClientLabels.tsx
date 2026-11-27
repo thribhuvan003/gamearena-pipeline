@@ -7,7 +7,7 @@ import { getClientsByLabel, type ClientLabelRow, type Range } from "@/lib/querie
 
 const KIND_TITLES: Record<ClientLabelRow["kind"], string> = { device: "Device", os: "OS", browser: "Browser", access: "Access type" };
 
-export default async function ClientLabels({ range, title, kinds }: { range: Range; title: string; kinds: ClientLabelRow["kind"][] }) {   // One card with a short list per kind; each row opens its clients
+export default async function ClientLabels({ range, title, kinds }: { range: Range; title: string; kinds: ClientLabelRow["kind"][] }) {   // One card with a short list per kind; a row opens its clients that didn't connect
   const rows = await getClientsByLabel(range);
 
   return (
@@ -18,18 +18,24 @@ export default async function ClientLabels({ range, title, kinds }: { range: Ran
         <div key={kind} className="label-group">
           <h4>{KIND_TITLES[kind]}</h4>
           <ul className="list reason-list">
-            {rows.filter((row) => row.kind === kind).map((row) => (
-              <li key={row.value}>
-                <Link href={link(range, { list: "client_label", arg: `${kind}|${row.value}` })} scroll={false} className="list-row">
+            {rows.filter((row) => row.kind === kind).map((row) => {
+              const body = (
+                <>
                   <span className="row-main">
                     <strong>{row.value}</strong>
                     <span className="row-meta">{formatNumber(row.connected)} connected · {formatNumber(row.not_connected)} didn&apos;t connect ({percent(row.not_connected, row.clients)}%)</span>
                   </span>
                   <span className="row-end"><strong>{formatNumber(row.clients)}</strong></span>
-                  <span className="chevron" aria-hidden="true">›</span>
-                </Link>
-              </li>
-            ))}
+                </>
+              );
+              return (
+                <li key={row.value}>
+                  {Number(row.not_connected) > 0
+                    ? <Link href={link(range, { list: "client_label", arg: `${kind}|${row.value}` })} scroll={false} className="list-row">{body}<span className="chevron" aria-hidden="true">›</span></Link>
+                    : <div className="list-row">{body}</div>}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ))}

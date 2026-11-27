@@ -154,7 +154,7 @@ export const COHORTS = {
   clients_not_connected: { unit: "clients", title: "Clients that didn't connect", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected'` },
   clients_unknown: { unit: "clients", title: "Clients with outcome not recorded (no app events)", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'unknown'` },
   client_reason: { unit: "clients", title: "Clients that didn't connect", arg: true, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected' AND s.reason = $3` },
-  client_label: { unit: "clients", title: "Client connections", arg: true, where: `${STARTED_IN_RANGE} AND ${CLIENT_LABEL} = substring($3 FROM position('|' IN $3) + 1)` },
+  client_label: { unit: "clients", title: "Clients that didn't connect", arg: true, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected' AND ${CLIENT_LABEL} = substring($3 FROM position('|' IN $3) + 1)` },
   client_error: { unit: "clients", title: "Client connections that recorded", arg: true, where: ERROR_ON("e.connection_id = s.connection_id", true) },
 } satisfies Record<string, Cohort>;
 export type CohortKey = keyof typeof COHORTS;

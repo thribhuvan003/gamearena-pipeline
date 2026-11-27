@@ -114,7 +114,7 @@ const COHORT_EXPLAINED: Record<string, string> = {
   no_client_error: "Sessions that logged this error with no client ID.",
   client_error: "Clients that logged this error at least once, any outcome.",
   session_end_reason: "App sessions with this end reason in the app's own record.",
-  client_label: "Client connections whose app record has this device, OS, browser or access type.",
+  client_label: "Clients that didn't connect, whose app record has this device, OS, browser or access type.",
 };
 
 export function cohortExplanation(key: string, arg: string | null): string | null {   // A list's one-line logic, under its row and at the top of its sheet
