@@ -63,6 +63,7 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   const shownArg = arg === null ? null
     : key === "session_reason" || key === "client_reason" ? reasonLabel(arg)
     : key === "client_label" ? labelText(arg)
+    : key === "client_logged_phase" || key === "client_warning_phase" ? `${eventLabel(arg.slice(arg.indexOf("|") + 1))} · phase ${arg.split("|")[0]}`
     : eventLabel(arg);
   const [total, rows, steps, errors, reasons, clientReasons] = await Promise.all([
     getCohortCount(key, arg, range, prefix),
@@ -156,7 +157,7 @@ function Evidence({ rows, unit }: { rows: EvidenceRow[]; unit: "sessions" | "cli
   const row = (item: EvidenceRow, i: number) => (
     <div key={i} className={item.level === "warn" ? "list-row muted" : "list-row"}>
       <div className="row-main">
-        {item.event === null ? (unit === "sessions" ? "No error logged" : "No warning or error logged") : <span className="mono">{eventLabel(item.event)}</span>}
+        {item.event === null ? (unit === "sessions" ? "No error logged" : "No warn/error-level event or ICE candidate warning on this connection ID") : <span className="mono">{eventLabel(item.event)}</span>}
         {item.level === "warn" && <> <span className="badge badge-warning">warn</span></>}
       </div>
       <span className="row-end">{formatNumber(item.count)}</span>

@@ -2,16 +2,30 @@
 
 import { connection } from "next/server";
 import { Pool, type QueryResultRow } from "pg";
+import { readFileSync } from "node:fs";
 import { cache } from "react";
 import { requireDashboardAccess } from "./auth/access";
 
-// One connection pool, with the same settings and defaults as the pipeline.
+// One read-only connection pool; remote connections must verify the server certificate.
+const dbHost = process.env.DB_HOST ?? "127.0.0.1";
+const localDb = ["127.0.0.1", "localhost", "::1"].includes(dbHost);
+const sslMode = process.env.DB_SSLMODE ?? (localDb ? "disable" : "verify-full");
+if (!["disable", "verify-full"].includes(sslMode) || (!localDb && sslMode === "disable")) {
+  throw new Error("Use DB_SSLMODE=verify-full for a remote database.");
+}
 const pool = new Pool({
-  host: process.env.DB_HOST ?? "127.0.0.1",
+  host: dbHost,
   port: Number(process.env.DB_PORT ?? 26257),
   database: process.env.DB_NAME ?? "gamearena_analytics",
   user: process.env.DB_USER ?? "root",
   password: process.env.DB_PASSWORD,
+  ssl: sslMode === "verify-full" ? {
+    rejectUnauthorized: true,
+    ...(process.env.DB_SSLROOTCERT ? { ca: readFileSync(process.env.DB_SSLROOTCERT, "utf8") } : {}),
+  } : false,
+  max: 5,
+  connectionTimeoutMillis: 5000,
+  statement_timeout: 60000,
 });
 
 async function query<Row extends QueryResultRow>(sql: string, params: unknown[] = []): Promise<Row[]> {   // Runs one SELECT after the sign-in check; never cached, so numbers are live
@@ -31,9 +45,9 @@ export type ClientLabelRow = { kind: "device" | "os" | "browser" | "access"; val
 type ClientReasonRow = { reason: string; clients: string; percent: string };
 type SessionReasonRow = { reason: string; sessions: string };
 export type EvidenceRow = { event: string | null; level: string | null; count: string };
-export type WarningCountRow = { event: string; clients: string };
+export type WarningCountRow = { event: string; phase: string | null; clients: string };
 type ReasonProgress = { clients: string; gathered: string; decoded: string };
-export type ErrorRow = { error: string; warning: boolean; clients: string };
+export type ErrorRow = { error: string; phase: string | null; warning: boolean; clients: string };
 export type FailedComboRow = { combo: string; sessions: string };
 export type FailedSessionErrorRow = { error: string; sessions: string; phase: string | null; stage: string | null; detail: string | null };
 type ReasonSeriesRow = { day: string | null; reason: string; clients: string };
@@ -70,6 +84,11 @@ const STARTED_IN_RANGE = IN_RANGE("s.started_at");
 // A raw event's name (alias e); ice.candidate.error counts as a warning, as most clients that hit it still connect.
 const RAW_EVENT = `coalesce(e.payload->>'event', e.event_type::STRING)`;
 const RAW_IS_WARNING = `(${RAW_EVENT} = 'ice.candidate.error')`;
+// NULL in aggregate results means all phases; missing payload phases are a separate group.
+const ERROR_PHASE = `coalesce(nullif(e.phase, ''), '(not recorded)')`;
+const RAW_PHASE = `coalesce(nullif(e.payload->>'phase', ''), '(not recorded)')`;
+const PHASE_ARG = `split_part($3, '|', 1)`;
+const EVENT_ARG = `substring($3 FROM position('|' IN $3) + 1)`;
 
 // The same two for error_events, the pipeline's copy of the error-level events: error + code, e.g. "pipeline.connect.failure 500".
 const ERROR_NAME = `e.event || coalesce(' → ' || e.state, '') || coalesce(' ' || coalesce(e.code, e.error_code), '')`;
@@ -126,8 +145,10 @@ export const COHORTS = {
   clients_unknown: { unit: "clients", title: "Clients with no app events before session_ended", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'unknown'` },
   client_reason: { unit: "clients", title: "Clients that didn't connect", arg: true, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected' AND s.reason = $3` },
   client_label: { unit: "clients", title: "Clients that didn't connect", arg: true, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected' AND ${CLIENT_LABEL} = substring($3 FROM position('|' IN $3) + 1)` },
-  client_logged: { unit: "clients", title: "Clients that logged", arg: true, where: ERROR_ON("e.connection_id = s.connection_id", true) },
+  client_logged: { unit: "clients", title: "Clients that logged", arg: true, where: ERROR_ON("e.session_id = s.session_id AND e.connection_id = s.connection_id", true) },
   client_warning: { unit: "clients", title: "Clients that logged", arg: true, where: WARNING_ON },
+  client_logged_phase: { unit: "clients", title: "Clients that logged", arg: true, where: `EXISTS (SELECT 1 FROM error_events e WHERE e.session_id = s.session_id AND e.connection_id = s.connection_id AND NOT ${IS_WARNING} AND ${ERROR_NAME} = ${EVENT_ARG} AND ${ERROR_PHASE} = ${PHASE_ARG} AND ${IN_RANGE("e.recorded_at")})` },
+  client_warning_phase: { unit: "clients", title: "Clients that logged", arg: true, where: `EXISTS (SELECT 1 FROM session_telemetry_events e WHERE e.session_id = s.session_id AND e.connection_id = s.connection_id AND (e.level = 'warn' OR ${RAW_IS_WARNING}) AND ${RAW_NAME} = ${EVENT_ARG} AND ${RAW_PHASE} = ${PHASE_ARG} AND ${IN_RANGE("e.recorded_at")})` },
 } satisfies Record<string, Cohort>;
 export type CohortKey = keyof typeof COHORTS;
 
@@ -233,12 +254,18 @@ export async function getSessionReasons(range: Range): Promise<SessionReasonRow[
 
 export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {   // Each error clients logged (event, state, code), with the clients that logged it
   return query<ErrorRow>(`
-    SELECT ${ERROR_NAME} AS error, bool_or(${IS_WARNING}) AS warning, count(DISTINCT e.connection_id) AS clients
-    FROM error_events e
-    JOIN connection_tags t ON t.connection_id = e.connection_id
-    WHERE ${IN_RANGE("e.recorded_at")}
-    GROUP BY 1
-    ORDER BY clients DESC, error`, [range.from, range.to]);
+    WITH events AS (
+      SELECT ${ERROR_NAME} AS error, ${ERROR_PHASE} AS phase, ${IS_WARNING} AS warning, e.connection_id
+      FROM error_events e
+      JOIN connection_tags t ON t.session_id = e.session_id AND t.connection_id = e.connection_id
+      WHERE ${IN_RANGE("e.recorded_at")} AND NOT ${IS_WARNING}
+    )
+    SELECT error, NULL::STRING AS phase, bool_or(warning) AS warning, count(DISTINCT connection_id) AS clients
+    FROM events GROUP BY error
+    UNION ALL
+    SELECT error, phase, bool_or(warning), count(DISTINCT connection_id)
+    FROM events GROUP BY error, phase
+    ORDER BY phase NULLS FIRST, clients DESC, error`, [range.from, range.to]);
 }
 
 // cache(): the device and browser cards share one query per page load.
@@ -305,12 +332,18 @@ export async function getFailedSessionErrors(range: Range): Promise<FailedSessio
 
 export async function getWarnings(range: Range): Promise<WarningCountRow[]> {   // Each warning on clients' own connections (warn level, and ice.candidate.error), from the raw events, with the clients that had it
   return query<WarningCountRow>(`
-    SELECT ${RAW_NAME} AS event, count(DISTINCT t.connection_id) AS clients
-    FROM session_telemetry_events e
-    JOIN connection_tags t ON t.session_id = e.session_id AND t.connection_id = e.connection_id
-    WHERE (e.level = 'warn' OR ${RAW_IS_WARNING}) AND ${IN_RANGE("e.recorded_at")}
-    GROUP BY 1
-    ORDER BY clients DESC, 1`, [range.from, range.to]);
+    WITH events AS (
+      SELECT ${RAW_NAME} AS event, ${RAW_PHASE} AS phase, e.connection_id
+      FROM session_telemetry_events e
+      JOIN connection_tags t ON t.session_id = e.session_id AND t.connection_id = e.connection_id
+      WHERE (e.level = 'warn' OR ${RAW_IS_WARNING}) AND ${IN_RANGE("e.recorded_at")}
+    )
+    SELECT event, NULL::STRING AS phase, count(DISTINCT connection_id) AS clients
+    FROM events GROUP BY event
+    UNION ALL
+    SELECT event, phase, count(DISTINCT connection_id)
+    FROM events GROUP BY event, phase
+    ORDER BY phase NULLS FIRST, clients DESC, event`, [range.from, range.to]);
 }
 
 export async function getReasonEvents(reason: string, range: Range): Promise<EvidenceRow[]> {   // A client reason's evidence: each warn or error event the clients logged themselves (state and code included), then those that logged none
@@ -319,14 +352,14 @@ export async function getReasonEvents(reason: string, range: Range): Promise<Evi
       SELECT ${RAW_NAME} AS event, e.level::STRING AS level, count(DISTINCT t.connection_id) AS count
       FROM connection_tags t
       JOIN session_telemetry_events e ON e.session_id = t.session_id AND e.connection_id = t.connection_id
-      WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")} AND e.level IN ('warn', 'error')
+      WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")} AND (e.level IN ('warn', 'error') OR ${RAW_IS_WARNING})
       GROUP BY 1, 2
       UNION ALL
       SELECT NULL::STRING, NULL::STRING, count(*)
       FROM connection_tags t
       WHERE t.tag = 'not_connected' AND t.reason = $3 AND ${IN_RANGE("t.started_at")}
         AND NOT EXISTS (SELECT 1 FROM session_telemetry_events e
-                        WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id AND e.level IN ('warn', 'error'))
+                        WHERE e.session_id = t.session_id AND e.connection_id = t.connection_id AND (e.level IN ('warn', 'error') OR ${RAW_IS_WARNING}))
     ) evidence
     ORDER BY event IS NULL, level = 'warn', count DESC, event`, [range.from, range.to, reason]);
 }

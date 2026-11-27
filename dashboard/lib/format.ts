@@ -107,6 +107,8 @@ const COHORT_EXPLAINED: Record<string, string> = {
   failed_no_error: "Sessions that didn't connect and logged no error-level event.",
   client_logged: "Clients that logged this error.",
   client_warning: "Clients that had this warning on their own connection.",
+  client_logged_phase: "Clients with this exact error and recorded phase on their own connection.",
+  client_warning_phase: "Clients with this exact warning and recorded phase on their own connection.",
   failed_session_errors: "Sessions that didn't connect whose errors with no client ID were exactly these.",
   tag_connected: "Ended sessions in which some client logged pipeline.connect.success.",
   no_end_event: "It has events, but session_ended was never logged, so it has no outcome.",

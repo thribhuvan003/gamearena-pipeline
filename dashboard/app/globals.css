@@ -690,6 +690,17 @@ details.more > summary::-webkit-details-marker {
   text-decoration: underline;
 }
 
+.client-error-phases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s4);
+  padding-bottom: var(--s2);
+  font-size: var(--fs-small);
+}
+.client-error-phases a {
+  color: var(--accent);
+}
+
 .reason-list small {
   display: block;
   font-size: var(--fs-small);

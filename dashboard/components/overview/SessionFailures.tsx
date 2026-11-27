@@ -19,7 +19,7 @@ export default async function SessionFailures({ range }: { range: Range }) {   /
       };
     }),
     { key: "client", to: { list: "failed_client_error_only" as const, arg: undefined }, count: counts.failed_client_error_only, label: "Errors only with a client ID (see Clients)", meta: "" },
-    { key: "none", to: { list: "failed_no_error" as const, arg: undefined }, count: counts.failed_no_error, label: "No error logged", meta: "" },
+    { key: "none", to: { list: "failed_no_error" as const, arg: undefined }, count: counts.failed_no_error, label: "No error-level event logged", meta: "" },
   ];
 
   return (

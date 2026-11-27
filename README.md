@@ -99,7 +99,7 @@ Local defaults:
 | `REBUILD_HOURS` | `24` |
 | `PRUNE_EXPIRED_TELEMETRY` | `0` (enable only after owner confirms retention) |
 
-The Python pipeline reads environment variables from the shell. Dashboard database settings (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) can be set in `dashboard/.env.local`. The dashboard SQL currently assumes the local source table names. Use separate restricted credentials for production; see the deployment guide.
+The Python pipeline reads environment variables from the shell. Dashboard database settings (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSLMODE`, `DB_SSLROOTCERT`) can be set in `dashboard/.env.local`. Non-local hosts require verified TLS; for a secure cluster set `DB_SSLMODE=verify-full` and the CA path as `DB_SSLROOTCERT`. The dashboard SQL currently assumes the local source table names. Use separate restricted credentials for production; see the deployment guide.
 
 ## Authentication
 
