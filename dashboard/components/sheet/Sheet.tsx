@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import Pager from "./Pager";
 import SessionView from "./SessionView";
 import SheetFrame from "./SheetFrame";
-import { cohortExplanation, eventLabel, labelText, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
+import { cohortExplanation, eventLabel, recordedEventLabel, labelText, formatNumber, formatSeconds, formatTime, reasonLabel, shortId, tagText } from "@/lib/format";
 import { isUuid, link, linkString, searchPrefix, type Sheet as SheetState } from "@/lib/links";
 import {
   COHORTS, getClientPage, getCohortCount, getReasonErrors, getReasonProgress, getSessionPage, isCohortKey, PAGE_SIZE, searchIds,
@@ -64,6 +64,7 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
     : key === "session_reason" || key === "client_reason" ? reasonLabel(arg)
     : key === "session_end_reason" ? (arg === "(none)" ? "No end reason recorded" : arg)
     : key === "client_label" ? labelText(arg)
+    : key.includes("_recorded_") ? recordedEventLabel(arg)
     : eventLabel(arg);
   const [total, rows, steps, errors] = await Promise.all([
     getCohortCount(key, arg, range, prefix),
@@ -159,7 +160,10 @@ function sessionRow(row: SessionListRow, range: Range, sheet: SheetState) {   //
       <div className="row-main">
         <div><span className="mono" title={row.session_id}>{shortId(row.session_id)}</span></div>
         <div className="row-meta">
-          {formatTime(row.started_at)} · {row.events === null ? "no telemetry events" : <>{row.tag ? <span>{tagText(row.tag, row.reason)}</span> : row.has_end ? "not tagged yet" : "outcome unavailable: no session end event"} · {formatNumber(row.events)} events</>} · {formatNumber(row.clients)} client connections
+          {formatTime(row.started_at)} · {row.events === null ? "no telemetry events" : <>{row.tag ? <span>{tagText(row.tag, row.reason)}</span> : row.has_end ? "not tagged yet" : "not classified: no session_ended"} · {formatNumber(row.events)} events</>} · {formatNumber(row.clients)} client connections
+          {(!row.tag || row.tag === "no_attempt") && row.has_logged_error && " · error-level event logged"}
+          {(!row.tag || row.tag === "no_attempt") && row.first_success && " · pipeline.connect.success recorded"}
+          {(!row.tag || row.tag === "no_attempt") && row.last_failure && " · pipeline.connect.failure recorded"}
         </div>
       </div>
       <span className="chevron">›</span>

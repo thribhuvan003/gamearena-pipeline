@@ -99,10 +99,14 @@ function outcome(session: SessionDetail): Headline {   // The session's outcome 
   if (session.reason && PHASE_REASONS.includes(session.reason) && session.failure_no_client) {
     return { title: tagText(session.tag!, null), note: `${reasonLabel(session.reason)} · from an error logged with no client ID; each client below shows its own evidence.`, status: session.tag! };
   }
-  if (session.tag) return { title: tagText(session.tag, null), note: session.reason ? reasonLabel(session.reason) : undefined, status: session.tag };
-  if (Number(session.events) === 0) return { title: "Session outcome unavailable", note: "No telemetry was recorded." };
-  return {
-    title: "Session outcome unavailable",
-    note: session.has_end_event ? "Telemetry has yet to be tagged." : "No session end event was recorded.",
-  };
+  if (session.tag === "failed") return { title: tagText(session.tag, null), note: session.reason ? reasonLabel(session.reason) : undefined, status: session.tag };
+  if (Number(session.events) === 0) return { title: "No telemetry recorded" };
+  const why = session.tag === "no_attempt" ? "No attempt or success up to session_ended." : session.has_end_event ? "Telemetry has yet to be tagged." : "No session_ended recorded.";
+  const evidence = [
+    session.recorded_success && "pipeline.connect.success recorded",
+    session.recorded_failure && "pipeline.connect.failure recorded",
+    Number(session.error_events) > 0 && `${formatNumber(session.error_events)} errors`,
+    Number(session.warn_events) > 0 && `${formatNumber(session.warn_events)} warnings`,
+  ].filter(Boolean).join(" · ");
+  return { title: "Session not classified", note: [why, evidence].filter(Boolean).join(" ") };
 }

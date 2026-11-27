@@ -11,12 +11,21 @@ export default async function SummaryCards({ range, unit }: { range: Range; unit
     return (
       <section className="metric-groups" aria-labelledby="sessions-title">
         <h2 id="sessions-title">Sessions</h2>
-        <p className="headline-share"><strong>{percent(sessions.with_telemetry, sessions.app_sessions)}%</strong> of app sessions have telemetry ({formatNumber(sessions.with_telemetry)} of {formatNumber(sessions.app_sessions)}).</p>
-        <div className="metric-strip session-metrics">
+        <p className="hint">Outcome tags use events up to session_ended: pipeline.connect.success, or an attempt without success.</p>
+        <p className="headline-share"><strong>{percent(sessions.with_telemetry, sessions.app_sessions)}%</strong> of app sessions have processed telemetry ({formatNumber(sessions.with_telemetry)} of {formatNumber(sessions.app_sessions)}).</p>
+        <div className="metric-strip client-metrics">
           <Metric range={range} list="app_sessions" label="Total" value={sessions.app_sessions} />
-          <Metric range={range} list="with_telemetry" label="With event logs" value={sessions.with_telemetry} />
-          <Metric range={range} list="no_telemetry" label="Without event logs" value={sessions.no_telemetry} />
+          <Metric range={range} list="tag_connected" label="Connected" value={sessions.tag_connected} />
+          <Metric range={range} list="tag_failed" label="Didn't connect" value={sessions.tag_failed} />
+          <Metric range={range} list="no_outcome" label="Not classified" value={sessions.no_outcome} />
         </div>
+        <p className="hint">
+          Not classified: <Link href={link(range, { list: "no_outcome_no_facts" })}>{formatNumber(sessions.no_outcome_no_facts)} no processed telemetry</Link>
+          {" · "}<Link href={link(range, { list: "no_end_event" })}>{formatNumber(sessions.no_end_event)} no session_ended</Link>
+          {" · "}<Link href={link(range, { list: "tag_no_attempt" })}>{formatNumber(sessions.tag_no_attempt)} no attempt or success logged</Link>
+          {Number(sessions.awaiting_tag) > 0 && <>{" · "}<Link href={link(range, { list: "awaiting_tag" })}>{formatNumber(sessions.awaiting_tag)} awaiting tag</Link></>}
+        </p>
+        {Number(sessions.no_outcome_with_errors) > 0 && <p className="hint"><Link href={link(range, { list: "no_outcome_with_errors" })}>{formatNumber(sessions.no_outcome_with_errors)} unclassified sessions logged error-level events</Link>. This is a subset of Not classified, not an extra outcome.</p>}
       </section>
     );
   }
@@ -24,13 +33,13 @@ export default async function SummaryCards({ range, unit }: { range: Range; unit
   return (
     <section className="metric-groups" aria-labelledby="clients-title">
       <h2 id="clients-title">Clients</h2>
-      <p className="hint">Didn&apos;t connect = no pipeline.connect.success recorded for the client.</p>
+      <p className="hint">Didn&apos;t connect = app events exist, but no pipeline.connect.success was recorded before session_ended. Unknown = system events only in that interval.</p>
       <p className="headline-share"><strong>{percent(clients.clients_connected, clients.clients)}%</strong> of tracked client connections connected ({formatNumber(clients.clients_connected)} of {formatNumber(clients.clients)}).</p>
       <div className="metric-strip client-metrics">
         <Metric range={range} list="clients" label="Total tracked" value={clients.clients} />
         <Metric range={range} list="clients_connected" label="Connected" value={clients.clients_connected} />
         <Metric range={range} list="clients_not_connected" label="Didn't connect" value={clients.clients_not_connected} />
-        <Metric range={range} list="clients_unknown" label="Outcome not recorded" value={clients.clients_unknown} />
+        <Metric range={range} list="clients_unknown" label="Unknown (no app events)" value={clients.clients_unknown} />
       </div>
     </section>
   );
