@@ -1,7 +1,7 @@
 // ClientLabels.tsx: tagged clients by device, OS, browser or access type from their app record, with how many connected or didn't.
 
 import Link from "next/link";
-import { formatNumber } from "@/lib/format";
+import { formatNumber, percent } from "@/lib/format";
 import { link } from "@/lib/links";
 import { getClientsByLabel, type ClientLabelRow, type Range } from "@/lib/queries";
 
@@ -23,7 +23,7 @@ export default async function ClientLabels({ range, title, kinds }: { range: Ran
                 <Link href={link(range, { list: "client_label", arg: `${kind}|${row.value}` })} scroll={false} className="list-row">
                   <span className="row-main">
                     <strong>{row.value}</strong>
-                    <span className="row-meta">{formatNumber(row.connected)} connected · {formatNumber(row.not_connected)} didn&apos;t connect</span>
+                    <span className="row-meta">{formatNumber(row.connected)} connected · {formatNumber(row.not_connected)} didn&apos;t connect ({percent(row.not_connected, row.clients)}%)</span>
                   </span>
                   <span className="row-end"><strong>{formatNumber(row.clients)}</strong></span>
                   <span className="chevron" aria-hidden="true">›</span>
