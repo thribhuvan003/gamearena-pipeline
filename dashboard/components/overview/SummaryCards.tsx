@@ -11,12 +11,19 @@ export default async function SummaryCards({ range, unit }: { range: Range; unit
     return (
       <section className="metric-groups" aria-labelledby="sessions-title">
         <h2 id="sessions-title">Sessions</h2>
+        <p className="hint">Connected = a client in it logged pipeline.connect.success; didn&apos;t connect = an attempt logged, no success.</p>
         <p className="headline-share"><strong>{percent(sessions.with_telemetry, sessions.app_sessions)}%</strong> of app sessions have telemetry ({formatNumber(sessions.with_telemetry)} of {formatNumber(sessions.app_sessions)}).</p>
         <div className="metric-strip session-metrics">
           <Metric range={range} list="app_sessions" label="Total" value={sessions.app_sessions} />
-          <Metric range={range} list="with_telemetry" label="With event logs" value={sessions.with_telemetry} />
-          <Metric range={range} list="no_telemetry" label="Without event logs" value={sessions.no_telemetry} />
+          <Metric range={range} list="tag_connected" label="Connected" value={sessions.tag_connected} />
+          <Metric range={range} list="tag_failed" label="Didn't connect" value={sessions.tag_failed} />
+          <Metric range={range} list="no_outcome" label="No outcome" value={sessions.no_outcome} />
         </div>
+        <p className="hint outcome-split">
+          No outcome: <Link href={link(range, { list: "no_telemetry" })} scroll={false}>{formatNumber(sessions.no_telemetry)} no telemetry</Link>
+          {" · "}<Link href={link(range, { list: "no_end_event" })} scroll={false}>{formatNumber(sessions.no_end_event)} no session_ended yet</Link>
+          {" · "}<Link href={link(range, { list: "tag_no_attempt" })} scroll={false}>{formatNumber(sessions.tag_no_attempt)} no attempt logged</Link>
+        </p>
       </section>
     );
   }
@@ -30,7 +37,7 @@ export default async function SummaryCards({ range, unit }: { range: Range; unit
         <Metric range={range} list="clients" label="Total tracked" value={clients.clients} />
         <Metric range={range} list="clients_connected" label="Connected" value={clients.clients_connected} />
         <Metric range={range} list="clients_not_connected" label="Didn't connect" value={clients.clients_not_connected} />
-        <Metric range={range} list="clients_unknown" label="Outcome not recorded" value={clients.clients_unknown} />
+        <Metric range={range} list="clients_unknown" label="Unknown (no app events)" value={clients.clients_unknown} />
       </div>
     </section>
   );

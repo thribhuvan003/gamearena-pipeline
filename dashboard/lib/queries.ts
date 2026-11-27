@@ -27,7 +27,6 @@ async function query<Row extends QueryResultRow>(sql: string, params: unknown[] 
 export type Range = { from: string | null; to: string | null };
 
 type DailyConnectionRow = { day: string; clients: string; not_connected: string };
-type EndReasonRow = { end_reason: string; sessions: string; connected: string; not_connected: string; no_outcome: string };
 export type ClientLabelRow = { kind: "device" | "os" | "browser" | "access"; value: string; clients: string; connected: string; not_connected: string };
 type ClientReasonRow = { reason: string; clients: string; percent: string };
 type SessionReasonRow = { reason: string; sessions: string };
@@ -37,9 +36,8 @@ export type ErrorRow = {
   error: string; warning: boolean; events: string; clients: string; not_tagged_clients: string; not_connected_clients: string; connected_clients: string;
   error_then_connected: string; connected_then_error: string; not_connected_percent: string | null;
 };
-export type NoClientErrorRow = { error: string; events: string; sessions: string; phase: string | null; stage: string | null; detail: string | null };
-type ErrorSeriesRow = { day: string | null; series: string; warning: boolean; clients: string };
-export type ErrorDetailRow = { error: string; field: "clients" | "message" | "phase" | "stage" | "text"; value: string | null; events: string };
+export type NoClientErrorRow = { error: string; events: string; sessions: string; not_connected: string; connected: string; no_outcome: string; phase: string | null; stage: string | null; detail: string | null };
+type ReasonSeriesRow = { day: string | null; reason: string; clients: string };
 export type SessionListRow = { session_id: string; started_at: Date; ended_at: Date | null; events: string | null; has_end: boolean; tag: string | null; reason: string | null; clients: string };
 export type ClientListRow = {
   connection_id: string; session_id: string; started_at: Date; tag: string; reason: string | null;
@@ -67,7 +65,7 @@ export type TimelineRow = {
 
 // The date filter: $1 = first day, $2 = last day (included); each is skipped when null.
 const IN_RANGE = (column: string) =>
-  `($1::DATE IS NULL OR ${column} >= $1::DATE::TIMESTAMPTZ) AND ($2::DATE IS NULL OR ${column} < ($2::DATE + 1)::TIMESTAMPTZ)`;
+  `($1::DATE IS NULL OR ${column} >= ($1::DATE::TIMESTAMP AT TIME ZONE 'UTC')) AND ($2::DATE IS NULL OR ${column} < (($2::DATE + 1)::TIMESTAMP AT TIME ZONE 'UTC'))`;
 const STARTED_IN_RANGE = IN_RANGE("s.started_at");
 
 // A raw event's name (alias e); ice.candidate.error counts as a warning, as most clients that hit it still connect.
@@ -88,7 +86,7 @@ const SESSIONS = `(
   LEFT JOIN session_tags t ON t.session_id = h.id) s`;
 
 // Every tagged client connection, as alias s.
-const CLIENTS = `(SELECT connection_id, session_id, started_at, tag, reason, device, os, browser, access, gathered, decoded, logged FROM connection_tags) s`;
+const CLIENTS = `(SELECT connection_id, session_id, started_at, connected_at, tag, reason, device, os, browser, access, gathered, decoded, logged FROM connection_tags) s`;
 
 // A client's reason as the dashboard shows it: no_video is split by what the client logged, e.g. no_video:ice_warning.
 const CLIENT_REASON = (t: string) => `CASE WHEN ${t}.reason = 'no_video' THEN 'no_video:' || coalesce(${t}.logged, 'nothing') ELSE ${t}.reason END`;
@@ -110,18 +108,27 @@ export const COHORTS = {
   app_sessions: { unit: "sessions", title: "App sessions", arg: false, where: STARTED_IN_RANGE },
   with_telemetry: { unit: "sessions", title: "App sessions with telemetry events", arg: false, where: `${STARTED_IN_RANGE} AND s.events IS NOT NULL` },
   no_telemetry: { unit: "sessions", title: "App sessions with no telemetry events", arg: false, where: `${STARTED_IN_RANGE} AND s.events IS NULL` },
+  tag_connected: { unit: "sessions", title: "Sessions that connected", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'connected'` },
   tag_failed: { unit: "sessions", title: "Sessions that didn't connect", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'failed'` },
+  no_outcome: { unit: "sessions", title: "App sessions with no outcome", arg: false, where: `${STARTED_IN_RANGE} AND (s.tag IS NULL OR s.tag NOT IN ('connected', 'failed'))` },
+  no_end_event: { unit: "sessions", title: "Sessions with events but no session_ended yet", arg: false, where: `${STARTED_IN_RANGE} AND s.events IS NOT NULL AND NOT s.has_end` },
+  tag_no_attempt: { unit: "sessions", title: "Ended sessions with no connection attempt logged", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'no_attempt'` },
   session_reason: { unit: "sessions", title: "Sessions that didn't connect", arg: true, where: `${STARTED_IN_RANGE} AND s.tag = 'failed' AND s.reason = $3` },
-  session_end_reason: { unit: "sessions", title: "App sessions by end reason", arg: true, where: `${STARTED_IN_RANGE} AND coalesce(s.end_reason, '(none)') = $3` },
-  failed_other: { unit: "sessions", title: "Sessions that didn't connect, other reasons", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'failed' AND s.reason NOT IN ('setup_error', 'someone_never_joined')` },
   no_client_error: { unit: "sessions", title: "Sessions with an error that names no client", arg: true, where: ERROR_ON("e.session_id = s.session_id", false) },
+  no_client_error_failed: { unit: "sessions", title: "Sessions that didn't connect and logged", arg: true, where: `${ERROR_ON("e.session_id = s.session_id", false)} AND s.tag = 'failed'` },
+  no_client_error_connected: { unit: "sessions", title: "Sessions that connected and logged", arg: true, where: `${ERROR_ON("e.session_id = s.session_id", false)} AND s.tag = 'connected'` },
+  no_client_error_no_outcome: { unit: "sessions", title: "Sessions with no outcome that logged", arg: true, where: `${ERROR_ON("e.session_id = s.session_id", false)} AND (s.tag IS NULL OR s.tag NOT IN ('connected', 'failed'))` },
   clients: { unit: "clients", title: "Client connections with telemetry", arg: false, where: STARTED_IN_RANGE },
   clients_connected: { unit: "clients", title: "Clients that connected", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'connected'` },
   clients_not_connected: { unit: "clients", title: "Clients that didn't connect", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected'` },
   clients_unknown: { unit: "clients", title: "Clients with outcome not recorded (no app events)", arg: false, where: `${STARTED_IN_RANGE} AND s.tag = 'unknown'` },
   client_reason: { unit: "clients", title: "Clients that didn't connect", arg: true, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected' AND ${CLIENT_REASON("s")} = $3` },
   client_label: { unit: "clients", title: "Clients that didn't connect", arg: true, where: `${STARTED_IN_RANGE} AND s.tag = 'not_connected' AND ${CLIENT_LABEL} = substring($3 FROM position('|' IN $3) + 1)` },
-  client_error: { unit: "clients", title: "Client connections that recorded", arg: true, where: ERROR_ON("e.connection_id = s.connection_id", true) },
+  client_error_after: {
+    unit: "clients", title: "Clients that connected, then logged", arg: true,
+    where: `${ERROR_ON("e.connection_id = s.connection_id", true)} AND s.tag = 'connected'
+            AND NOT EXISTS (SELECT 1 FROM error_events e WHERE e.connection_id = s.connection_id AND ${ERROR_NAME} = $3 AND ${IN_RANGE("e.recorded_at")} AND e.recorded_at < s.connected_at)`,
+  },
 } satisfies Record<string, Cohort>;
 export type CohortKey = keyof typeof COHORTS;
 
@@ -129,7 +136,7 @@ export function isCohortKey(value: string): value is CohortKey {   // True for a
   return Object.hasOwn(COHORTS, value);
 }
 
-const SESSION_COUNTS = ["app_sessions", "with_telemetry", "no_telemetry", "tag_failed", "failed_other"] as const;
+const SESSION_COUNTS = ["app_sessions", "with_telemetry", "no_telemetry", "tag_connected", "tag_failed", "no_outcome", "no_end_event", "tag_no_attempt"] as const;
 const CLIENT_COUNTS = ["clients", "clients_connected", "clients_not_connected", "clients_unknown"] as const;
 
 async function countEach<Key extends CohortKey>(keys: readonly Key[], rows: string, range: Range): Promise<Record<Key, string>> {   // One count per cohort, all in one pass over the same rows
@@ -207,16 +214,20 @@ export async function getDataDays(): Promise<{ first: string | null; last: strin
 
 // ---------- Overview ----------
 
-export async function getNoClientErrors(range: Range): Promise<NoClientErrorRow[]> {   // Errors that name no client: sessions, times logged, and the payload's most common phase, stage and reason
+export async function getNoClientErrors(range: Range): Promise<NoClientErrorRow[]> {   // Errors that name no client: sessions by outcome, times logged, and the payload's most common phase, stage and reason
   return query<NoClientErrorRow>(`
     WITH ev AS (
       SELECT ${ERROR_NAME} AS error, e.session_id, e.phase, e.stage, e.detail
       FROM error_events e
       JOIN gamearena_source.host_sessions h ON h.id = e.session_id
       WHERE e.connection_id IS NULL AND ${IN_RANGE("e.recorded_at")}),
-    per AS (SELECT error, count(*) AS events, count(DISTINCT session_id) AS sessions FROM ev GROUP BY error),
+    per AS (SELECT ev.error, count(*) AS events, count(DISTINCT ev.session_id) AS sessions,
+                   count(DISTINCT CASE WHEN t.tag = 'failed' THEN ev.session_id END) AS not_connected,
+                   count(DISTINCT CASE WHEN t.tag = 'connected' THEN ev.session_id END) AS connected,
+                   count(DISTINCT CASE WHEN t.tag IS NULL OR t.tag NOT IN ('connected', 'failed') THEN ev.session_id END) AS no_outcome
+            FROM ev LEFT JOIN session_tags t ON t.session_id = ev.session_id GROUP BY ev.error),
     top AS (SELECT DISTINCT ON (error) error, phase, stage, detail FROM ev GROUP BY error, phase, stage, detail ORDER BY error, count(*) DESC, phase, stage, detail)
-    SELECT p.error, p.events, p.sessions, top.phase, top.stage, top.detail
+    SELECT p.error, p.events, p.sessions, p.not_connected, p.connected, p.no_outcome, top.phase, top.stage, top.detail
     FROM per p JOIN top ON top.error = p.error
     ORDER BY p.sessions DESC, p.error`, [range.from, range.to]);
 }
@@ -261,17 +272,6 @@ export async function getErrorFrequency(range: Range): Promise<ErrorRow[]> {   /
     ORDER BY warning, not_connected_percent DESC NULLS LAST, not_connected_clients DESC`, [range.from, range.to]);
 }
 
-export async function getSessionsByEndReason(range: Range): Promise<EndReasonRow[]> {   // App sessions per end reason in their own record: connected, didn't connect, no outcome
-  return query<EndReasonRow>(`
-    SELECT coalesce(s.end_reason, '(none)') AS end_reason, count(*) AS sessions,
-           count(*) FILTER (WHERE s.tag = 'connected') AS connected, count(*) FILTER (WHERE s.tag = 'failed') AS not_connected,
-           count(*) FILTER (WHERE s.tag IS NULL OR s.tag NOT IN ('connected', 'failed')) AS no_outcome
-    FROM ${SESSIONS}
-    WHERE ${STARTED_IN_RANGE}
-    GROUP BY 1
-    ORDER BY sessions DESC`, [range.from, range.to]);
-}
-
 // cache(): the device and browser cards share one query per page load.
 export const getClientsByLabel = cache(async (range: Range): Promise<ClientLabelRow[]> => {   // Tagged clients per stored device, OS, browser and access type, with how many connected or didn't
   return query<ClientLabelRow>(`
@@ -295,39 +295,18 @@ export async function getDailyConnections(range: Range): Promise<DailyConnection
     ORDER BY 1`, [range.from, range.to]);
 }
 
-export async function getErrorSeries(range: Range): Promise<ErrorSeriesRow[]> {   // Per day, clients that didn't connect per error: top 5, warnings, rest as "Other"; day NULL = whole range
-  return query<ErrorSeriesRow>(`
-    WITH ev AS (
-      SELECT (e.recorded_at AT TIME ZONE 'UTC')::DATE::STRING AS day, ${ERROR_NAME} AS error, ${IS_WARNING} AS warning, e.connection_id
-      FROM error_events e
-      JOIN connection_tags t ON t.connection_id = e.connection_id
-      WHERE t.tag = 'not_connected' AND ${IN_RANGE("e.recorded_at")}),
-    ranked AS (SELECT error, row_number() OVER (ORDER BY count(DISTINCT connection_id) DESC, error) AS n FROM ev WHERE NOT warning GROUP BY error),
-    named AS (SELECT ev.day, CASE WHEN ev.warning OR r.n <= 5 THEN ev.error ELSE 'Other' END AS series, ev.warning, ev.connection_id
-              FROM ev LEFT JOIN ranked r ON r.error = ev.error)
-    SELECT day, series, bool_or(warning) AS warning, count(DISTINCT connection_id) AS clients FROM named GROUP BY day, series
+export async function getReasonSeries(range: Range): Promise<ReasonSeriesRow[]> {   // Per day (UTC, client's first event, as the daily totals), clients that didn't connect per reason; day NULL = whole range
+  return query<ReasonSeriesRow>(`
+    SELECT (s.started_at AT TIME ZONE 'UTC')::DATE::STRING AS day, s.reason, count(*) AS clients
+    FROM ${CLIENTS}
+    WHERE ${COHORTS.clients_not_connected.where}
+    GROUP BY 1, 2
     UNION ALL
-    SELECT NULL, series, bool_or(warning), count(DISTINCT connection_id) FROM named GROUP BY series
+    SELECT NULL::STRING, s.reason, count(*)
+    FROM ${CLIENTS}
+    WHERE ${COHORTS.clients_not_connected.where}
+    GROUP BY 2
     ORDER BY 1, 2`, [range.from, range.to]);
-}
-
-export async function getErrorDetails(range: Range): Promise<ErrorDetailRow[]> {   // Per chart error: clients hit, and each message, phase, stage and text the app logged, with counts
-  return query<ErrorDetailRow>(`
-    WITH errs AS (
-      SELECT ${ERROR_NAME} AS error, e.connection_id, e.message, e.phase, e.stage, e.detail AS text
-      FROM error_events e
-      JOIN connection_tags t ON t.connection_id = e.connection_id
-      WHERE t.tag = 'not_connected' AND ${IN_RANGE("e.recorded_at")})
-    SELECT error, 'clients' AS field, NULL::STRING AS value, count(DISTINCT connection_id) AS events FROM errs GROUP BY error
-    UNION ALL
-    SELECT error, 'message', message, count(*) FROM errs WHERE message IS NOT NULL GROUP BY error, message
-    UNION ALL
-    SELECT error, 'phase', phase, count(*) FROM errs GROUP BY error, phase
-    UNION ALL
-    SELECT error, 'stage', stage, count(*) FROM errs GROUP BY error, stage
-    UNION ALL
-    SELECT error, 'text', text, count(*) FROM errs WHERE text IS NOT NULL GROUP BY error, text
-    ORDER BY error, field, events DESC`, [range.from, range.to]);
 }
 
 // ---------- Sheet: inside one reason ----------

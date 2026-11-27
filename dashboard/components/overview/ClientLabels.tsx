@@ -24,7 +24,7 @@ export default async function ClientLabels({ range, title, kinds }: { range: Ran
                   <>
                     <span className="row-main">
                       <strong>{row.value}</strong>
-                      <span className="row-meta">{formatNumber(row.connected)} connected · {formatNumber(row.not_connected)} didn&apos;t connect ({percent(row.not_connected, row.clients)}%)</span>
+                      <span className="row-meta">{formatNumber(row.connected)} connected · {formatNumber(row.not_connected)} didn&apos;t connect ({percent(row.not_connected, row.clients)}% of all){unknownOf(row) > 0 && ` · ${formatNumber(String(unknownOf(row)))} unknown`}</span>
                     </span>
                     <span className="row-end"><strong>{formatNumber(row.clients)}</strong></span>
                   </>
@@ -43,4 +43,8 @@ export default async function ClientLabels({ range, title, kinds }: { range: Ran
       </div>
     </section>
   );
+}
+
+function unknownOf(row: { clients: string; connected: string; not_connected: string }): number {   // Clients in the row with no outcome (no app events)
+  return Number(row.clients) - Number(row.connected) - Number(row.not_connected);
 }

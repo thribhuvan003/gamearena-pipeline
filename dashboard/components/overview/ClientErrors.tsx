@@ -1,60 +1,42 @@
-// ClientErrors.tsx: each client error with the clients it hit and how many connected or didn't; warnings last.
+// ClientErrors.tsx: clients that connected, then logged an error (stability after connecting). Errors of clients that didn't
+// connect are not repeated here: they are in each reason's list on the left.
 
 import Link from "next/link";
 import { eventLabel, formatNumber } from "@/lib/format";
 import { link } from "@/lib/links";
 import { getErrorFrequency, type ErrorRow, type Range } from "@/lib/queries";
 
-export default async function ClientErrors({ range }: { range: Range }) {   // Lists the five client errors that hit the most clients, the rest and the warnings folded below. Called by the diagnostics view
-  const rows = await getErrorFrequency(range);
-  const errors = rows.filter((row) => !row.warning).sort((a, b) => Number(b.clients) - Number(a.clients));
+export default async function ClientErrors({ range }: { range: Range }) {   // One row per error logged after pipeline.connect.success; each opens exactly those clients
+  const rows = (await getErrorFrequency(range)).filter((row) => Number(row.connected_then_error) > 0);
+  const errors = rows.filter((row) => !row.warning).sort((a, b) => Number(b.connected_then_error) - Number(a.connected_then_error));
   const warnings = rows.filter((row) => row.warning);
 
   return (
     <section className="overview-panel" aria-labelledby="logged-errors-title">
-      <h3 id="logged-errors-title">Errors logged by clients</h3>
-      <p className="hint">Clients that logged each error; a client can be under several.</p>
+      <h3 id="logged-errors-title">Errors after connecting</h3>
+      <p className="hint">Clients that logged pipeline.connect.success, then this error (none of it before). For clients that didn&apos;t connect, open a reason on the left.</p>
       <div className="card-body">
-        {errors.length === 0 && <p className="hint">No client errors recorded.</p>}
-        <div className="diagnostic-list">
-          {errors.slice(0, 5).map((row) => <ClientError key={row.error} row={row} range={range} />)}
-        </div>
-        {errors.length > 5 && (
-          <details className="disclosure nested-disclosure">
-            <summary>More client errors <span className="disclosure-value">{formatNumber(String(errors.length - 5))}</span></summary>
-            <div className="diagnostic-list">{errors.slice(5).map((row) => <ClientError key={row.error} row={row} range={range} />)}</div>
-          </details>
-        )}
-        {warnings.length > 0 && (
-          <details className="disclosure nested-disclosure">
-            <summary>Warnings</summary>
-            <div className="diagnostic-list">{warnings.map((row) => <ClientError key={row.error} row={row} range={range} />)}</div>
-          </details>
+        {rows.length === 0 ? <p className="hint">No errors after connecting in this period.</p> : (
+          <ul className="list reason-list">
+            {[...errors, ...warnings].map((row) => <ErrorLine key={row.error} row={row} range={range} />)}
+          </ul>
         )}
       </div>
     </section>
   );
 }
 
-function ClientError({ row, range }: { row: ErrorRow; range: Range }) {   // One error as a fold: clients hit, how many connected or didn't, and a link to exactly those clients. Called by ClientErrors for each error
-  const unknown = Number(row.clients) - Number(row.connected_clients) - Number(row.not_connected_clients);
-  const stats = [
-    ["Times recorded", formatNumber(row.events)],
-    ["Didn't connect", formatNumber(row.not_connected_clients)],
-    ["Connected, logged it only after", formatNumber(row.connected_then_error)],
-    ["Logged it before connecting (some also after)", formatNumber(row.error_then_connected)],
-    ["Outcome not recorded", formatNumber(String(unknown))],
-    ["Connections without telemetry tags", formatNumber(row.not_tagged_clients)],
-    ["Didn't connect, of known outcomes", row.not_connected_percent === null ? "Unavailable" : `${formatNumber(row.not_connected_clients)} of ${formatNumber(String(Number(row.not_connected_clients) + Number(row.connected_clients)))} (${row.not_connected_percent}%)`],
-  ];
+function ErrorLine({ row, range }: { row: ErrorRow; range: Range }) {   // One error: its name and the clients that connected, then logged it
   return (
-    <details className="disclosure">
-      <summary>{eventLabel(row.error)} <span className="disclosure-value">{formatNumber(row.clients)} clients</span></summary>
-      <div className="disclosure-body">
-        <dl className="compact-facts">{stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-        <p className="id">{row.error}</p>
-        {Number(row.clients) > 0 && <Link href={link(range, { list: "client_error", arg: row.error })} scroll={false}>View connections ›</Link>}
-      </div>
-    </details>
+    <li>
+      <Link href={link(range, { list: "client_error_after", arg: row.error })} scroll={false} className="list-row">
+        <span className="row-main">
+          <strong>{eventLabel(row.error)}</strong>
+          {row.warning && <span className="row-meta">Logged at error level; shown as a warning</span>}
+        </span>
+        <span className="row-end"><strong>{formatNumber(row.connected_then_error)}</strong><small>clients</small></span>
+        <span className="chevron" aria-hidden="true">›</span>
+      </Link>
+    </li>
   );
 }

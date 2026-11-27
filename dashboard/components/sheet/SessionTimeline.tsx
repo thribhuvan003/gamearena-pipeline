@@ -36,7 +36,7 @@ export default async function SessionTimeline({ sessionId, detail, eventPage, pa
               {warnings.length === 0 ? <p className="hint">No warnings recorded.</p> : warnings.map((row) => (
                 <div key={`${row.event}|${row.connection}`} className="evidence-row">
                   <div className="section-line"><strong>{eventLabel(row.event)}</strong><span>{row.connection === "-" ? "Session" : row.connection} · {formatNumber(row.events)}</span></div>
-                  <div className="id">{row.event}{row.warning && " · App logged as an error"}</div>
+                  {row.warning && <div className="id">The app logged it at error level</div>}
                   <div className="row-meta">{formatClock(row.first_at)}{+row.last_at !== +row.first_at && ` → ${formatClock(row.last_at)}`} UTC</div>
                 </div>
               ))}
@@ -55,13 +55,12 @@ export default async function SessionTimeline({ sessionId, detail, eventPage, pa
   );
 }
 
-function eventRow(row: TimelineRow, i: number) {   // One event: its label, client or sender, time, level, raw name and known fields. Called by SessionTimeline for both lists
+function eventRow(row: TimelineRow, i: number) {   // One event: its name, client or sender, time, level and known fields. Called by SessionTimeline for both lists
   const meta = [details(row), message(row)].filter((text) => text !== "-").join(" · ");
   return (
     <div key={i} className="evidence-row">
       <div className="section-line"><strong>{eventLabel(row.event)}</strong><span>{row.connection === "-" ? row.sent_by : row.connection}</span></div>
       <div className="row-meta">{formatClock(row.recorded_at)} UTC · {row.connection !== "-" && `Sent by ${row.sent_by} · `}{row.level}</div>
-      <div className="id">{row.event}</div>
       {meta && <div className="row-meta">{meta}</div>}
     </div>
   );

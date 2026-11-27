@@ -62,7 +62,6 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   const prefix = searchPrefix(sheet.filter) ?? undefined;
   const shownArg = arg === null ? null
     : key === "session_reason" || key === "client_reason" ? reasonLabel(arg)
-    : key === "session_end_reason" ? (arg === "(none)" ? "No end reason recorded" : arg)
     : key === "client_label" ? labelText(arg)
     : eventLabel(arg);
   const [total, rows, steps, errors] = await Promise.all([
@@ -75,7 +74,7 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
   ]);
   const unit = cohort.unit === "sessions" ? "sessions" : "client connections";
 
-  const title = key === "client_error" || key === "no_client_error"
+  const title = key === "no_client_error"
     ? shownArg ?? cohort.title
     : shownArg === null ? cohort.title : `${cohort.title} · ${shownArg}`;
 
@@ -108,8 +107,8 @@ async function listStep(range: Range, sheet: SheetState): Promise<Step> {   // T
           <details className="sheet-section">
             <summary>Connection evidence</summary>
             <p className="row-meta">
-              Network discovery completed for {formatNumber(steps.gathered)} of {formatNumber(steps.clients)} connections.
-              First video frame decoded for {formatNumber(steps.decoded)}.
+              ice.gathering.complete logged by {formatNumber(steps.gathered)} of {formatNumber(steps.clients)} connections;
+              media.first_decode by {formatNumber(steps.decoded)}.
             </p>
             <ReasonErrors errors={errors} />
           </details>
